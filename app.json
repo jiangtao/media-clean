@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "app-cleaner",
-    "slug": "app-cleaner",
+    "name": "误触清理",
+    "slug": "mistap-media-cleaner",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -13,7 +13,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jt.mistapmediacleaner"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,10 +22,32 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.jt.mistapmediacleaner"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "允许误触清理读取你的照片与视频，以便识别疑似误触媒体。",
+          "savePhotosPermission": "允许误触清理在你确认时删除或整理媒体。",
+          "granularPermissions": [
+            "photo",
+            "video"
+          ]
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "cleanup-reminders",
+          "color": "#173944"
+        }
+      ],
+      "expo-video"
+    ]
   }
 }

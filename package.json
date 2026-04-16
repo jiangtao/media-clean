@@ -4,19 +4,50 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit",
+    "export:android": "expo export --platform android",
+    "prebuild:android": "expo prebuild --platform android --clean",
+    "prebuild:ios": "expo prebuild --platform ios --clean",
+    "build:android:debug": "expo run:android --variant debug",
+    "build:android:release": "cd android && ./gradlew assembleRelease",
+    "build:android:clean": "cd android && ./gradlew clean",
+    "build:ios:debug": "expo run:ios --configuration Debug",
+    "build:ios:release": "cd ios && xcodebuild -workspace MistapMediaCleaner.xcworkspace -scheme MistapMediaCleaner -configuration Release -sdk iphoneos build",
+    "build:ios:clean": "cd ios && xcodebuild clean"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-navigation/bottom-tabs": "^7.15.9",
+    "@react-navigation/native": "^7.2.2",
+    "@react-navigation/native-stack": "^7.14.11",
+    "@shopify/flash-list": "^2.3.1",
+    "base64-js": "^1.5.1",
+    "buffer": "^6.0.3",
     "expo": "~54.0.33",
+    "expo-file-system": "~19.0.21",
+    "expo-image": "~3.0.11",
+    "expo-image-manipulator": "~14.0.8",
+    "expo-media-library": "~18.2.1",
+    "expo-notifications": "~0.32.16",
     "expo-status-bar": "~3.0.9",
+    "expo-video": "~3.0.16",
+    "expo-video-thumbnails": "~10.0.8",
+    "jpeg-js": "^0.4.4",
     "react": "19.1.0",
-    "react-native": "0.81.5"
+    "react-native": "0.81.5",
+    "react-native-safe-area-context": "^5.7.0",
+    "react-native-screens": "^4.24.0"
   },
   "devDependencies": {
+    "@types/node": "^25.6.0",
     "@types/react": "~19.1.0",
-    "typescript": "~5.9.2"
+    "react-test-renderer": "^19.1.0",
+    "typescript": "~5.9.2",
+    "vitest": "^4.1.4"
   },
   "private": true
 }

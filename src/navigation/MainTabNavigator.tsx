@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, View } from 'react-native';
 
 import type { MainTabParamList } from './types';
 import { TabBar } from '../ui/components/TabBar';
@@ -11,11 +11,11 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 // Placeholder screens - will be replaced by actual implementations
 function RecycleBinScreen() {
-  return null;
+  return <View style={{ flex: 1, backgroundColor: '#f5f5f5' }} />;
 }
 
 function SettingsScreen() {
-  return null;
+  return <View style={{ flex: 1, backgroundColor: '#f5f5f5' }} />;
 }
 
 export function MainTabNavigator() {

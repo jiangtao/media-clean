@@ -1,3 +1,8 @@
+// Polyfill for React Native 0.81.5 - FormData
+if (typeof global.FormData === 'undefined') {
+  global.FormData = require('form-data');
+}
+
 import { registerRootComponent } from 'expo';
 
 import App from './App';

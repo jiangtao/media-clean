@@ -15,6 +15,7 @@ import {
   translateRiskReason,
 } from '../i18n/app-copy';
 import type { AppThemePalette } from '../theme/app-theme';
+import { buildSizedImageSource } from './components/image-source';
 
 interface CandidateCardProps {
   candidate: CleanupCandidate;
@@ -44,9 +45,11 @@ export function CandidateCard({
     <View style={[styles.card, mode === 'recycle' && styles.recycleCard]}>
       <Pressable onPress={onOpen} style={styles.hero}>
         <Image
-          source={{ uri: candidate.asset.previewUri ?? candidate.asset.uri }}
+          source={buildSizedImageSource(candidate.asset.previewUri ?? candidate.asset.uri, 92, 92)}
           style={styles.thumbnail}
           contentFit="cover"
+          allowDownscaling
+          decodeFormat="rgb"
         />
         <View style={styles.body}>
           <View style={styles.headerRow}>

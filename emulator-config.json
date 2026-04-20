@@ -1,0 +1,467 @@
+{
+  "version": "1.0.0",
+  "description": "Android Emulator Configuration Matrix for Mistap Media Cleaner - 24 devices covering all screen types",
+  "devices": [
+    {
+      "id": "pixel_5",
+      "name": "Pixel 5",
+      "type": "standard",
+      "api": 31,
+      "androidVersion": "12.0",
+      "screen": {
+        "width": 1080,
+        "height": 2340,
+        "density": 420
+      },
+      "ram": "8GB",
+      "abi": "x86_64",
+      "googleApis": true
+    },
+    {
+      "id": "pixel_8",
+      "name": "Pixel 8",
+      "type": "standard",
+      "api": 34,
+      "androidVersion": "14.0",
+      "screen": {
+        "width": 1080,
+        "height": 2400,
+        "density": 420
+      },
+      "ram": "8GB",
+      "abi": "x86_64",
+      "googleApis": true
+    },
+    {
+      "id": "redmi_9a",
+      "name": "Redmi 9A",
+      "type": "standard",
+      "api": 29,
+      "androidVersion": "10.0",
+      "screen": {
+        "width": 720,
+        "height": 1600,
+        "density": 269
+      },
+      "ram": "4GB",
+      "abi": "x86_64",
+      "googleApis": false
+    },
+    {
+      "id": "pixel_7_notch",
+      "name": "Pixel 7 Notch",
+      "type": "notch",
+      "api": 33,
+      "androidVersion": "13.0",
+      "screen": {
+        "width": 1080,
+        "height": 2400,
+        "density": 420
+      },
+      "ram": "8GB",
+      "abi": "x86_64",
+      "googleApis": true,
+      "notch": {
+        "type": "center",
+        "width": 240,
+        "height": 80
+      }
+    },
+    {
+      "id": "huawei_p30",
+      "name": "Huawei P30",
+      "type": "notch",
+      "api": 28,
+      "androidVersion": "9.0",
+      "screen": {
+        "width": 1080,
+        "height": 2340,
+        "density": 420
+      },
+      "ram": "6GB",
+      "abi": "x86",
+      "googleApis": false,
+      "notch": {
+        "type": "center",
+        "width": 280,
+        "height": 90
+      }
+    },
+    {
+      "id": "xiaomi_9",
+      "name": "Xiaomi 9",
+      "type": "notch",
+      "api": 29,
+      "androidVersion": "10.0",
+      "screen": {
+        "width": 1080,
+        "height": 2340,
+        "density": 440
+      },
+      "ram": "6GB",
+      "abi": "x86_64",
+      "googleApis": false,
+      "notch": {
+        "type": "center",
+        "width": 260,
+        "height": 85
+      }
+    },
+    {
+      "id": "oneplus_7",
+      "name": "OnePlus 7",
+      "type": "teardrop",
+      "api": 29,
+      "androidVersion": "10.0",
+      "screen": {
+        "width": 1080,
+        "height": 2400,
+        "density": 402
+      },
+      "ram": "8GB",
+      "abi": "x86_64",
+      "googleApis": false,
+      "notch": {
+        "type": "teardrop",
+        "width": 120,
+        "height": 40
+      }
+    },
+    {
+      "id": "redmi_note_8",
+      "name": "Redmi Note 8",
+      "type": "teardrop",
+      "api": 28,
+      "androidVersion": "9.0",
+      "screen": {
+        "width": 1080,
+        "height": 2340,
+        "density": 409
+      },
+      "ram": "4GB",
+      "abi": "x86",
+      "googleApis": false,
+      "notch": {
+        "type": "teardrop",
+        "width": 130,
+        "height": 45
+      }
+    },
+    {
+      "id": "samsung_s23",
+      "name": "Samsung S23",
+      "type": "hole-punch",
+      "api": 33,
+      "androidVersion": "13.0",
+      "screen": {
+        "width": 1080,
+        "height": 2340,
+        "density": 450
+      },
+      "ram": "8GB",
+      "abi": "x86_64",
+      "googleApis": true,
+      "hole": {
+        "position": "center",
+        "diameter": 32
+      }
+    },
+    {
+      "id": "pixel_8_pro",
+      "name": "Pixel 8 Pro",
+      "type": "hole-punch",
+      "api": 34,
+      "androidVersion": "14.0",
+      "screen": {
+        "width": 1344,
+        "height": 2992,
+        "density": 489
+      },
+      "ram": "12GB",
+      "abi": "x86_64",
+      "googleApis": true,
+      "hole": {
+        "position": "center",
+        "diameter": 30
+      }
+    },
+    {
+      "id": "pixel_6a",
+      "name": "Pixel 6a",
+      "type": "hole-punch",
+      "api": 31,
+      "androidVersion": "12.0",
+      "screen": {
+        "width": 1080,
+        "height": 2400,
+        "density": 429
+      },
+      "ram": "6GB",
+      "abi": "x86_64",
+      "googleApis": true,
+      "hole": {
+        "position": "center",
+        "diameter": 30
+      }
+    },
+    {
+      "id": "samsung_a14",
+      "name": "Samsung A14",
+      "type": "hole-punch",
+      "api": 31,
+      "androidVersion": "12.0",
+      "screen": {
+        "width": 1080,
+        "height": 2408,
+        "density": 400
+      },
+      "ram": "4GB",
+      "abi": "x86_64",
+      "googleApis": true,
+      "hole": {
+        "position": "center",
+        "diameter": 28
+      }
+    },
+    {
+      "id": "samsung_s20",
+      "name": "Samsung S20",
+      "type": "hole-punch-left",
+      "api": 30,
+      "androidVersion": "11.0",
+      "screen": {
+        "width": 1440,
+        "height": 3200,
+        "density": 560
+      },
+      "ram": "12GB",
+      "abi": "x86_64",
+      "googleApis": true,
+      "hole": {
+        "position": "left",
+        "diameter": 30,
+        "offsetX": 40,
+        "offsetY": 40
+      }
+    },
+    {
+      "id": "huawei_mate_40",
+      "name": "Huawei Mate 40",
+      "type": "hole-punch-left",
+      "api": 30,
+      "androidVersion": "11.0",
+      "screen": {
+        "width": 1344,
+        "height": 2772,
+        "density": 456
+      },
+      "ram": "8GB",
+      "abi": "x86_64",
+      "googleApis": false,
+      "hole": {
+        "position": "left",
+        "diameter": 32,
+        "offsetX": 45,
+        "offsetY": 45
+      }
+    },
+    {
+      "id": "pixel_7_pro",
+      "name": "Pixel 7 Pro",
+      "type": "waterfall",
+      "api": 33,
+      "androidVersion": "13.0",
+      "screen": {
+        "width": 1440,
+        "height": 3120,
+        "density": 512
+      },
+      "ram": "12GB",
+      "abi": "x86_64",
+      "googleApis": true,
+      "edge": {
+        "type": "curved",
+        "curve": "waterfall"
+      }
+    },
+    {
+      "id": "samsung_s23_ultra",
+      "name": "Samsung S23 Ultra",
+      "type": "waterfall",
+      "api": 33,
+      "androidVersion": "13.0",
+      "screen": {
+        "width": 1440,
+        "height": 3088,
+        "density": 500
+      },
+      "ram": "12GB",
+      "abi": "x86_64",
+      "googleApis": true,
+      "edge": {
+        "type": "curved",
+        "curve": "waterfall"
+      }
+    },
+    {
+      "id": "oneplus_11",
+      "name": "OnePlus 11",
+      "type": "waterfall",
+      "api": 33,
+      "androidVersion": "13.0",
+      "screen": {
+        "width": 1440,
+        "height": 3216,
+        "density": 525
+      },
+      "ram": "16GB",
+      "abi": "x86_64",
+      "googleApis": false,
+      "edge": {
+        "type": "curved",
+        "curve": "waterfall"
+      }
+    },
+    {
+      "id": "honor_90",
+      "name": "Honor 90",
+      "type": "pill",
+      "api": 33,
+      "androidVersion": "13.0",
+      "screen": {
+        "width": 1200,
+        "height": 2664,
+        "density": 435
+      },
+      "ram": "12GB",
+      "abi": "x86_64",
+      "googleApis": false,
+      "notch": {
+        "type": "pill",
+        "width": 140,
+        "height": 36
+      }
+    },
+    {
+      "id": "pixel_tablet",
+      "name": "Pixel Tablet",
+      "type": "tablet",
+      "api": 33,
+      "androidVersion": "13.0",
+      "screen": {
+        "width": 1600,
+        "height": 2560,
+        "density": 320
+      },
+      "ram": "8GB",
+      "abi": "x86_64",
+      "googleApis": true
+    },
+    {
+      "id": "galaxy_tab_s9",
+      "name": "Galaxy Tab S9",
+      "type": "tablet",
+      "api": 33,
+      "androidVersion": "13.0",
+      "screen": {
+        "width": 1600,
+        "height": 2560,
+        "density": 274
+      },
+      "ram": "8GB",
+      "abi": "x86_64",
+      "googleApis": true
+    },
+    {
+      "id": "galaxy_z_flip5_cover",
+      "name": "Galaxy Z Flip5 Cover",
+      "type": "foldable-cover",
+      "api": 33,
+      "androidVersion": "13.0",
+      "screen": {
+        "width": 720,
+        "height": 748,
+        "density": 301
+      },
+      "ram": "8GB",
+      "abi": "x86_64",
+      "googleApis": true
+    },
+    {
+      "id": "galaxy_z_fold5_cover",
+      "name": "Galaxy Z Fold5 Cover",
+      "type": "foldable-cover",
+      "api": 33,
+      "androidVersion": "13.0",
+      "screen": {
+        "width": 904,
+        "height": 2316,
+        "density": 412
+      },
+      "ram": "12GB",
+      "abi": "x86_64",
+      "googleApis": true
+    },
+    {
+      "id": "galaxy_z_flip5_inner",
+      "name": "Galaxy Z Flip5 Inner",
+      "type": "foldable-inner",
+      "api": 33,
+      "androidVersion": "13.0",
+      "screen": {
+        "width": 1080,
+        "height": 2640,
+        "density": 426
+      },
+      "ram": "8GB",
+      "abi": "x86_64",
+      "googleApis": true,
+      "fold": {
+        "type": "horizontal",
+        "foldPosition": 1320
+      }
+    },
+    {
+      "id": "galaxy_z_fold5_inner",
+      "name": "Galaxy Z Fold5 Inner",
+      "type": "foldable-inner",
+      "api": 33,
+      "androidVersion": "13.0",
+      "screen": {
+        "width": 1812,
+        "height": 2176,
+        "density": 374
+      },
+      "ram": "12GB",
+      "abi": "x86_64",
+      "googleApis": true,
+      "fold": {
+        "type": "vertical",
+        "foldPosition": 904
+      }
+    }
+  ],
+  "summary": {
+    "totalDevices": 24,
+    "byType": {
+      "standard": 3,
+      "notch": 3,
+      "teardrop": 2,
+      "hole-punch": 4,
+      "hole-punch-left": 2,
+      "waterfall": 3,
+      "pill": 1,
+      "tablet": 2,
+      "foldable-cover": 2,
+      "foldable-inner": 2
+    },
+    "byApi": {
+      "28": 2,
+      "29": 3,
+      "30": 2,
+      "31": 3,
+      "33": 11,
+      "34": 3
+    }
+  }
+}

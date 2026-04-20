@@ -18,10 +18,10 @@ import {
 import { applyCleanupAction, createInitialCleanupState } from '../features/cleanup/cleanup-state';
 import type { CleanupAction, CleanupState } from '../features/cleanup/cleanup-state';
 import {
-  DEFAULT_SCAN_LIMIT,
   scanMediaLibrary,
   type ScanSummary,
 } from '../features/scan/scan-media-library';
+import { DEFAULT_SCAN_LIMIT } from '../features/scan/scan-config';
 import { buildRecentScanReminderCopy } from '../features/reminders/reminder-copy';
 import {
   DEFAULT_REMINDER_SUMMARY,

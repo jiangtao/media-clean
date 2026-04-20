@@ -18,6 +18,10 @@ export interface VisualMetrics {
   edgeDensity: number;
 }
 
+export interface MediaComparisonSignals {
+  contentHash?: string | null;
+}
+
 export type CleanupConfidence = 'low' | 'medium' | 'high';
 export type CleanupIssueType = 'accidental' | 'abnormal' | 'duplicate';
 export type CleanupKind =

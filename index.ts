@@ -1,7 +1,11 @@
-// Polyfill for React Native 0.81.5 - FormData
-if (typeof global.FormData === 'undefined') {
-  global.FormData = require('form-data');
-}
+// Entry point for React Native
+// This file must be the first to load to ensure FormData shim is applied before any other modules
+
+import './shims/formdata-shim';
+import './shims/immediate-shim';
+import './shims/websocket-shim';
+import './shims/window-shim';
+import './shims/performance-shim';
 
 import { registerRootComponent } from 'expo';
 

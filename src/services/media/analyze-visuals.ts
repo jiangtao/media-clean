@@ -6,6 +6,7 @@ import * as jpeg from 'jpeg-js';
 
 import {
   calculateAverageHashFromRgba,
+  calculateDifferenceHashFromRgba,
   calculateVisualMetricsFromRgba,
 } from '../../domain/recognition/image-metrics';
 import type { MediaType, VisualMetrics } from '../../domain/recognition/types';
@@ -24,6 +25,7 @@ export interface VisualAnalysisResult {
   metrics: VisualMetrics;
   previewUri: string;
   fingerprint: string | null;
+  differenceHash: string | null;
   frameFingerprints: string[];
   status: 'ok' | 'fallback';
 }
@@ -57,6 +59,7 @@ interface ReducedFrameAnalysis {
   previewUri: string;
   metrics: VisualMetrics;
   fingerprint: string | null;
+  differenceHash: string | null;
 }
 
 async function analyzeReducedFrame(sourceUri: string): Promise<ReducedFrameAnalysis> {
@@ -66,6 +69,7 @@ async function analyzeReducedFrame(sourceUri: string): Promise<ReducedFrameAnaly
     previewUri: reduced.previewUri,
     metrics: calculateVisualMetricsFromRgba(reduced.rgba, reduced.width, reduced.height),
     fingerprint: calculateAverageHashFromRgba(reduced.rgba, reduced.width, reduced.height),
+    differenceHash: calculateDifferenceHashFromRgba(reduced.rgba, reduced.width, reduced.height),
   };
 }
 
@@ -76,14 +80,29 @@ export function buildVideoSampleTimes(durationSeconds: number) {
   }
 
   const lastSafeMs = Math.max(0, durationMs - 250);
-  const sampleCount = durationMs <= 5_000 ? 3 : durationMs <= 20_000 ? 5 : 7;
-  const samples = [0];
-
-  for (let index = 1; index < sampleCount; index += 1) {
-    samples.push(Math.max(0, Math.min(Math.round((lastSafeMs * index) / sampleCount), lastSafeMs)));
+  if (lastSafeMs <= 0) {
+    return [0];
   }
 
-  return Array.from(new Set(samples));
+  const sampleCount = durationMs <= 5_000 ? 3 : durationMs <= 20_000 ? 5 : 7;
+  const marginRatio = durationMs <= 5_000 ? 0.14 : durationMs <= 20_000 ? 0.16 : 0.18;
+  const windowStartMs = Math.min(Math.round(durationMs * marginRatio), lastSafeMs);
+  const windowEndMs = Math.max(
+    windowStartMs,
+    Math.min(lastSafeMs, Math.round(durationMs * (1 - marginRatio))),
+  );
+  const windowSpanMs = Math.max(0, windowEndMs - windowStartMs);
+  const samples = Array.from({ length: sampleCount }, (_, index) =>
+    Math.max(
+      0,
+      Math.min(
+        Math.round(windowStartMs + (windowSpanMs * (index + 0.5)) / sampleCount),
+        lastSafeMs,
+      ),
+    ),
+  );
+
+  return Array.from(new Set(samples)).sort((left, right) => left - right);
 }
 
 async function analyzeVideoFrames(assetUri: string, durationSeconds: number) {
@@ -117,6 +136,7 @@ export async function analyzeVisualsForAsset(
         previewUri: frames[0].previewUri,
         metrics: frames[0].metrics,
         fingerprint: frames[0].fingerprint,
+        differenceHash: frames[0].differenceHash,
         frameFingerprints: frames
           .map((frame) => frame.fingerprint)
           .filter((fingerprint): fingerprint is string => Boolean(fingerprint)),
@@ -130,6 +150,7 @@ export async function analyzeVisualsForAsset(
       previewUri: reduced.previewUri,
       metrics: reduced.metrics,
       fingerprint: reduced.fingerprint,
+      differenceHash: reduced.differenceHash,
       frameFingerprints: reduced.fingerprint ? [reduced.fingerprint] : [],
       status: 'ok',
     };
@@ -138,6 +159,7 @@ export async function analyzeVisualsForAsset(
       previewUri: assetUri,
       metrics: FALLBACK_METRICS,
       fingerprint: null,
+      differenceHash: null,
       frameFingerprints: [],
       status: 'fallback',
     };

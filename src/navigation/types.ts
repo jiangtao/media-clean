@@ -8,6 +8,7 @@ export type MainTabParamList = {
 };
 
 export type RootStackParamList = {
+  Landing: undefined;
   Main: NavigatorScreenParams<MainTabParamList>;
   Detail: { candidateId: string };
 };

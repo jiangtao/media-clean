@@ -35,6 +35,29 @@ describe('classifyAccidentalMedia', () => {
     );
   });
 
+  it('treats a moderately blurry gray-dark photo as an actionable accidental candidate', () => {
+    const result = classifyAccidentalMedia(
+      {
+        ...baseAsset,
+        id: 'asset-medium-blur-dark',
+        uri: 'file:///asset-medium-blur-dark.jpg',
+        width: 3024,
+        height: 4032,
+        fileSize: 2_800_000,
+      },
+      {
+        brightness: 0.2,
+        contrast: 0.08,
+        edgeDensity: 0.095,
+      },
+    );
+
+    expect(result.kind).toBe('accidental-photo');
+    expect(result.confidence).not.toBe('low');
+    expect(result.score).toBeGreaterThanOrEqual(55);
+    expect(result.reasons).toEqual(expect.arrayContaining(['边缘信息很少']));
+  });
+
   it('marks a short dark video as a strong accidental candidate', () => {
     const result = classifyAccidentalMedia(
       {
@@ -98,6 +121,30 @@ describe('classifyAccidentalMedia', () => {
     );
 
     expect(result.reasons).not.toContain('文件尺寸较小');
+  });
+
+  it('marks a moderately dim blurry photo as actionable even when it is not an extreme dark frame', () => {
+    const result = classifyAccidentalMedia(
+      {
+        ...baseAsset,
+        id: 'asset-moderate-blur',
+        uri: 'file:///asset-moderate-blur.jpg',
+        width: 1920,
+        height: 1080,
+        fileSize: 980_000,
+      },
+      {
+        brightness: 0.22,
+        contrast: 0.09,
+        edgeDensity: 0.08,
+      },
+    );
+
+    expect(result.score).toBeGreaterThanOrEqual(55);
+    expect(result.confidence).not.toBe('low');
+    expect(result.reasons).toEqual(
+      expect.arrayContaining(['画面明显过暗', '边缘信息很少']),
+    );
   });
 
   it('sorts candidates by descending score and creation time', () => {
@@ -167,9 +214,61 @@ describe('classifyAbnormalMedia', () => {
       expect.arrayContaining(['媒体时长异常短', '缩略图接近全黑']),
     );
   });
+
+  it('treats a near-solid low-information photo as an actionable abnormal candidate', () => {
+    const result = classifyAbnormalMedia(
+      {
+        ...baseAsset,
+        id: 'abnormal-flat-photo',
+        uri: 'file:///abnormal-flat-photo.jpg',
+        width: 1170,
+        height: 2532,
+        fileSize: 860_000,
+      },
+      {
+        brightness: 0.52,
+        contrast: 0.03,
+        edgeDensity: 0.01,
+      },
+    );
+
+    expect(result.kind).toBe('abnormal-photo');
+    expect(result.primaryIssueType).toBe('abnormal');
+    expect(result.confidence).not.toBe('low');
+    expect(result.score).toBeGreaterThanOrEqual(55);
+    expect(result.reasons).toEqual(expect.arrayContaining(['几乎没有可见内容']));
+  });
 });
 
 describe('buildCleanupCandidates', () => {
+  it('marks a flat low-information photo as an actionable low-quality candidate', () => {
+    const result = buildCleanupCandidates([
+      {
+        asset: {
+          ...baseAsset,
+          id: 'flat-photo',
+          uri: 'file:///flat-photo.jpg',
+          width: 1600,
+          height: 1600,
+          fileSize: 1_100_000,
+        },
+        metrics: {
+          brightness: 0.48,
+          contrast: 0.05,
+          edgeDensity: 0.03,
+        },
+        fingerprint: '8888888888888888',
+      },
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe('flat-photo');
+    expect(result[0]?.score).toBeGreaterThanOrEqual(55);
+    expect(result[0]?.reasons).toEqual(
+      expect.arrayContaining(['几乎没有可见内容']),
+    );
+  });
+
   it('flags fallback analysis with broken metadata as abnormal media', () => {
     const result = buildCleanupCandidates([
       {
@@ -219,6 +318,7 @@ describe('buildCleanupCandidates', () => {
           edgeDensity: 0.18,
         },
         fingerprint: 'f0f0f0f0f0f0f0f0',
+        contentHash: 'exact-photo-hash',
       },
       {
         asset: {
@@ -266,6 +366,141 @@ describe('buildCleanupCandidates', () => {
     expect(result[0]?.duplicateGroup?.representativeWidth).toBe(3024);
     expect(result[0]?.duplicateGroup?.representativeHeight).toBe(4032);
     expect(result[0]?.duplicateGroup?.representativeFileSize).toBe(4_200_000);
+  });
+
+  it('treats two identical photos as duplicates even when one analysis falls back to metadata-only signals', () => {
+    const result = buildCleanupCandidates([
+      {
+        asset: {
+          ...baseAsset,
+          id: 'identical-keep',
+          uri: 'file:///identical-keep.jpg',
+          width: 3024,
+          height: 4032,
+          fileSize: 4_200_000,
+          creationTime: 3,
+        },
+        metrics: {
+          brightness: 0.51,
+          contrast: 0.19,
+          edgeDensity: 0.18,
+        },
+        fingerprint: 'f0f0f0f0f0f0f0f0',
+        contentHash: 'exact-photo-hash',
+      },
+      {
+        asset: {
+          ...baseAsset,
+          id: 'identical-dup',
+          uri: 'file:///identical-dup.jpg',
+          width: 3024,
+          height: 4032,
+          fileSize: 4_200_000,
+          creationTime: 3,
+        },
+        metrics: {
+          brightness: 0.5,
+          contrast: 0.18,
+          edgeDensity: 0.17,
+        },
+        fingerprint: null,
+        contentHash: 'exact-photo-hash',
+        analysisStatus: 'fallback',
+      },
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe('identical-dup');
+    expect(result[0]?.primaryIssueType).toBe('duplicate');
+    expect(result[0]?.duplicateGroup?.size).toBe(2);
+  });
+
+  it('detects visually similar photos that are slightly farther apart than the current near-duplicate threshold', () => {
+    const result = buildCleanupCandidates([
+      {
+        asset: {
+          ...baseAsset,
+          id: 'similar-keep',
+          uri: 'file:///similar-keep.jpg',
+          width: 3024,
+          height: 4032,
+          fileSize: 4_200_000,
+          creationTime: 3,
+        },
+        metrics: {
+          brightness: 0.52,
+          contrast: 0.2,
+          edgeDensity: 0.18,
+        },
+        fingerprint: 'ffffffffffffffff',
+      },
+      {
+        asset: {
+          ...baseAsset,
+          id: 'similar-dup',
+          uri: 'file:///similar-dup.jpg',
+          width: 3000,
+          height: 4000,
+          fileSize: 4_100_000,
+          creationTime: 4,
+        },
+        metrics: {
+          brightness: 0.51,
+          contrast: 0.19,
+          edgeDensity: 0.17,
+        },
+        fingerprint: 'ff0fffffffffff0f',
+      },
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe('similar-dup');
+    expect(result[0]?.primaryIssueType).toBe('duplicate');
+    expect(result[0]?.duplicateGroup?.size).toBe(2);
+    expect(result[0]?.duplicateGroup?.relation).toBe('near');
+  });
+
+  it('does not merge visually different landscape photos that only share broad tone and average-hash similarity', () => {
+    const result = buildCleanupCandidates([
+      {
+        asset: {
+          ...baseAsset,
+          id: 'landscape-a',
+          uri: 'file:///landscape-a.jpg',
+          width: 4032,
+          height: 3024,
+          fileSize: 4_200_000,
+          creationTime: 3,
+        },
+        metrics: {
+          brightness: 0.58,
+          contrast: 0.19,
+          edgeDensity: 0.18,
+        },
+        fingerprint: 'f0f0f0f0f0f0f0f0',
+        differenceHash: '00000000ffffffff',
+      },
+      {
+        asset: {
+          ...baseAsset,
+          id: 'landscape-b',
+          uri: 'file:///landscape-b.jpg',
+          width: 4032,
+          height: 3024,
+          fileSize: 4_050_000,
+          creationTime: 4,
+        },
+        metrics: {
+          brightness: 0.57,
+          contrast: 0.18,
+          edgeDensity: 0.17,
+        },
+        fingerprint: 'f0f0f0f0f0f0f0f1',
+        differenceHash: 'ffffffff00000000',
+      },
+    ]);
+
+    expect(result).toHaveLength(0);
   });
 
   it('detects duplicate videos when later frames are similar even if the first frame differs', () => {
@@ -319,5 +554,50 @@ describe('buildCleanupCandidates', () => {
     expect(result[0]?.duplicateGroup?.representativeReason).toBe('higher-resolution');
     expect(result[0]?.duplicateGroup?.representativeWidth).toBe(1920);
     expect(result[0]?.duplicateGroup?.representativeHeight).toBe(1080);
+  });
+
+  it('expresses the duplicate-group quantity semantics as 2 for two exact same photos', () => {
+    const result = buildCleanupCandidates([
+      {
+        asset: {
+          ...baseAsset,
+          id: 'photo-keep',
+          uri: 'file:///photo-keep.jpg',
+          width: 3024,
+          height: 4032,
+          fileSize: 4_200_000,
+          creationTime: 4,
+        },
+        metrics: {
+          brightness: 0.54,
+          contrast: 0.23,
+          edgeDensity: 0.22,
+        },
+        fingerprint: '1234123412341234',
+      },
+      {
+        asset: {
+          ...baseAsset,
+          id: 'photo-dup',
+          uri: 'file:///photo-dup.jpg',
+          width: 1080,
+          height: 1440,
+          fileSize: 620_000,
+          creationTime: 8,
+        },
+        metrics: {
+          brightness: 0.54,
+          contrast: 0.23,
+          edgeDensity: 0.22,
+        },
+        fingerprint: '1234123412341234',
+      },
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe('photo-dup');
+    expect(result[0]?.kind).toBe('duplicate-photo');
+    expect(result[0]?.duplicateGroup?.relation).toBe('exact');
+    expect(result[0]?.duplicateGroup?.size).toBe(2);
   });
 });

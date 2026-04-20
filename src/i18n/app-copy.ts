@@ -90,6 +90,7 @@ interface LocalizedCopy {
     plannedReminder: string;
     noScanSummary: string;
     noScanDetail: string;
+    eligibilityHint: (months: number) => string;
   };
   permission: {
     title: string;
@@ -99,6 +100,43 @@ interface LocalizedCopy {
   tabs: {
     suggestions: string;
     recycle: string;
+    photos: string;
+    settings: string;
+  };
+  screens: {
+    photoGrid: {
+      filterAll: string;
+      filterPhoto: string;
+      filterVideo: string;
+      permissionChecking: string;
+      scanPromptTitle: string;
+      scanPromptBody: string;
+      startScan: string;
+      scanScopeSummary: (count: number) => string;
+      scanScopeHint: string;
+      scanProgressTitle: string;
+      scanProgressValue: (current: number, total: number) => string;
+      scanProgressFootnote: string;
+      scanCompleteTitle: string;
+      scanResultSummary: (count: number) => string;
+      scanResultFootnote: string;
+      scanExhaustedTitle: string;
+      scanExhaustedBody: string;
+      continueScan: string;
+      selectedItems: (count: number) => string;
+      cleanupSelected: string;
+      keepSelected: string;
+    };
+    recycleBin: {
+      title: string;
+      emptyTitle: string;
+      emptyBody: string;
+      expireHint: (days: number) => string;
+      selectedItems: (count: number) => string;
+      cancel: string;
+      restore: string;
+      delete: string;
+    };
   };
   filters: {
     all: string;
@@ -165,6 +203,8 @@ interface LocalizedCopy {
   preview: {
     title: string;
     subtitle: string;
+    clearAction: string;
+    clearCompactAction: string;
     judgementTitle: string;
     mediaInfoTitle: string;
     typeLabel: string;
@@ -174,10 +214,27 @@ interface LocalizedCopy {
     durationLabel: string;
     video: string;
     photo: string;
+    keepAction: string;
+    keepCompactAction: string;
+    keepHint: string;
     restore: string;
+    restoreCompactAction: string;
     moveToRecycle: string;
     deleteForever: string;
+    deleteForeverCompactAction: string;
     duplicateGroupHint: (count: number) => string;
+    duplicateExpand: string;
+    duplicateCollapse: string;
+    duplicateSelectionHint: string;
+    duplicateSelectedCount: (count: number) => string;
+    duplicateKeepReference: string;
+    duplicateCurrentItem: string;
+    duplicateSimilarItem: (index: number) => string;
+    duplicateExactTag: string;
+    duplicateSimilarTag: string;
+    duplicateSimilarityTag: (percentage: number) => string;
+    duplicateSelectDelete: string;
+    duplicateSelectedDelete: string;
     duplicateRepresentativeTitle: string;
     duplicateReasonHigherResolution: string;
     duplicateReasonLargerFile: string;
@@ -271,6 +328,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       plannedReminder: '计划提醒时间',
       noScanSummary: '还没有最近扫描记录，先打开应用完成一次本地扫描，再开始定期清理。',
       noScanDetail: '建议把扫描和提醒都保留在本地，避免把照片与视频上传到云端。',
+      eligibilityHint: (months: number) => `仅当最近 ${months} 个月内有新增媒体时才触发提醒。`,
     },
     permission: {
       title: '需要媒体权限',
@@ -280,6 +338,43 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     tabs: {
       suggestions: '识别结果',
       recycle: '回收站',
+      photos: '照片',
+      settings: '设置',
+    },
+    screens: {
+      photoGrid: {
+        filterAll: '全部',
+        filterPhoto: '照片',
+        filterVideo: '视频',
+        permissionChecking: '正在检查权限...',
+        scanPromptTitle: '本地扫描',
+        scanPromptBody: '最近媒体会在本地检查，结果直接留在本页。',
+        startScan: '开始扫描',
+        scanScopeSummary: (count: number) => `已选择 ${count} 个媒体`,
+        scanScopeHint: '默认扫描最近媒体，尽量把空间留给下方展示区。',
+        scanProgressTitle: '本地扫描',
+        scanProgressValue: (current: number, total: number) => `${current}/${total}`,
+        scanProgressFootnote: '正常媒体会持续退场，异常结果直接留在下方。',
+        scanCompleteTitle: '本地扫描',
+        scanResultSummary: (count: number) => `发现 ${count} 个异常媒体`,
+        scanResultFootnote: '结果已留在当前页面，可继续筛选、查看并决定清理或保留。',
+        scanExhaustedTitle: '当前这一批已处理完成',
+        scanExhaustedBody: '可以继续扫描最近媒体，或等待新的媒体进入这一批范围。',
+        continueScan: '继续扫描',
+        selectedItems: (count) => `已选择 ${count} 项`,
+        cleanupSelected: '清理',
+        keepSelected: '保留',
+      },
+      recycleBin: {
+        title: '回收站',
+        emptyTitle: '回收站还是空的',
+        emptyBody: '自动清理或手动移入回收站后，会在这里统一管理。',
+        expireHint: (days) => `回收站中的项目将在 ${days} 天后自动彻底删除`,
+        selectedItems: (count) => `已选择 ${count} 项`,
+        cancel: '取消',
+        restore: '恢复',
+        delete: '删除',
+      },
     },
     filters: {
       all: '全部',
@@ -346,6 +441,8 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     preview: {
       title: '媒体预览',
       subtitle: '先确认内容，再决定是否清理',
+      clearAction: '清除',
+      clearCompactAction: '清除',
       judgementTitle: '识别判断',
       mediaInfoTitle: '媒体信息',
       typeLabel: '类型',
@@ -355,10 +452,27 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       durationLabel: '时长',
       video: '视频',
       photo: '照片',
+      keepAction: '保留此媒体',
+      keepCompactAction: '保留',
+      keepHint: '保留表示这是误报，不再作为待清理项显示。',
       restore: '恢复当前媒体',
+      restoreCompactAction: '恢复',
       moveToRecycle: '移入回收站',
       deleteForever: '彻底删除',
+      deleteForeverCompactAction: '删除',
       duplicateGroupHint: (count) => `同组还有 ${count} 项相似媒体，当前已保留一份参考副本。`,
+      duplicateExpand: '展开重复组',
+      duplicateCollapse: '收起重复组',
+      duplicateSelectionHint: '展开后可明确选择要删除的重复项；未展开时默认保留最佳副本。',
+      duplicateSelectedCount: (count) => `已明确选择删除 ${count} 项`,
+      duplicateKeepReference: '保留参考副本',
+      duplicateCurrentItem: '当前条目',
+      duplicateSimilarItem: (index) => `相似副本 ${index}`,
+      duplicateExactTag: '完全相同',
+      duplicateSimilarTag: '相似',
+      duplicateSimilarityTag: (percentage) => `相似度${percentage}%`,
+      duplicateSelectDelete: '选中此项删除',
+      duplicateSelectedDelete: '已选中待删除',
       duplicateRepresentativeTitle: '保留副本依据',
       duplicateReasonHigherResolution: '分辨率更高',
       duplicateReasonLargerFile: '文件体积更大',
@@ -476,6 +590,8 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       plannedReminder: 'Planned reminder time',
       noScanSummary: 'There is no recent scan yet. Open the app and finish one local scan before starting recurring cleanup.',
       noScanDetail: 'Keep both scanning and reminders local so photos and videos never have to be uploaded to the cloud.',
+      eligibilityHint: (months: number) =>
+        `Only triggers when new media exists within the last ${months} month${months > 1 ? 's' : ''}.`,
     },
     permission: {
       title: 'Media permission required',
@@ -485,6 +601,43 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     tabs: {
       suggestions: 'Recognition results',
       recycle: 'Recycle bin',
+      photos: 'Photos',
+      settings: 'Settings',
+    },
+    screens: {
+      photoGrid: {
+        filterAll: 'All',
+        filterPhoto: 'Photos',
+        filterVideo: 'Videos',
+        permissionChecking: 'Checking permission...',
+        scanPromptTitle: 'Local scan',
+        scanPromptBody: 'Recent media is checked locally and the results stay on this page.',
+        startScan: 'Start scan',
+        scanScopeSummary: (count: number) => `${count} media selected`,
+        scanScopeHint: 'The default recent-media scope stays compact so the gallery keeps most of the space.',
+        scanProgressTitle: 'Local scan',
+        scanProgressValue: (current: number, total: number) => `${current}/${total}`,
+        scanProgressFootnote: 'Normal items keep fading away while flagged results stay below.',
+        scanCompleteTitle: 'Local scan',
+        scanResultSummary: (count: number) => `Found ${count} anomalous media items`,
+        scanResultFootnote: 'Results stay on the page so filtering, review, cleanup, or keep actions can continue immediately.',
+        scanExhaustedTitle: 'This batch is fully processed',
+        scanExhaustedBody: 'You can continue scanning recent media or wait for new media to enter this range.',
+        continueScan: 'Scan again',
+        selectedItems: (count) => `${count} selected`,
+        cleanupSelected: 'Clean up',
+        keepSelected: 'Keep',
+      },
+      recycleBin: {
+        title: 'Recycle Bin',
+        emptyTitle: 'The recycle bin is still empty',
+        emptyBody: 'Items moved by auto cleanup or manual cleanup will be managed here.',
+        expireHint: (days) => `Items in the recycle bin will be permanently deleted after ${days} days.`,
+        selectedItems: (count) => `${count} selected`,
+        cancel: 'Cancel',
+        restore: 'Restore',
+        delete: 'Delete',
+      },
     },
     filters: {
       all: 'All',
@@ -551,6 +704,8 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     preview: {
       title: 'Media Preview',
       subtitle: 'Confirm the content first, then decide whether to clean it',
+      clearAction: 'Clear',
+      clearCompactAction: 'Clear',
       judgementTitle: 'Detection result',
       mediaInfoTitle: 'Media details',
       typeLabel: 'Type',
@@ -560,10 +715,27 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       durationLabel: 'Duration',
       video: 'Video',
       photo: 'Photo',
+      keepAction: 'Keep this media',
+      keepCompactAction: 'Keep',
+      keepHint: 'Keep means this result is a false positive and should not be cleaned.',
       restore: 'Restore this media',
+      restoreCompactAction: 'Restore',
       moveToRecycle: 'Move to recycle bin',
       deleteForever: 'Delete forever',
+      deleteForeverCompactAction: 'Delete',
       duplicateGroupHint: (count) => `${count} similar items remain in this group, and one reference copy has been kept.`,
+      duplicateExpand: 'Expand duplicate group',
+      duplicateCollapse: 'Collapse duplicate group',
+      duplicateSelectionHint: 'Expand to choose exactly which duplicate to delete. Without expanding, the best-quality copy is kept by default.',
+      duplicateSelectedCount: (count) => `${count} items explicitly selected for deletion`,
+      duplicateKeepReference: 'Keep reference copy',
+      duplicateCurrentItem: 'Current item',
+      duplicateSimilarItem: (index) => `Similar copy ${index}`,
+      duplicateExactTag: 'Exact match',
+      duplicateSimilarTag: 'Similar',
+      duplicateSimilarityTag: (percentage) => `${percentage}% similar`,
+      duplicateSelectDelete: 'Select this copy to delete',
+      duplicateSelectedDelete: 'Selected for deletion',
       duplicateRepresentativeTitle: 'Reference copy kept because',
       duplicateReasonHigherResolution: 'higher resolution',
       duplicateReasonLargerFile: 'larger file size',
@@ -776,6 +948,58 @@ export function getCandidateTitle(kind: CleanupKind, language: AppLanguage) {
 
 export function getMediaTypeLabel(mediaType: MediaType, language: AppLanguage) {
   return mediaType === 'video' ? COPY[language].preview.video : COPY[language].preview.photo;
+}
+
+function getCompactReasonLabel(reason: string, language: AppLanguage) {
+  const compactLabels: Partial<Record<string, Record<AppLanguage, string>>> = {
+    '画面明显过暗': { 'zh-CN': '过暗', 'en-US': 'Dark' },
+    '缩略图明显过暗': { 'zh-CN': '过暗', 'en-US': 'Dark' },
+    '边缘信息很少': { 'zh-CN': '模糊', 'en-US': 'Blurry' },
+    '缩略图边缘信息很少': { 'zh-CN': '模糊', 'en-US': 'Blurry' },
+    '文件尺寸较小': { 'zh-CN': '低质量', 'en-US': 'Low quality' },
+    '视频文件较小': { 'zh-CN': '低质量', 'en-US': 'Low quality' },
+    '分辨率较低': { 'zh-CN': '低质量', 'en-US': 'Low quality' },
+    '媒体尺寸异常小': { 'zh-CN': '低质量', 'en-US': 'Low quality' },
+    '画面接近全黑': { 'zh-CN': '全黑', 'en-US': 'Nearly black' },
+    '几乎没有可见内容': { 'zh-CN': '无内容', 'en-US': 'No visible content' },
+    '媒体内容分析失败': { 'zh-CN': '识别失败', 'en-US': 'Analysis failed' },
+    '媒体文件为空': { 'zh-CN': '空文件', 'en-US': 'Empty file' },
+    '媒体元数据异常': { 'zh-CN': '元数据异常', 'en-US': 'Metadata issue' },
+    '画面比例异常': { 'zh-CN': '比例异常', 'en-US': 'Odd ratio' },
+    '媒体时长异常短': { 'zh-CN': '时长过短', 'en-US': 'Too short' },
+    '视频时长极短': { 'zh-CN': '时长过短', 'en-US': 'Too short' },
+    '视频时长较短': { 'zh-CN': '时长较短', 'en-US': 'Short' },
+    '与其他媒体高度相似': { 'zh-CN': '高度相似', 'en-US': 'Highly similar' },
+    '已保留一份更高质量副本': { 'zh-CN': '已保留最佳副本', 'en-US': 'Best copy kept' },
+    '曝光过度': { 'zh-CN': '曝光过度', 'en-US': 'Overexposed' },
+  };
+
+  return compactLabels[reason]?.[language] ?? translateRiskReason(reason, language);
+}
+
+function uniqueLabels(labels: string[]) {
+  return Array.from(new Set(labels.filter(Boolean)));
+}
+
+export function getDetailViewerTags(candidate: CleanupCandidate, language: AppLanguage) {
+  const copy = COPY[language];
+  const tags: string[] = [];
+
+  if (candidate.duplicateGroup) {
+    if (candidate.duplicateGroup.relation === 'exact') {
+      tags.push(copy.candidate.duplicateIssue, copy.preview.duplicateExactTag);
+    } else {
+      tags.push(
+        copy.preview.duplicateSimilarTag,
+        copy.preview.duplicateSimilarityTag(Math.round(candidate.duplicateGroup.similarity * 100)),
+      );
+    }
+  } else if (candidate.primaryIssueType === 'accidental') {
+    tags.push(copy.candidate.accidentalIssue);
+  }
+
+  const compactReasons = candidate.reasons.map((reason) => getCompactReasonLabel(reason, language));
+  return uniqueLabels([...tags, ...compactReasons]);
 }
 
 export function formatLocalizedDateTime(timestamp: number | null | undefined, language: AppLanguage) {

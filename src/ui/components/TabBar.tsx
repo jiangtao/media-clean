@@ -1,12 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AppThemePalette } from '../../theme/app-theme';
+import { TouchSurface } from './TouchSurface';
 
 interface TabItem {
   name: string;
   label: string;
   icon: string;
+  activeIcon?: string;
   badge?: number;
 }
 
@@ -27,16 +30,21 @@ export function TabBar({ tabs, activeTab, onTabPress, theme }: TabBarProps) {
         {tabs.map((tab) => {
           const isActive = activeTab === tab.name;
           return (
-            <TouchableOpacity
+            <TouchSurface
               key={tab.name}
               style={styles.tabItem}
               onPress={() => onTabPress(tab.name)}
-              activeOpacity={0.7}
+              preset="tab"
             >
               <View style={styles.iconContainer}>
-                <Text style={[styles.icon, isActive && styles.activeIcon]}>
-                  {tab.icon}
-                </Text>
+                <View style={[styles.iconSurface, isActive && styles.iconSurfaceActive]}>
+                  <Ionicons
+                    name={(isActive ? tab.activeIcon ?? tab.icon : tab.icon) as React.ComponentProps<typeof Ionicons>['name']}
+                    size={19}
+                    color={isActive ? theme.pageTextPrimary : theme.pageTextMuted}
+                    testID={`tab-icon-${tab.name}`}
+                  />
+                </View>
                 {tab.badge && tab.badge > 0 ? (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
@@ -48,7 +56,7 @@ export function TabBar({ tabs, activeTab, onTabPress, theme }: TabBarProps) {
               <Text style={[styles.label, isActive && styles.activeLabel]}>
                 {tab.label}
               </Text>
-            </TouchableOpacity>
+            </TouchSurface>
           );
         })}
       </View>
@@ -79,12 +87,15 @@ function createStyles(theme: AppThemePalette, bottomInset: number) {
       position: 'relative',
       marginBottom: 2,
     },
-    icon: {
-      fontSize: 22,
-      opacity: 0.6,
+    iconSurface: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-    activeIcon: {
-      opacity: 1,
+    iconSurfaceActive: {
+      backgroundColor: theme.cardMutedBackground,
     },
     label: {
       fontSize: 11,
@@ -99,7 +110,7 @@ function createStyles(theme: AppThemePalette, bottomInset: number) {
       position: 'absolute',
       top: -6,
       right: -10,
-      backgroundColor: '#FF3B30',
+      backgroundColor: '#ff3b30',
       borderRadius: 10,
       minWidth: 18,
       height: 18,

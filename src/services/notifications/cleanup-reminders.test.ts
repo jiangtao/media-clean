@@ -12,6 +12,26 @@ const notificationsApi = vi.hoisted(() => ({
   getNextTriggerDateAsync: vi.fn(),
 }));
 
+const mediaLibraryApi = vi.hoisted(() => ({
+  getAssetsAsync: vi.fn(),
+  MediaType: {
+    photo: 'photo',
+    video: 'video',
+  },
+  SortBy: {
+    creationTime: 'creationTime',
+  },
+}));
+
+const appStorageApi = vi.hoisted(() => ({
+  loadLastScanMeta: vi.fn(),
+}));
+
+const scanRangeStorageApi = vi.hoisted(() => ({
+  loadScanRange: vi.fn(),
+  buildScanRangeStartAt: vi.fn(),
+}));
+
 vi.mock('expo-notifications', () => ({
   SchedulableTriggerInputTypes: {
     DAILY: 'daily',
@@ -22,12 +42,16 @@ vi.mock('expo-notifications', () => ({
   },
   ...notificationsApi,
 }));
+vi.mock('expo-media-library', () => mediaLibraryApi);
 
 vi.mock('react-native', () => ({
   Platform: {
     OS: 'android',
   },
 }));
+
+vi.mock('../storage/app-storage', () => appStorageApi);
+vi.mock('../storage/scan-range-storage', () => scanRangeStorageApi);
 
 import {
   buildCleanupReminderRequest,
@@ -44,6 +68,29 @@ describe('cleanup reminders', () => {
     notificationsApi.cancelScheduledNotificationAsync.mockReset();
     notificationsApi.scheduleNotificationAsync.mockReset();
     notificationsApi.getNextTriggerDateAsync.mockReset();
+    mediaLibraryApi.getAssetsAsync.mockReset();
+    appStorageApi.loadLastScanMeta.mockReset();
+    scanRangeStorageApi.loadScanRange.mockReset();
+    scanRangeStorageApi.buildScanRangeStartAt.mockReset();
+
+    mediaLibraryApi.getAssetsAsync.mockResolvedValue({
+      assets: [
+        {
+          id: 'newer-photo',
+          creationTime: 1_710_100_000_000,
+          mediaType: mediaLibraryApi.MediaType.photo,
+        },
+      ],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+    appStorageApi.loadLastScanMeta.mockResolvedValue({
+      scannedAt: 1_710_000_000_000,
+      scannedCount: 180,
+      candidateCount: 12,
+    });
+    scanRangeStorageApi.loadScanRange.mockResolvedValue(3);
+    scanRangeStorageApi.buildScanRangeStartAt.mockReturnValue(1_709_000_000_000);
   });
 
   it('formats reminder time consistently', () => {
@@ -252,6 +299,84 @@ describe('cleanup reminders', () => {
 
     expect(notificationsApi.cancelScheduledNotificationAsync).toHaveBeenCalledWith(
       'old-reminder-id',
+    );
+    expect(notificationsApi.scheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+
+  it('does not schedule a reminder when the configured recent range has no newer media', async () => {
+    mediaLibraryApi.getAssetsAsync.mockResolvedValueOnce({
+      assets: [
+        {
+          id: 'older-photo',
+          creationTime: 1_709_000_000_000,
+          mediaType: mediaLibraryApi.MediaType.photo,
+        },
+      ],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+
+    await expect(
+      syncCleanupReminderNotification(
+        {
+          enabled: true,
+          frequency: 'daily',
+          weekday: 1,
+          hour: 20,
+          minute: 30,
+          previousNotificationId: 'old-reminder-id',
+        },
+        {
+          title: '定期清理提醒',
+          summary: '重新打开应用检查最近媒体。',
+          detail: '不会在后台偷偷扫描。',
+        },
+      ),
+    ).resolves.toEqual({
+      notificationId: null,
+      nextTriggerAt: null,
+    });
+
+    expect(notificationsApi.scheduleNotificationAsync).not.toHaveBeenCalled();
+    expect(notificationsApi.getNextTriggerDateAsync).not.toHaveBeenCalled();
+  });
+
+  it('cancels an existing reminder when trigger conditions are no longer met on cold start', async () => {
+    mediaLibraryApi.getAssetsAsync.mockResolvedValueOnce({
+      assets: [
+        {
+          id: 'older-photo',
+          creationTime: 1_709_000_000_000,
+          mediaType: mediaLibraryApi.MediaType.photo,
+        },
+      ],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+
+    await expect(
+      reconcileCleanupReminderNotification(
+        {
+          enabled: true,
+          frequency: 'daily',
+          weekday: 1,
+          hour: 20,
+          minute: 30,
+          notificationId: 'stale-reminder-id',
+        },
+        {
+          title: '定期清理提醒',
+          summary: '重新打开应用检查最近媒体。',
+          detail: '不会在后台偷偷扫描。',
+        },
+      ),
+    ).resolves.toEqual({
+      notificationId: null,
+      nextTriggerAt: null,
+    });
+
+    expect(notificationsApi.cancelScheduledNotificationAsync).toHaveBeenCalledWith(
+      'stale-reminder-id',
     );
     expect(notificationsApi.scheduleNotificationAsync).not.toHaveBeenCalled();
   });

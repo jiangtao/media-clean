@@ -45,8 +45,12 @@
     "react-native-screens": "^4.24.0"
   },
   "devDependencies": {
+    "@testing-library/jest-native": "^5.4.3",
+    "@testing-library/react-native": "^14.0.0-alpha.6",
     "@types/node": "^25.6.0",
     "@types/react": "~19.1.0",
+    "patch-package": "^8.0.1",
+    "react-native-web": "^0.21.2",
     "react-test-renderer": "^19.1.0",
     "typescript": "~5.9.2",
     "vitest": "^4.1.4"

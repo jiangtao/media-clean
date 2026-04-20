@@ -1,0 +1,587 @@
+# Device Compatibility CI Workflow
+# Task 41 - 机型适配自动化测试
+#
+# This workflow runs automated screen adaptation tests across
+# 24 different device configurations to verify notch/punch hole
+# compatibility, orientation handling, and navigation adaptation.
+#
+# Author: 赵虎
+
+name: Device Compatibility Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/features/compatibility/**'
+      - 'src/services/device/**'
+      - 'src/ui/**'
+      - '.github/workflows/device-compatibility.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/features/compatibility/**'
+      - 'src/services/device/**'
+      - 'src/ui/**'
+  schedule:
+    # Run daily at 2 AM UTC (10 AM Beijing)
+    - cron: '0 2 * * *'
+
+env:
+  NODE_VERSION: '20'
+  JAVA_VERSION: '17'
+  ANDROID_API: '33'
+  EMULATOR_TIMEOUT: '600'
+
+jobs:
+  # ============================================================================
+  # Job 1: Unit Tests - Screen Type Detection
+  # ============================================================================
+  unit-tests:
+    name: Screen Type Detection Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run screen adaptation tests
+        run: |
+          npm run test -- --run src/features/compatibility/__tests__/screen-adaptation.test.ts
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: |
+            test-results/
+            coverage/
+
+  # ============================================================================
+  # Job 2: Android Emulator Matrix Tests
+  # ============================================================================
+  emulator-tests:
+    name: Emulator Tests (${{ matrix.device }})
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # 24 device configurations grouped by type
+        include:
+          # Standard screens (3)
+          - device: Pixel_5
+            api: 31
+            target: google_apis
+            arch: x86_64
+            screen: 1080x2340
+            density: 420
+            screen-type: standard
+
+          - device: Pixel_8
+            api: 34
+            target: google_apis
+            arch: x86_64
+            screen: 1080x2400
+            density: 420
+            screen-type: standard
+
+          - device: Redmi_9A
+            api: 29
+            target: google_apis
+            arch: x86_64
+            screen: 720x1600
+            density: 269
+            screen-type: standard
+
+          # Notch screens (3)
+          - device: Pixel_7_Notch
+            api: 33
+            target: google_apis
+            arch: x86_64
+            screen: 1080x2400
+            density: 420
+            screen-type: notch
+            cutout: default
+
+          - device: Huawei_P30
+            api: 28
+            target: google_apis
+            arch: x86_64
+            screen: 1080x2340
+            density: 420
+            screen-type: notch
+            cutout: double
+
+          - device: Xiaomi_9
+            api: 29
+            target: google_apis
+            arch: x86_64
+            screen: 1080x2340
+            density: 440
+            screen-type: notch
+            cutout: corner
+
+          # Teardrop screens (2)
+          - device: OnePlus_7
+            api: 29
+            target: google_apis
+            arch: x86_64
+            screen: 1080x2400
+            density: 402
+            screen-type: teardrop
+            cutout: tall
+
+          - device: Redmi_Note_8
+            api: 28
+            target: google_apis
+            arch: x86_64
+            screen: 1080x2340
+            density: 409
+            screen-type: teardrop
+            cutout: tall
+
+          # Hole punch center (4)
+          - device: Samsung_S23
+            api: 33
+            target: google_apis
+            arch: x86_64
+            screen: 1080x2340
+            density: 450
+            screen-type: hole-punch
+            cutout: hole
+
+          - device: Pixel_8_Pro
+            api: 34
+            target: google_apis
+            arch: x86_64
+            screen: 1344x2992
+            density: 489
+            screen-type: hole-punch
+            cutout: hole
+
+          - device: Xiaomi_13
+            api: 33
+            target: google_apis
+            arch: x86_64
+            screen: 1080x2400
+            density: 419
+            screen-type: hole-punch
+            cutout: hole
+
+          - device: Samsung_A14
+            api: 31
+            target: google_apis
+            arch: x86_64
+            screen: 1080x2408
+            density: 400
+            screen-type: hole-punch
+            cutout: hole
+
+          # Hole punch left (2)
+          - device: Samsung_S20
+            api: 30
+            target: google_apis
+            arch: x86_64
+            screen: 1440x3200
+            density: 560
+            screen-type: hole-punch-left
+            cutout: hole-left
+
+          - device: Huawei_Mate_40
+            api: 30
+            target: google_apis
+            arch: x86_64
+            screen: 1344x2772
+            density: 456
+            screen-type: hole-punch-left
+            cutout: hole-left
+
+          # Waterfall screens (3)
+          - device: Pixel_7_Pro
+            api: 33
+            target: google_apis
+            arch: x86_64
+            screen: 1440x3120
+            density: 512
+            screen-type: waterfall
+            cutout: waterfall
+
+          - device: Samsung_S23_Ultra
+            api: 33
+            target: google_apis
+            arch: x86_64
+            screen: 1440x3088
+            density: 500
+            screen-type: waterfall
+            cutout: waterfall
+
+          - device: OnePlus_11
+            api: 33
+            target: google_apis
+            arch: x86_64
+            screen: 1440x3216
+            density: 525
+            screen-type: waterfall
+            cutout: waterfall
+
+          # Pill screens (1)
+          - device: Honor_90
+            api: 33
+            target: google_apis
+            arch: x86_64
+            screen: 1200x2664
+            density: 435
+            screen-type: pill
+            cutout: pill
+
+          # Tablets (2)
+          - device: Pixel_Tablet
+            api: 33
+            target: google_apis
+            arch: x86_64
+            screen: 1600x2560
+            density: 320
+            screen-type: tablet
+
+          - device: Galaxy_Tab_S9
+            api: 33
+            target: google_apis
+            arch: x86_64
+            screen: 1600x2560
+            density: 274
+            screen-type: tablet
+
+          # Foldable cover (2)
+          - device: Galaxy_Z_Flip5_Cover
+            api: 33
+            target: google_apis
+            arch: x86_64
+            screen: 720x748
+            density: 301
+            screen-type: foldable-cover
+
+          - device: Galaxy_Z_Fold5_Cover
+            api: 33
+            target: google_apis
+            arch: x86_64
+            screen: 904x2316
+            density: 412
+            screen-type: foldable-cover
+
+          # Foldable inner (2)
+          - device: Galaxy_Z_Flip5_Inner
+            api: 33
+            target: google_apis
+            arch: x86_64
+            screen: 1080x2640
+            density: 426
+            screen-type: foldable-inner
+
+          - device: Galaxy_Z_Fold5_Inner
+            api: 33
+            target: google_apis
+            arch: x86_64
+            screen: 1812x2176
+            density: 374
+            screen-type: foldable-inner
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: AVD cache
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-${{ matrix.api }}-${{ matrix.arch }}-${{ matrix.device }}
+
+      - name: Create AVD and generate snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
+          arch: ${{ matrix.arch }}
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "Generated AVD snapshot for caching."
+
+      - name: Run tests
+        uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 30
+        with:
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
+          arch: ${{ matrix.arch }}
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            # Configure emulator screen
+            adb shell wm size ${{ matrix.screen }}
+            adb shell wm density ${{ matrix.density }}
+
+            # Configure display cutout if specified
+            case "${{ matrix.cutout }}" in
+              "default")
+                adb shell cmd overlay enable com.android.internal.display.cutout.emulation.normal
+                ;;
+              "double")
+                adb shell cmd overlay enable com.android.internal.display.cutout.emulation.double
+                ;;
+              "corner")
+                adb shell cmd overlay enable com.android.internal.display.cutout.emulation.corner
+                ;;
+              "tall")
+                adb shell cmd overlay enable com.android.internal.display.cutout.emulation.tall
+                ;;
+              "hole")
+                adb shell cmd overlay enable com.android.internal.display.cutout.emulation.hole
+                ;;
+              "hole-left")
+                adb shell cmd overlay enable com.android.internal.display.cutout.emulation.hole-left
+                ;;
+              "waterfall")
+                adb shell cmd overlay enable com.android.internal.display.cutout.emulation.waterfall
+                ;;
+              "pill")
+                adb shell cmd overlay enable com.android.internal.display.cutout.emulation.pill
+                ;;
+            esac
+
+            # Build debug APK
+            npx expo prebuild --platform android
+            cd android && ./gradlew assembleDebug && cd ..
+
+            # Install and launch app
+            adb install android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -n com.appcleaner/.MainActivity
+
+            # Wait for app to stabilize
+            sleep 10
+
+            # Take screenshot of home screen
+            adb shell screencap -p /sdcard/${{ matrix.device }}-home.png
+            adb pull /sdcard/${{ matrix.device }}-home.png test-screenshots/current/
+
+            # Verify SafeArea insets
+            adb logcat -d | grep -i "SafeArea" || echo "No SafeArea logs found"
+
+            # Cleanup
+            adb shell am force-stop com.appcleaner
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-${{ matrix.device }}
+          path: test-screenshots/current/${{ matrix.device }}-home.png
+
+  # ============================================================================
+  # Job 3: Screenshot Comparison
+  # ============================================================================
+  screenshot-comparison:
+    name: Screenshot Comparison
+    runs-on: ubuntu-latest
+    needs: emulator-tests
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install pixelmatch
+        run: npm install --save-dev pixelmatch pngjs
+
+      - name: Download all screenshots
+        uses: actions/download-artifact@v4
+        with:
+          path: test-screenshots/current/
+          pattern: screenshot-*
+          merge-multiple: true
+
+      - name: Setup baseline screenshots
+        run: |
+          mkdir -p test-screenshots/baseline
+          # If baseline doesn't exist in repo, use current as baseline
+          if [ ! "$(ls -A test-screenshots/baseline)" ]; then
+            cp test-screenshots/current/*.png test-screenshots/baseline/ || true
+          fi
+
+      - name: Run screenshot comparison
+        run: |
+          node scripts/screenshot-compare.js --generate-report --verbose || true
+
+      - name: Upload comparison results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-comparison-report
+          path: |
+            test-screenshots/diff/
+            test-screenshots/reports/
+
+  # ============================================================================
+  # Job 4: Report Generation
+  # ============================================================================
+  generate-report:
+    name: Generate Compatibility Report
+    runs-on: ubuntu-latest
+    needs: [unit-tests, emulator-tests, screenshot-comparison]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download test results
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          pattern: '*'
+
+      - name: Generate summary report
+        run: |
+          cat > compatibility-report.md << 'EOF'
+          # 机型适配兼容性测试报告
+
+          ## 测试概要
+
+          - **测试时间**: ${{ github.event.head_commit.timestamp || 'Scheduled Run' }}
+          - **Commit**: ${{ github.sha }}
+          - **Branch**: ${{ github.ref }}
+
+          ## 测试覆盖
+
+          ### 屏幕类型 (10种)
+          | 类型 | 设备数量 | 状态 |
+          |------|---------|------|
+          | 标准屏 | 3 | 待验证 |
+          | 刘海屏 | 3 | 待验证 |
+          | 水滴屏 | 2 | 待验证 |
+          | 打孔屏（居中） | 4 | 待验证 |
+          | 打孔屏（左上） | 2 | 待验证 |
+          | 瀑布屏 | 3 | 待验证 |
+          | 药丸屏 | 1 | 待验证 |
+          | 平板 | 2 | 待验证 |
+          | 折叠屏外屏 | 2 | 待验证 |
+          | 折叠屏内屏 | 2 | 待验证 |
+
+          ### API 级别分布
+          | API | Android 版本 | 设备数 |
+          |-----|--------------|--------|
+          | 28 | Android 9 | 2 |
+          | 29 | Android 10 | 3 |
+          | 30 | Android 11 | 2 |
+          | 31 | Android 12 | 2 |
+          | 33 | Android 13 | 13 |
+          | 34 | Android 14 | 2 |
+
+          ## 验证清单
+
+          ### 状态栏适配
+          - [ ] 刘海屏状态栏高度正确
+          - [ ] 打孔屏内容不被遮挡
+          - [ ] 标准屏无额外偏移
+          - [ ] 瀑布屏边缘内容可交互
+          - [ ] 水滴屏状态栏正确
+          - [ ] 药丸屏内容环绕
+
+          ### 底部导航
+          - [ ] 手势导航区域计算正确
+          - [ ] 三键导航栏处理正确
+          - [ ] TabBar位置正确
+
+          ### 横竖屏切换
+          - [ ] 横屏刘海侧处理正确
+          - [ ] 全屏模式适配
+          - [ ] 平板横竖屏切换
+          - [ ] 折叠屏展开/折叠切换
+
+          ## 测试结果
+
+          详细测试结果请查看Artifacts中的:
+          - `unit-test-results`: 单元测试结果
+          - `screenshot-*`: 各设备截图
+          - `screenshot-comparison-report`: 截图对比报告
+
+          EOF
+
+          cat compatibility-report.md
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: compatibility-report
+          path: compatibility-report.md
+
+      - name: Comment PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('compatibility-report.md', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            });

@@ -20,15 +20,31 @@ const visualAnalysisApi = vi.hoisted(() => ({
   analyzeVisualsForAsset: vi.fn(),
 }));
 
+const appStorageApi = vi.hoisted(() => ({
+  loadMediaAnalysisCache: vi.fn(),
+  saveMediaAnalysisCache: vi.fn(),
+}));
+
 vi.mock('expo-media-library', () => mediaLibraryApi);
 vi.mock('expo-file-system/legacy', () => fileSystemApi);
 vi.mock('../../services/media/analyze-visuals', () => visualAnalysisApi);
+vi.mock('../../services/storage/app-storage', () => appStorageApi);
 
-import { scanMediaLibrary } from './scan-media-library';
+import {
+  SCAN_ANALYSIS_EXECUTION_STRATEGY,
+  scanMediaLibrary,
+} from './scan-media-library';
+
+const NEUTRAL_METRICS = {
+  brightness: 0.56,
+  contrast: 0.32,
+  edgeDensity: 0.28,
+};
 
 function createAsset(id: string, overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id,
+    filename: `${id}.jpg`,
     uri: `file:///${id}.jpg`,
     mediaType: mediaLibraryApi.MediaType.photo,
     width: 3024,
@@ -39,12 +55,35 @@ function createAsset(id: string, overrides: Partial<Record<string, unknown>> = {
   };
 }
 
+function createVisualAnalysisResult(
+  fingerprint: string | null,
+  overrides: Partial<{
+    previewUri: string;
+    frameFingerprints: string[];
+    differenceHash: string | null;
+    status: 'ok' | 'fallback';
+    metrics: typeof NEUTRAL_METRICS;
+  }> = {},
+) {
+  return {
+    previewUri: overrides.previewUri ?? 'file:///preview.jpg',
+    fingerprint,
+    differenceHash: overrides.differenceHash ?? fingerprint,
+    frameFingerprints:
+      overrides.frameFingerprints ?? (fingerprint ? [fingerprint] : []),
+    status: overrides.status ?? 'ok',
+    metrics: overrides.metrics ?? NEUTRAL_METRICS,
+  };
+}
+
 describe('scanMediaLibrary', () => {
   beforeEach(() => {
     mediaLibraryApi.getAssetsAsync.mockReset();
     mediaLibraryApi.getAssetInfoAsync.mockReset();
     fileSystemApi.getInfoAsync.mockReset();
     visualAnalysisApi.analyzeVisualsForAsset.mockReset();
+    appStorageApi.loadMediaAnalysisCache.mockReset();
+    appStorageApi.saveMediaAnalysisCache.mockReset();
 
     mediaLibraryApi.getAssetsAsync.mockResolvedValue({
       assets: [],
@@ -60,12 +99,10 @@ describe('scanMediaLibrary', () => {
       previewUri: 'file:///preview.jpg',
       fingerprint: null,
       status: 'ok',
-      metrics: {
-        brightness: 0.56,
-        contrast: 0.32,
-        edgeDensity: 0.28,
-      },
+      metrics: NEUTRAL_METRICS,
     });
+    appStorageApi.loadMediaAnalysisCache.mockResolvedValue({});
+    appStorageApi.saveMediaAnalysisCache.mockResolvedValue(undefined);
   });
 
   it('keeps recycle-bin items even when they score below the active candidate threshold', async () => {
@@ -123,5 +160,480 @@ describe('scanMediaLibrary', () => {
     expect(mediaLibraryApi.getAssetInfoAsync).toHaveBeenCalledTimes(1);
     expect(result.summary.scannedCount).toBe(1);
     expect(result.state.recycleBin.map((candidate) => candidate.id)).toEqual(['shared-id']);
+  });
+
+  it('reports per-asset progress and a terminal completion state when a callback is provided', async () => {
+    mediaLibraryApi.getAssetsAsync.mockResolvedValueOnce({
+      assets: [createAsset('first'), createAsset('second')],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+
+    const onProgress = vi.fn();
+
+    await scanMediaLibrary([], onProgress);
+
+    expect(onProgress).toHaveBeenCalledTimes(3);
+    expect(onProgress.mock.calls[0][0]).toMatchObject({
+      current: 1,
+      total: 2,
+      currentFileName: 'first.jpg',
+      isScanning: true,
+      percentage: 50,
+    });
+    expect(onProgress.mock.calls[1][0]).toMatchObject({
+      current: 2,
+      total: 2,
+      currentFileName: 'second.jpg',
+      isScanning: true,
+      percentage: 100,
+    });
+    expect(onProgress.mock.calls[2][0]).toMatchObject({
+      current: 2,
+      total: 2,
+      currentFileName: 'second.jpg',
+      isScanning: false,
+      percentage: 100,
+    });
+  });
+
+  it('falls back to cooperative yielding when no dedicated worker runtime is available', () => {
+    expect(SCAN_ANALYSIS_EXECUTION_STRATEGY).toBe('cooperative-yield');
+  });
+
+  it('yields between analysis chunks so scanning does not monopolize the UI thread', async () => {
+    mediaLibraryApi.getAssetsAsync.mockResolvedValueOnce({
+      assets: [createAsset('first'), createAsset('second'), createAsset('third')],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+
+    const timeline: string[] = [];
+    const yieldToMainThread = vi.fn(async () => {
+      timeline.push('yield');
+    });
+
+    visualAnalysisApi.analyzeVisualsForAsset.mockImplementation(async (uri: string) => {
+      timeline.push(uri);
+      return {
+        previewUri: uri,
+        fingerprint: null,
+        status: 'ok',
+        metrics: {
+          brightness: 0.56,
+          contrast: 0.32,
+          edgeDensity: 0.28,
+        },
+      };
+    });
+
+    await scanMediaLibrary([], {
+      analysisConcurrency: 1,
+      yieldToMainThread,
+    });
+
+    expect(yieldToMainThread).toHaveBeenCalledTimes(2);
+    expect(timeline).toEqual([
+      'file:///first.jpg',
+      'yield',
+      'file:///second.jpg',
+      'yield',
+      'file:///third.jpg',
+    ]);
+  });
+
+  it('reuses persisted asset analysis for unchanged assets', async () => {
+    mediaLibraryApi.getAssetsAsync.mockResolvedValueOnce({
+      assets: [
+        createAsset('cached-photo', {
+          width: 1179,
+          height: 2556,
+          creationTime: 1_710_000_000_000,
+        }),
+      ],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+    fileSystemApi.getInfoAsync.mockResolvedValueOnce({ exists: true, size: 1024 });
+    appStorageApi.loadMediaAnalysisCache.mockResolvedValueOnce({
+      'cached-photo': {
+        assetId: 'cached-photo',
+        signature: 'v1:photo:1710000000000:1179:2556:0:1024',
+        previewUri: 'file:///cached-preview.jpg',
+        fingerprint: null,
+        frameFingerprints: [],
+        status: 'ok',
+        metrics: {
+          brightness: 0.02,
+          contrast: 0.01,
+          edgeDensity: 0.01,
+        },
+      },
+    });
+
+    const result = await scanMediaLibrary([]);
+
+    expect(visualAnalysisApi.analyzeVisualsForAsset).not.toHaveBeenCalled();
+    expect(appStorageApi.saveMediaAnalysisCache).not.toHaveBeenCalled();
+    expect(result.state.activeCandidates.map((candidate) => candidate.id)).toEqual([
+      'cached-photo',
+    ]);
+  });
+
+  it('re-analyzes assets whose cache signature no longer matches and persists the refreshed result', async () => {
+    mediaLibraryApi.getAssetsAsync.mockResolvedValueOnce({
+      assets: [createAsset('stale-photo')],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+    fileSystemApi.getInfoAsync.mockResolvedValueOnce({ exists: true, size: 3_600_000 });
+    appStorageApi.loadMediaAnalysisCache.mockResolvedValueOnce({
+      'stale-photo': {
+        assetId: 'stale-photo',
+        signature: 'v1:photo:1710000000000:3024:4032:0:111',
+        previewUri: 'file:///stale-preview.jpg',
+        fingerprint: 'old-fingerprint',
+        frameFingerprints: ['old-fingerprint'],
+        status: 'ok',
+        metrics: {
+          brightness: 0.5,
+          contrast: 0.2,
+          edgeDensity: 0.2,
+        },
+      },
+    });
+
+    await scanMediaLibrary([]);
+
+    expect(visualAnalysisApi.analyzeVisualsForAsset).toHaveBeenCalledTimes(1);
+    expect(appStorageApi.saveMediaAnalysisCache).toHaveBeenCalledWith({
+      'stale-photo': expect.objectContaining({
+        assetId: 'stale-photo',
+        signature: 'v1:photo:1710000000000:3024:4032:0:3600000',
+        previewUri: 'file:///preview.jpg',
+        status: 'ok',
+      }),
+    });
+  });
+
+  it('keeps identical photos in one duplicate group even if one analysis falls back without a perceptual fingerprint', async () => {
+    mediaLibraryApi.getAssetsAsync.mockResolvedValueOnce({
+      assets: [
+        createAsset('identical-keep'),
+        createAsset('identical-dup'),
+      ],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+    fileSystemApi.getInfoAsync
+      .mockResolvedValueOnce({ exists: true, size: 4_200_000, md5: 'identical-photo-md5' })
+      .mockResolvedValueOnce({ exists: true, size: 4_200_000, md5: 'identical-photo-md5' });
+    visualAnalysisApi.analyzeVisualsForAsset
+      .mockResolvedValueOnce({
+        previewUri: 'file:///identical-keep.jpg',
+        fingerprint: 'f0f0f0f0f0f0f0f0',
+        status: 'ok',
+        metrics: {
+          brightness: 0.5,
+          contrast: 0.2,
+          edgeDensity: 0.18,
+        },
+      })
+      .mockResolvedValueOnce({
+        previewUri: 'file:///identical-dup.jpg',
+        fingerprint: null,
+        status: 'fallback',
+        metrics: {
+          brightness: 0.5,
+          contrast: 0.2,
+          edgeDensity: 0.18,
+        },
+      });
+
+    const result = await scanMediaLibrary([]);
+
+    expect(result.state.activeCandidates).toHaveLength(1);
+    expect(result.state.activeCandidates[0]?.id).toBe('identical-dup');
+    expect(result.state.activeCandidates[0]?.duplicateGroup?.size).toBe(2);
+  });
+
+  it('surfaces near-similar photos that are slightly beyond the current strict near-duplicate threshold', async () => {
+    mediaLibraryApi.getAssetsAsync.mockResolvedValueOnce({
+      assets: [
+        createAsset('similar-keep'),
+        createAsset('similar-dup', {
+          width: 3000,
+          height: 4000,
+        }),
+      ],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+    fileSystemApi.getInfoAsync
+      .mockResolvedValueOnce({ exists: true, size: 4_200_000 })
+      .mockResolvedValueOnce({ exists: true, size: 4_050_000 });
+    visualAnalysisApi.analyzeVisualsForAsset
+      .mockResolvedValueOnce({
+        previewUri: 'file:///similar-keep.jpg',
+        fingerprint: 'ffffffffffffffff',
+        status: 'ok',
+        metrics: {
+          brightness: 0.52,
+          contrast: 0.21,
+          edgeDensity: 0.18,
+        },
+      })
+      .mockResolvedValueOnce({
+        previewUri: 'file:///similar-dup.jpg',
+        fingerprint: 'ff0fffffffffff0f',
+        status: 'ok',
+        metrics: {
+          brightness: 0.51,
+          contrast: 0.2,
+          edgeDensity: 0.17,
+        },
+      });
+
+    const result = await scanMediaLibrary([]);
+
+    expect(result.state.activeCandidates).toHaveLength(1);
+    expect(result.state.activeCandidates[0]?.id).toBe('similar-dup');
+    expect(result.state.activeCandidates[0]?.duplicateGroup?.relation).toBe('near');
+    expect(result.summary.candidateCount).toBe(1);
+  });
+
+  it('BDD: Given 两张完全相同的照片且其中一张首次分析 fallback, when 扫描, then 仍应通过兜底形成重复组并给出正确组数量', async () => {
+    mediaLibraryApi.getAssetsAsync.mockResolvedValueOnce({
+      assets: [createAsset('fallback-exact-a'), createAsset('fallback-exact-b')],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+    fileSystemApi.getInfoAsync
+      .mockResolvedValueOnce({ exists: true, size: 4_200_000, md5: 'fallback-exact-md5' })
+      .mockResolvedValueOnce({ exists: true, size: 4_200_000, md5: 'fallback-exact-md5' });
+
+    visualAnalysisApi.analyzeVisualsForAsset.mockImplementation(async (uri: string) => {
+      if (uri.includes('fallback-exact-a')) {
+        return createVisualAnalysisResult(null, {
+          previewUri: uri,
+          status: 'fallback',
+          metrics: NEUTRAL_METRICS,
+        });
+      }
+
+      return createVisualAnalysisResult('0000000000000000', {
+        previewUri: uri,
+      });
+    });
+
+    const result = await scanMediaLibrary([]);
+
+    expect(result.state.activeCandidates).toHaveLength(1);
+    expect(result.state.activeCandidates[0]?.primaryIssueType).toBe('duplicate');
+    expect(result.state.activeCandidates[0]?.duplicateGroup?.size).toBe(2);
+  });
+
+  it('BDD: Given 两张相似但不完全重复的照片, when 扫描, then 应形成可浏览的近重复结果组', async () => {
+    mediaLibraryApi.getAssetsAsync.mockResolvedValueOnce({
+      assets: [
+        createAsset('similar-photo-a', {
+          width: 1170,
+          height: 2532,
+          fileSize: 2_900_000,
+        }),
+        createAsset('similar-photo-b', {
+          width: 1170,
+          height: 2532,
+          fileSize: 2_700_000,
+          creationTime: 1_710_000_010_000,
+        }),
+      ],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+
+    visualAnalysisApi.analyzeVisualsForAsset.mockImplementation(async (uri: string) => {
+      if (uri.includes('similar-photo-a')) {
+        return createVisualAnalysisResult('0000000000000000', {
+          previewUri: uri,
+        });
+      }
+
+      return createVisualAnalysisResult('000000000000000f', {
+        previewUri: uri,
+      });
+    });
+
+    const result = await scanMediaLibrary([]);
+
+    expect(result.state.activeCandidates).toHaveLength(1);
+    expect(result.state.activeCandidates[0]?.issueTypes).toContain('duplicate');
+    expect(result.state.activeCandidates[0]?.duplicateGroup?.size).toBe(2);
+    expect(
+      result.state.activeCandidates[0]?.reasons.some((reason) => reason.includes('近似')),
+    ).toBe(true);
+  });
+
+  it('BDD: Given 两张不同风景图仅在平均色调上接近, when 扫描, then 不应被识别为重复或相似组', async () => {
+    mediaLibraryApi.getAssetsAsync.mockResolvedValueOnce({
+      assets: [
+        createAsset('landscape-a', {
+          width: 4032,
+          height: 3024,
+          fileSize: 4_200_000,
+        }),
+        createAsset('landscape-b', {
+          width: 4032,
+          height: 3024,
+          fileSize: 4_050_000,
+          creationTime: 1_710_000_010_000,
+        }),
+      ],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+
+    visualAnalysisApi.analyzeVisualsForAsset.mockImplementation(async (uri: string) => {
+      if (uri.includes('landscape-a')) {
+        return createVisualAnalysisResult('f0f0f0f0f0f0f0f0', {
+          previewUri: uri,
+          differenceHash: '00000000ffffffff',
+          metrics: {
+            brightness: 0.58,
+            contrast: 0.19,
+            edgeDensity: 0.18,
+          },
+        });
+      }
+
+      return createVisualAnalysisResult('f0f0f0f0f0f0f0f1', {
+        previewUri: uri,
+        differenceHash: 'ffffffff00000000',
+        metrics: {
+          brightness: 0.57,
+          contrast: 0.18,
+          edgeDensity: 0.17,
+        },
+      });
+    });
+
+    const result = await scanMediaLibrary([]);
+
+    expect(result.state.activeCandidates).toHaveLength(0);
+    expect(result.summary.candidateCount).toBe(0);
+  });
+
+  it('BDD: Given 重复对跨过默认扫描上限, when 扫描最近媒体, then 当前默认范围限制必须被显式锁定', async () => {
+    const leadingDuplicate = createAsset('limit-duplicate-a', {
+      creationTime: 1_710_000_500_000,
+    });
+    const fillerAssets = Array.from({ length: 359 }, (_, index) =>
+      createAsset(`filler-${index + 1}`, {
+        creationTime: 1_710_000_499_000 - index,
+      }),
+    );
+    const trailingDuplicate = createAsset('limit-duplicate-b', {
+      creationTime: 1_709_999_000_000,
+    });
+    const allAssets = [leadingDuplicate, ...fillerAssets, trailingDuplicate];
+
+    mediaLibraryApi.getAssetsAsync.mockImplementation(
+      async ({ first, after }: { first: number; after?: string }) => {
+        const start = after ? Number.parseInt(after, 10) : 0;
+        const end = start + first;
+
+        return {
+          assets: allAssets.slice(start, end),
+          hasNextPage: end < allAssets.length,
+          endCursor: end < allAssets.length ? String(end) : undefined,
+        };
+      },
+    );
+
+    visualAnalysisApi.analyzeVisualsForAsset.mockImplementation(async (uri: string) => {
+      if (uri.includes('limit-duplicate-a') || uri.includes('limit-duplicate-b')) {
+        return createVisualAnalysisResult('1111111111111111', {
+          previewUri: uri,
+        });
+      }
+
+      return createVisualAnalysisResult(null, {
+        previewUri: uri,
+      });
+    });
+
+    const result = await scanMediaLibrary([]);
+
+    expect(result.state.activeCandidates).toHaveLength(0);
+    expect(result.summary.scannedCount).toBe(360);
+  });
+
+  it('reuses reviewed decisions so kept items and cached recycle-bin items skip heavy analysis on later scans', async () => {
+    mediaLibraryApi.getAssetsAsync.mockResolvedValueOnce({
+      assets: [
+        createAsset('kept-photo'),
+        createAsset('recycle-photo'),
+        createAsset('fresh-photo', {
+          width: 720,
+          height: 1280,
+        }),
+      ],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+
+    visualAnalysisApi.analyzeVisualsForAsset.mockResolvedValueOnce({
+      previewUri: 'file:///fresh-photo.jpg',
+      fingerprint: null,
+      status: 'ok',
+      metrics: {
+        brightness: 0.08,
+        contrast: 0.05,
+        edgeDensity: 0.04,
+      },
+    });
+
+    const result = await scanMediaLibrary(['recycle-photo'], {
+      falsePositiveIds: ['kept-photo'],
+      recycleBinCandidateCache: [
+        {
+          id: 'recycle-photo',
+          asset: {
+            id: 'recycle-photo',
+            uri: 'file:///recycle-photo.jpg',
+            previewUri: 'file:///recycle-photo-preview.jpg',
+            mediaType: 'photo',
+            width: 1080,
+            height: 1440,
+            duration: 0,
+            fileSize: 680_000,
+            creationTime: 1_710_000_000_000,
+          },
+          score: 88,
+          confidence: 'high',
+          kind: 'duplicate-photo',
+          primaryIssueType: 'duplicate',
+          issueTypes: ['duplicate'],
+          reasons: ['已移入回收站'],
+          duplicateGroup: {
+            groupId: 'recycle-group',
+            representativeId: 'recycle-keep',
+            relation: 'exact',
+            size: 2,
+            similarity: 0.98,
+            representativeReason: 'higher-resolution',
+            representativeWidth: 3024,
+            representativeHeight: 4032,
+            representativeFileSize: 4_200_000,
+            representativeCreationTime: 1_709_999_000_000,
+          },
+        },
+      ],
+    });
+
+    expect(visualAnalysisApi.analyzeVisualsForAsset).toHaveBeenCalledTimes(1);
+    expect(result.state.activeCandidates.map((candidate) => candidate.id)).toEqual(['fresh-photo']);
+    expect(result.state.recycleBin.map((candidate) => candidate.id)).toEqual(['recycle-photo']);
+    expect(result.summary.candidateCount).toBe(2);
   });
 });

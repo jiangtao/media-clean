@@ -10,12 +10,14 @@ import type {
 
 const ISSUE_PRIORITY: CleanupIssueType[] = ['duplicate', 'abnormal', 'accidental'];
 const DUPLICATE_EXACT_DISTANCE = 2;
-const DUPLICATE_NEAR_DISTANCE = 6;
+const DUPLICATE_NEAR_DISTANCE = 10;
 
 export interface AnalyzedMediaInput {
   asset: MediaAssetSnapshot;
   metrics: VisualMetrics;
   fingerprint: string | null;
+  differenceHash?: string | null;
+  contentHash?: string | null;
   frameFingerprints?: string[];
   analysisStatus?: 'ok' | 'fallback';
 }
@@ -93,21 +95,38 @@ function scoreAccidentalPhoto(asset: MediaAssetSnapshot, metrics: VisualMetrics)
 
   if (metrics.brightness < 0.18) {
     pushReason(candidate, '画面明显过暗', 35);
+  } else if (metrics.brightness < 0.26 && (metrics.contrast < 0.14 || metrics.edgeDensity < 0.12)) {
+    pushReason(candidate, '画面明显过暗', 20);
   }
 
   if (metrics.edgeDensity < 0.1) {
     pushReason(candidate, '边缘信息很少', 25);
+  } else if (metrics.edgeDensity < 0.14 && metrics.contrast < 0.14) {
+    pushReason(candidate, '边缘信息很少', 15);
   }
 
   if (asset.fileSize > 0 && asset.fileSize < 400_000) {
     pushReason(candidate, '文件尺寸较小', 20);
+  } else if (
+    asset.fileSize > 0 &&
+    asset.fileSize < 1_200_000 &&
+    (metrics.edgeDensity < 0.12 || metrics.contrast < 0.12)
+  ) {
+    pushReason(candidate, '文件尺寸较小', 10);
   }
 
   if (Math.max(asset.width, asset.height) < 1_440) {
     pushReason(candidate, '分辨率较低', 10);
+  } else if (
+    Math.max(asset.width, asset.height) < 2_000 &&
+    (metrics.edgeDensity < 0.12 || metrics.contrast < 0.12)
+  ) {
+    pushReason(candidate, '分辨率较低', 10);
   }
 
   if (metrics.contrast < 0.1) {
+    candidate.score += 10;
+  } else if (metrics.contrast < 0.14 && metrics.edgeDensity < 0.12) {
     candidate.score += 10;
   }
 
@@ -171,7 +190,11 @@ function scoreAbnormalPhoto(
   }
 
   if (metrics.edgeDensity < 0.04 && metrics.contrast < 0.08) {
-    pushReason(candidate, '几乎没有可见内容', 25);
+    pushReason(candidate, '几乎没有可见内容', 35);
+  }
+
+  if (metrics.contrast < 0.05 && metrics.edgeDensity < 0.06) {
+    pushReason(candidate, '画面层次异常单一', 20);
   }
 
   if (asset.fileSize > 0 && asset.fileSize < 120_000) {
@@ -219,7 +242,11 @@ function scoreAbnormalVideo(
   }
 
   if (metrics.edgeDensity < 0.04 && metrics.contrast < 0.08) {
-    pushReason(candidate, '缩略图几乎没有内容', 20);
+    pushReason(candidate, '缩略图几乎没有内容', 30);
+  }
+
+  if (metrics.contrast < 0.05 && metrics.edgeDensity < 0.06) {
+    pushReason(candidate, '缩略图层次异常单一', 15);
   }
 
   if (asset.fileSize > 0 && asset.fileSize < 1_000_000) {
@@ -334,6 +361,17 @@ function safeRatio(left: number, right: number) {
   return Math.max(left, right) / Math.min(left, right);
 }
 
+function hasExactContentHashMatch(
+  left: AnalyzedMediaInput,
+  right: AnalyzedMediaInput,
+) {
+  if (left.asset.mediaType !== right.asset.mediaType) {
+    return false;
+  }
+
+  return Boolean(left.contentHash && right.contentHash && left.contentHash === right.contentHash);
+}
+
 function compareMediaSimilarity(
   left: AnalyzedMediaInput,
   right: AnalyzedMediaInput,
@@ -354,17 +392,36 @@ function compareMediaSimilarity(
     relation = videoSimilarity.relation;
     similarity = videoSimilarity.similarity;
   } else {
-    if (!left.fingerprint || !right.fingerprint) {
-      return null;
-    }
+    if (hasExactContentHashMatch(left, right)) {
+      relation = 'exact';
+      similarity = 1;
+    } else {
+      const averageHash = left.fingerprint;
+      const nextAverageHash = right.fingerprint;
+      const differenceHash = left.differenceHash ?? left.fingerprint;
+      const nextDifferenceHash = right.differenceHash ?? right.fingerprint;
 
-    const distance = calculateHashDistance(left.fingerprint, right.fingerprint);
-    if (distance > DUPLICATE_NEAR_DISTANCE) {
-      return null;
-    }
+      if (!averageHash || !nextAverageHash || !differenceHash || !nextDifferenceHash) {
+        return null;
+      }
 
-    relation = distance <= DUPLICATE_EXACT_DISTANCE ? 'exact' : 'near';
-    similarity = Math.max(0, 1 - distance / 64);
+      const averageDistance = calculateHashDistance(averageHash, nextAverageHash);
+      const differenceDistance = calculateHashDistance(differenceHash, nextDifferenceHash);
+
+      if (
+        averageDistance > DUPLICATE_NEAR_DISTANCE ||
+        differenceDistance > DUPLICATE_NEAR_DISTANCE
+      ) {
+        return null;
+      }
+
+      relation =
+        averageDistance <= DUPLICATE_EXACT_DISTANCE &&
+        differenceDistance <= DUPLICATE_EXACT_DISTANCE
+          ? 'exact'
+          : 'near';
+      similarity = Math.max(0, 1 - (averageDistance + differenceDistance) / 128);
+    }
   }
 
   const aspectRatioDelta = Math.abs(
@@ -477,6 +534,12 @@ function resolveRepresentativeReason(items: AnalyzedMediaInput[], representative
 
 function pickRepresentative(items: AnalyzedMediaInput[]) {
   return [...items].sort((left, right) => {
+    const fallbackDelta =
+      Number(left.analysisStatus === 'fallback') - Number(right.analysisStatus === 'fallback');
+    if (fallbackDelta !== 0) {
+      return fallbackDelta;
+    }
+
     const areaDelta = right.asset.width * right.asset.height - left.asset.width * left.asset.height;
     if (areaDelta !== 0) {
       return areaDelta;

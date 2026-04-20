@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "误触清理",
+    "name": "MediaClean",
     "slug": "mistap-media-cleaner",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -32,8 +32,8 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "允许误触清理读取你的照片与视频，以便识别疑似误触媒体。",
-          "savePhotosPermission": "允许误触清理在你确认时删除或整理媒体。",
+          "photosPermission": "允许 MediaClean 读取你的照片与视频，以便识别疑似误触媒体。",
+          "savePhotosPermission": "允许 MediaClean 在你确认时删除或整理媒体。",
           "granularPermissions": [
             "photo",
             "video"

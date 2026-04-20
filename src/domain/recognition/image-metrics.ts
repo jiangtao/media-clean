@@ -107,3 +107,46 @@ export function calculateAverageHashFromRgba(
 
   return hash;
 }
+
+export function calculateDifferenceHashFromRgba(
+  rgba: Uint8Array,
+  width: number,
+  height: number,
+  gridSize = 8,
+) {
+  if (width <= 0 || height <= 0 || rgba.length < width * height * 4) {
+    return null;
+  }
+
+  const comparisons: number[] = [];
+
+  for (let row = 0; row < gridSize; row += 1) {
+    const sourceY = Math.min(
+      height - 1,
+      Math.floor(((row + 0.5) * height) / gridSize),
+    );
+
+    for (let column = 0; column < gridSize; column += 1) {
+      const leftX = Math.min(
+        width - 1,
+        Math.floor(((column + 0.5) * width) / (gridSize + 1)),
+      );
+      const rightX = Math.min(
+        width - 1,
+        Math.floor(((column + 1.5) * width) / (gridSize + 1)),
+      );
+
+      const leftLuminance = getLuminanceAt(rgba, width, leftX, sourceY);
+      const rightLuminance = getLuminanceAt(rgba, width, rightX, sourceY);
+      comparisons.push(leftLuminance <= rightLuminance ? 1 : 0);
+    }
+  }
+
+  let hash = '';
+  for (let index = 0; index < comparisons.length; index += 4) {
+    const nibble = comparisons.slice(index, index + 4).join('');
+    hash += Number.parseInt(nibble, 2).toString(16);
+  }
+
+  return hash;
+}

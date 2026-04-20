@@ -1,38 +1,70 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useColorScheme, View } from 'react-native';
 
 import type { MainTabParamList } from './types';
 import { TabBar } from '../ui/components/TabBar';
-import { getAppTheme } from '../theme/app-theme';
 import { PhotoGridScreen } from '../ui/screens/PhotoGridScreen';
+import { RecycleBinScreen } from '../ui/screens/RecycleBinScreen';
+import { SettingsScreen } from '../ui/screens/SettingsScreen';
+import { useAppPreferences } from '../application/AppPreferencesContext';
+import { loadRecycleBinIds } from '../services/storage/app-storage';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-// Placeholder screens - will be replaced by actual implementations
-function RecycleBinScreen() {
-  return <View style={{ flex: 1, backgroundColor: '#f5f5f5' }} />;
-}
-
-function SettingsScreen() {
-  return <View style={{ flex: 1, backgroundColor: '#f5f5f5' }} />;
-}
-
 export function MainTabNavigator() {
-  const systemTheme = useColorScheme();
-  const theme = useMemo(() => getAppTheme(systemTheme ?? 'light'), [systemTheme]);
+  const appPreferences = useAppPreferences() as ReturnType<typeof useAppPreferences> & {
+    recycleBinIds?: string[];
+  };
+  const { copy, theme } = appPreferences;
+  const [recycleBinIds, setRecycleBinIds] = useState<string[]>(() => appPreferences.recycleBinIds ?? []);
+  const recycleBinCount = recycleBinIds.length;
 
-  // TODO: Get recycle bin count from state management
-  const recycleBinCount = 0;
+  const refreshRecycleBinIds = useCallback(async () => {
+    try {
+      const nextRecycleBinIds = await loadRecycleBinIds();
+      setRecycleBinIds(nextRecycleBinIds);
+    } catch {
+      setRecycleBinIds([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshRecycleBinIds();
+  }, [refreshRecycleBinIds]);
+
+  useEffect(() => {
+    if (appPreferences.recycleBinIds) {
+      setRecycleBinIds(appPreferences.recycleBinIds);
+    }
+  }, [appPreferences.recycleBinIds]);
 
   const tabs = useMemo(() => [
-    { name: 'Photos', label: '照片', icon: '📷', badge: undefined },
-    { name: 'RecycleBin', label: '回收站', icon: '🗑', badge: recycleBinCount || undefined },
-    { name: 'Settings', label: '设置', icon: '⚙️', badge: undefined },
-  ], [recycleBinCount]);
+    {
+      name: 'Photos',
+      label: copy.tabs.photos,
+      icon: 'images-outline',
+      activeIcon: 'images',
+      badge: undefined,
+    },
+    {
+      name: 'RecycleBin',
+      label: copy.tabs.recycle,
+      icon: 'trash-outline',
+      activeIcon: 'trash',
+      badge: recycleBinCount || undefined,
+    },
+    {
+      name: 'Settings',
+      label: copy.tabs.settings,
+      icon: 'settings-outline',
+      activeIcon: 'settings',
+      badge: undefined,
+    },
+  ], [copy, recycleBinCount]);
 
   return (
     <Tab.Navigator
+      id="main-tabs"
       screenOptions={{
         headerShown: false,
       }}
@@ -41,6 +73,7 @@ export function MainTabNavigator() {
           tabs={tabs}
           activeTab={state.routes[state.index].name}
           onTabPress={(name) => {
+            void refreshRecycleBinIds();
             const route = state.routes.find(r => r.name === name);
             if (route) {
               navigation.navigate(route.name);
@@ -50,8 +83,22 @@ export function MainTabNavigator() {
         />
       )}
     >
-      <Tab.Screen name="Photos" component={PhotoGridScreen} />
-      <Tab.Screen name="RecycleBin" component={RecycleBinScreen} />
+      <Tab.Screen name="Photos">
+        {() => (
+          <PhotoGridScreen
+            recycleBinIds={recycleBinIds}
+            onRecycleBinIdsChange={setRecycleBinIds}
+          />
+        )}
+      </Tab.Screen>
+      <Tab.Screen name="RecycleBin">
+        {() => (
+          <RecycleBinScreen
+            recycleBinIds={recycleBinIds}
+            onRecycleBinIdsChange={setRecycleBinIds}
+          />
+        )}
+      </Tab.Screen>
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );

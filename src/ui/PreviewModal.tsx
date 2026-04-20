@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useMemo } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { CleanupCandidate } from '../domain/recognition/types';
 import type { AppLanguage } from '../i18n/app-language';
@@ -19,6 +19,7 @@ import {
 } from '../i18n/app-copy';
 import type { AppThemePalette } from '../theme/app-theme';
 import { resolvePreviewPrimaryActionMode } from '../application/media-cleaner-helpers';
+import { buildSizedImageSource } from './components/image-source';
 
 interface PreviewModalProps {
   candidate: CleanupCandidate | null;
@@ -43,7 +44,7 @@ function VideoPreview({ uri, theme }: { uri: string; theme: AppThemePalette }) {
       player={player}
       nativeControls
       contentFit="contain"
-      allowsFullscreen
+      fullscreenOptions={{ enable: true }}
       style={styles.previewMedia}
     />
   );
@@ -62,6 +63,8 @@ export function PreviewModal({
   const copy = getAppCopy(language);
   const styles = useMemo(() => createStyles(theme), [theme]);
   const primaryActionMode = resolvePreviewPrimaryActionMode(mode);
+  const previewWidth = Math.max(Dimensions.get('window').width - 40, 280);
+  const previewHeight = Math.max(Math.round(previewWidth * 0.9), 280);
 
   if (!candidate) {
     return null;
@@ -85,9 +88,10 @@ export function PreviewModal({
             <VideoPreview uri={candidate.asset.uri} theme={theme} />
           ) : (
             <Image
-              source={{ uri: candidate.asset.uri }}
+              source={buildSizedImageSource(candidate.asset.uri, previewWidth, previewHeight)}
               contentFit="contain"
               style={styles.previewMedia}
+              allowDownscaling
             />
           )}
 

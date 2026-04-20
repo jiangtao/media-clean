@@ -1,12 +1,16 @@
 import * as Notifications from 'expo-notifications';
+import * as MediaLibrary from 'expo-media-library';
 import { Platform } from 'react-native';
 
 import { isDefaultReminderSummary } from '../../i18n/app-copy';
+import { assessReminderTrigger } from '../../features/reminders/reminder-trigger';
 import type { ReminderCopy } from '../../features/reminders/reminder-copy';
 import {
   formatReminderTime,
   type ReminderSettings,
 } from '../../features/reminders/reminder-settings';
+import { loadLastScanMeta } from '../storage/app-storage';
+import { buildScanRangeStartAt, loadScanRange } from '../storage/scan-range-storage';
 
 export const REMINDER_CHANNEL_ID = 'cleanup-reminders';
 
@@ -125,6 +129,34 @@ export async function configureCleanupReminderChannel(copy?: ReminderChannelCopy
   });
 }
 
+async function loadLatestEligibleAssetCreatedAt(createdAfter: number) {
+  const page = await MediaLibrary.getAssetsAsync({
+    first: 1,
+    createdAfter,
+    mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
+    sortBy: [[MediaLibrary.SortBy.creationTime, false]],
+  });
+
+  return page.assets[0]?.creationTime ?? null;
+}
+
+async function evaluateCleanupReminderTrigger(enabled: boolean) {
+  const [scanRange, lastScanMeta] = await Promise.all([
+    loadScanRange(),
+    loadLastScanMeta(),
+  ]);
+  const latestEligibleAssetAt = await loadLatestEligibleAssetCreatedAt(
+    buildScanRangeStartAt(scanRange),
+  );
+
+  return assessReminderTrigger({
+    enabled,
+    scanRangeMonths: scanRange,
+    latestEligibleAssetAt,
+    lastScanAt: lastScanMeta?.scannedAt ?? null,
+  });
+}
+
 export async function syncCleanupReminderNotification(
   settings: ReminderScheduleLike,
   copy: ReminderCopy,
@@ -137,6 +169,14 @@ export async function syncCleanupReminderNotification(
   }
 
   if (!settings.enabled) {
+    return {
+      notificationId: null,
+      nextTriggerAt: null,
+    };
+  }
+
+  const triggerAssessment = await evaluateCleanupReminderTrigger(settings.enabled);
+  if (!triggerAssessment.shouldSchedule) {
     return {
       notificationId: null,
       nextTriggerAt: null,
@@ -163,6 +203,18 @@ export async function reconcileCleanupReminderNotification(
   await configureCleanupReminderChannel(channelCopy);
 
   if (!settings.enabled) {
+    return {
+      notificationId: null,
+      nextTriggerAt: null,
+    };
+  }
+
+  const triggerAssessment = await evaluateCleanupReminderTrigger(settings.enabled);
+  if (!triggerAssessment.shouldSchedule) {
+    if (settings.notificationId) {
+      await Notifications.cancelScheduledNotificationAsync(settings.notificationId);
+    }
+
     return {
       notificationId: null,
       nextTriggerAt: null,

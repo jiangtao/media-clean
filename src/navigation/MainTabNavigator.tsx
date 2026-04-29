@@ -62,6 +62,26 @@ export function MainTabNavigator() {
     },
   ], [copy, recycleBinCount]);
 
+  const renderPhotoGridScreen = useCallback(
+    () => (
+      <PhotoGridScreen
+        recycleBinIds={recycleBinIds}
+        onRecycleBinIdsChange={setRecycleBinIds}
+      />
+    ),
+    [recycleBinIds],
+  );
+
+  const renderRecycleBinScreen = useCallback(
+    () => (
+      <RecycleBinScreen
+        recycleBinIds={recycleBinIds}
+        onRecycleBinIdsChange={setRecycleBinIds}
+      />
+    ),
+    [recycleBinIds],
+  );
+
   return (
     <Tab.Navigator
       id="main-tabs"
@@ -83,22 +103,8 @@ export function MainTabNavigator() {
         />
       )}
     >
-      <Tab.Screen name="Photos">
-        {() => (
-          <PhotoGridScreen
-            recycleBinIds={recycleBinIds}
-            onRecycleBinIdsChange={setRecycleBinIds}
-          />
-        )}
-      </Tab.Screen>
-      <Tab.Screen name="RecycleBin">
-        {() => (
-          <RecycleBinScreen
-            recycleBinIds={recycleBinIds}
-            onRecycleBinIdsChange={setRecycleBinIds}
-          />
-        )}
-      </Tab.Screen>
+      <Tab.Screen name="Photos">{renderPhotoGridScreen}</Tab.Screen>
+      <Tab.Screen name="RecycleBin">{renderRecycleBinScreen}</Tab.Screen>
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );

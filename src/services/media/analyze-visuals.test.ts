@@ -1,17 +1,43 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const fileSystemApi = vi.hoisted(() => ({
+  deleteAsync: vi.fn(),
+}));
+
+const imageManipulatorApi = vi.hoisted(() => ({
+  manipulateAsync: vi.fn(),
+}));
+
+const videoThumbnailsApi = vi.hoisted(() => ({
+  getThumbnailAsync: vi.fn(),
+}));
+
+const jpegApi = vi.hoisted(() => ({
+  decode: vi.fn(() => ({
+    data: new Uint8ClampedArray(48 * 48 * 4),
+    width: 48,
+    height: 48,
+  })),
+}));
+
+vi.mock('expo-file-system/legacy', () => fileSystemApi);
 
 vi.mock('expo-image-manipulator', () => ({
-  manipulateAsync: vi.fn(),
+  manipulateAsync: imageManipulatorApi.manipulateAsync,
   SaveFormat: {
     JPEG: 'jpeg',
   },
 }));
 
 vi.mock('expo-video-thumbnails', () => ({
-  getThumbnailAsync: vi.fn(),
+  getThumbnailAsync: videoThumbnailsApi.getThumbnailAsync,
 }));
 
-import { buildVideoSampleTimes } from './analyze-visuals';
+vi.mock('jpeg-js', () => jpegApi);
+
+import { analyzeVisualsForAsset, buildVideoSampleTimes } from './analyze-visuals';
+
+const ONE_PIXEL_JPEG_BASE64 = Buffer.from('fake-jpeg').toString('base64');
 
 describe('buildVideoSampleTimes', () => {
   it('returns one zero sample when duration is unavailable', () => {
@@ -50,5 +76,60 @@ describe('buildVideoSampleTimes', () => {
 
     expect(Math.max(...mediumGaps) - Math.min(...mediumGaps)).toBeLessThanOrEqual(2);
     expect(Math.max(...longGaps) - Math.min(...longGaps)).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('analyzeVisualsForAsset', () => {
+  beforeEach(() => {
+    fileSystemApi.deleteAsync.mockReset();
+    imageManipulatorApi.manipulateAsync.mockReset();
+    videoThumbnailsApi.getThumbnailAsync.mockReset();
+    jpegApi.decode.mockClear();
+  });
+
+  it('returns the original photo URI and deletes the generated reduced analysis image', async () => {
+    imageManipulatorApi.manipulateAsync.mockResolvedValueOnce({
+      uri: 'file:///cache/ImageManipulator/photo-reduced.jpg',
+      base64: ONE_PIXEL_JPEG_BASE64,
+    });
+
+    const result = await analyzeVisualsForAsset('file:///media/original-photo.jpg', 'photo');
+
+    expect(result.previewUri).toBe('file:///media/original-photo.jpg');
+    expect(fileSystemApi.deleteAsync).toHaveBeenCalledWith(
+      'file:///cache/ImageManipulator/photo-reduced.jpg',
+      { idempotent: true },
+    );
+  });
+
+  it('returns the original video URI and deletes generated frame thumbnails and reduced images', async () => {
+    videoThumbnailsApi.getThumbnailAsync
+      .mockResolvedValueOnce({ uri: 'file:///cache/VideoThumbnails/frame-1.jpg' })
+      .mockResolvedValueOnce({ uri: 'file:///cache/VideoThumbnails/frame-2.jpg' })
+      .mockResolvedValueOnce({ uri: 'file:///cache/VideoThumbnails/frame-3.jpg' });
+    imageManipulatorApi.manipulateAsync.mockImplementation(async (sourceUri: string) => ({
+      uri: `${sourceUri}.reduced.jpg`,
+      base64: ONE_PIXEL_JPEG_BASE64,
+    }));
+
+    const result = await analyzeVisualsForAsset('file:///media/original-video.mp4', 'video', 4.8);
+
+    expect(result.previewUri).toBe('file:///media/original-video.mp4');
+    expect(fileSystemApi.deleteAsync).toHaveBeenCalledWith(
+      'file:///cache/VideoThumbnails/frame-1.jpg.reduced.jpg',
+      { idempotent: true },
+    );
+    expect(fileSystemApi.deleteAsync).toHaveBeenCalledWith(
+      'file:///cache/VideoThumbnails/frame-1.jpg',
+      { idempotent: true },
+    );
+    expect(fileSystemApi.deleteAsync).toHaveBeenCalledWith(
+      'file:///cache/VideoThumbnails/frame-3.jpg.reduced.jpg',
+      { idempotent: true },
+    );
+    expect(fileSystemApi.deleteAsync).toHaveBeenCalledWith(
+      'file:///cache/VideoThumbnails/frame-3.jpg',
+      { idempotent: true },
+    );
   });
 });

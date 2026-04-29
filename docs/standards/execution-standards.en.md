@@ -8,14 +8,18 @@ This document defines the required team structure, quality gates, TODO sequencin
 
 ## 1. Goal File and Acceptance Sources
 
-1. [v0.1.md](../goal/v0.1.md) is the immutable goal file. It may be read, referenced, and compared against, but it must not be edited.
-2. Every execution cycle must be checked against all of the following:
-   - `docs/goal/v0.1.md`
+1. All `docs/goal/*.md` files are immutable goal files. They may be read, referenced, and compared against, but they must not be edited.
+2. When multiple goal versions exist, the newest version explicitly activated by the user becomes the active goal source.
+3. The current active goal source is `docs/goal/v0.3.md`; `docs/goal/v0.2.md` and `docs/goal/v0.1.md` remain historical baselines for comparison only and must not keep driving the current wave.
+4. Every execution cycle must be checked against all of the following:
+   - `docs/goal/v0.3.md`
+   - `docs/goal/v0.2.md` for previous-wave comparison only
+   - `docs/goal/v0.1.md` for historical comparison only
    - active standards
    - the relevant design docs
    - the relevant execution plan
    - the relevant BDD scenarios or `.feature` files
-3. If code, plans, and standards diverge, the goal file and confirmed standards win. Existing code does not get to redefine the target.
+5. If code, plans, and standards diverge, the active goal source and confirmed standards win. Existing code does not get to redefine the target.
 
 ## 2. Team Structure
 
@@ -98,25 +102,29 @@ This document defines the required team structure, quality gates, TODO sequencin
 
 ## 7. Current Default TODO Queue
 
-1. First queue: runtime-path stabilization  
-   - keep scan cache, cooperative yielding, and reminder cold-start reconcile aligned with tests.
-2. Second queue: continued scan-entry interaction rollout  
-   - centered on the Photos scan entry and result interaction path.
-3. Third queue: legacy gap closure  
-   - AppPreferences unification
-   - i18n and theme coverage
-   - special-screen adaptation and verification
-4. Fourth queue: real recycle-bin data flow  
-   - storage-backed loading
-   - real badge counts
-   - detail-view path
+1. First queue: `v0.3` product workflow shell
+   - upgrade standards and plans so the current wave is explicitly driven by `docs/goal/v0.3.md`
+   - make the landing page explain the `scan -> recognize -> filter -> clean -> report` workflow
+   - make the scan page expose recognition-category summaries instead of only a result list
+2. Second queue: keep-and-clean plus cumulative reporting
+   - tighten recycle-bin semantics into keep-and-clean
+   - make hard delete write a `SQLite`-backed cumulative cleanup report
+   - ensure restore actions never roll back cumulative report totals
+3. Third queue: remote observability foundation
+   - Firebase / Crashlytics / Analytics are out of scope for the current Android-first build
+   - the current version keeps only the local error fallback and does not require remote-device reporting acceptance
+   - when a later version re-enables this lane, it must include service files, native configuration, and real-device acceptance
+4. Fourth queue: later end-state capabilities
+   - Rust shared core, iOS adapters, and skill / desktop reuse stay in later waves
+   - they must not block the current product-shell delivery
 
 ## 8. Current Delivery-Blocking TODOs
 
-1. [RecycleBinScreen.tsx](/Users/jt/places/personal/app-cleaner/src/ui/screens/RecycleBinScreen.tsx:33) still lacks real recycle-bin data loading.
-2. [MainTabNavigator.tsx](/Users/jt/places/personal/app-cleaner/src/navigation/MainTabNavigator.tsx:16) still does not wire the recycle-bin badge to real state.
-3. [RecycleBinScreen.tsx](/Users/jt/places/personal/app-cleaner/src/ui/screens/RecycleBinScreen.tsx:46) still lacks a real detail-navigation path from the recycle bin.
-4. Until those three gaps are closed, the recycle-bin flow must not be considered complete.
+1. [LandingScreen.tsx](/Users/jt/places/personal/app-cleaner/src/ui/screens/LandingScreen.tsx:1) does not yet act as the five-step product-workflow homepage required by `v0.3`.
+2. [PhotoGridScreen.tsx](/Users/jt/places/personal/app-cleaner/src/ui/screens/PhotoGridScreen.tsx:1) does not yet expose an explicit recognition-category summary layer.
+3. [RecycleBinScreen.tsx](/Users/jt/places/personal/app-cleaner/src/ui/screens/RecycleBinScreen.tsx:1) does not yet show a `SQLite`-backed cumulative cleanup report.
+4. Firebase / Crashlytics / Analytics have been removed from the current Android-first delivery blockers; do not treat the noop fallback warning as a current-version defect.
+5. Until the first three gaps are closed, the current Android-first slice of `docs/goal/v0.3.md` must not be considered delivered.
 
 ## 9. Documentation Discipline
 
@@ -125,10 +133,12 @@ This document defines the required team structure, quality gates, TODO sequencin
 3. When a standard changes, the related design, plan, or BDD scenarios must be updated as well.
 4. Documentation must match the live code path. A documented behavior that is not wired into the live path is not complete work.
 
+The runtime mechanics for team mode live in [agent-team-mode.en.md](./agent-team-mode.en.md).
+
 ## 10. Definition of Done
 
 1. Quality gates pass.
-2. The result matches the goal file.
+2. The result matches the active goal source.
 3. The result matches the standards and BDD scenarios.
 4. Sub-agent verification evidence is complete.
 5. No blocking TODO remains in the current delivery wave.

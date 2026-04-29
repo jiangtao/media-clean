@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { detectPreferredAppLanguage, normalizeAppLanguage } from './app-language';
+import {
+  detectPreferredAppLanguage,
+  normalizeAppLanguage,
+  normalizeAppLanguagePreference,
+  resolveAppLanguagePreference,
+} from './app-language';
 
 describe('app language', () => {
   afterEach(() => {
@@ -36,5 +41,16 @@ describe('app language', () => {
     });
 
     expect(detectPreferredAppLanguage()).toBe('zh-CN');
+  });
+
+  it('normalizes system as a language preference and resolves it to the current locale', () => {
+    vi.stubGlobal('Intl', {
+      DateTimeFormat: () => ({
+        resolvedOptions: () => ({ locale: 'en-GB' }),
+      }),
+    });
+
+    expect(normalizeAppLanguagePreference('system')).toBe('system');
+    expect(resolveAppLanguagePreference('system')).toBe('en-US');
   });
 });

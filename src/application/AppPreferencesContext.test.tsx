@@ -8,9 +8,17 @@ import * as themePreferenceStorage from '../services/storage/theme-preference-st
 
 vi.mock('../services/storage/app-language-storage');
 vi.mock('../services/storage/theme-preference-storage');
+vi.mock('react-native', () => ({
+  AppState: {
+    addEventListener: vi.fn(() => ({
+      remove: vi.fn(),
+    })),
+  },
+  useColorScheme: () => 'dark',
+}));
 
-const mockLoadAppLanguage = vi.mocked(appLanguageStorage.loadAppLanguage);
-const mockSaveAppLanguage = vi.mocked(appLanguageStorage.saveAppLanguage);
+const mockLoadAppLanguagePreference = vi.mocked(appLanguageStorage.loadAppLanguagePreference);
+const mockSaveAppLanguagePreference = vi.mocked(appLanguageStorage.saveAppLanguagePreference);
 const mockLoadThemePreference = vi.mocked(themePreferenceStorage.loadThemePreference);
 const mockSaveThemePreference = vi.mocked(themePreferenceStorage.saveThemePreference);
 
@@ -26,8 +34,8 @@ describe('AppPreferencesContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     latestSnapshot = null;
-    mockLoadAppLanguage.mockResolvedValue('en-US');
-    mockSaveAppLanguage.mockResolvedValue(undefined);
+    mockLoadAppLanguagePreference.mockResolvedValue('en-US');
+    mockSaveAppLanguagePreference.mockResolvedValue(undefined);
     mockLoadThemePreference.mockResolvedValue('dark');
     mockSaveThemePreference.mockResolvedValue(undefined);
   });
@@ -43,11 +51,12 @@ describe('AppPreferencesContext', () => {
     });
 
     expect(latestSnapshot?.copy.tabs.photos).toBe('Photos');
+    expect(latestSnapshot?.languagePreference).toBe('en-US');
     expect(latestSnapshot?.theme.scheme).toBe('dark');
     expect(latestSnapshot?.themePreference).toBe('dark');
     expect(latestSnapshot?.resolvedThemeScheme).toBe('dark');
 
-    expect(mockLoadAppLanguage).toHaveBeenCalledTimes(1);
+    expect(mockLoadAppLanguagePreference).toHaveBeenCalledTimes(1);
     expect(mockLoadThemePreference).toHaveBeenCalledTimes(1);
   });
 
@@ -70,7 +79,27 @@ describe('AppPreferencesContext', () => {
     expect(latestSnapshot?.theme.scheme).toBe('light');
     expect(latestSnapshot?.resolvedThemeScheme).toBe('light');
 
-    expect(mockSaveAppLanguage).toHaveBeenCalledWith('zh-CN');
+    expect(mockSaveAppLanguagePreference).toHaveBeenCalledWith('zh-CN');
     expect(mockSaveThemePreference).toHaveBeenCalledWith('light');
+  });
+
+  it('supports following the system language as a first-class preference', async () => {
+    mockLoadAppLanguagePreference.mockResolvedValueOnce('system');
+
+    await act(async () => {
+      TestRenderer.create(
+        <AppPreferencesProvider>
+          <PreferencesProbe />
+        </AppPreferencesProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await latestSnapshot?.setLanguage('system');
+    });
+
+    expect(latestSnapshot?.languagePreference).toBe('system');
+    expect(mockSaveAppLanguagePreference).toHaveBeenCalledWith('system');
   });
 });

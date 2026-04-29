@@ -1,0 +1,13 @@
+{
+  "name": "mc-vercel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ./scripts/build.mjs",
+    "dev": "node ./scripts/dev-server.mjs",
+    "preview": "node ./scripts/dev-server.mjs dist 4173",
+    "deploy": "vercel",
+    "deploy:prod": "vercel --prod"
+  }
+}

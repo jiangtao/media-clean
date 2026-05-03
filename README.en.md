@@ -62,6 +62,9 @@ npm run export:android
 - Goal: [docs/goal/v0.1.md](./docs/goal/v0.1.md)
 - Design: [docs/plans/2026-04-16-android-media-cleaner-design/_index.md](./docs/plans/2026-04-16-android-media-cleaner-design/_index.md)
 - Execution Plan: [docs/plans/2026-04-16-android-media-cleaner-plan/_index.md](./docs/plans/2026-04-16-android-media-cleaner-plan/_index.md)
+- Android release contract: [docs/release/android.md](./docs/release/android.md)
+- Vercel release contract: [docs/release/vercel.md](./docs/release/vercel.md)
+- `v0.0.1` audit record: [docs/release/v0.0.1-audit.md](./docs/release/v0.0.1-audit.md)
 
 ## Suggested Next Steps
 

@@ -62,6 +62,9 @@ npm run export:android
 - 目标文档：[docs/goal/v0.1.md](./docs/goal/v0.1.md)
 - 设计文档：[docs/plans/2026-04-16-android-media-cleaner-design/_index.md](./docs/plans/2026-04-16-android-media-cleaner-design/_index.md)
 - 执行计划：[docs/plans/2026-04-16-android-media-cleaner-plan/_index.md](./docs/plans/2026-04-16-android-media-cleaner-plan/_index.md)
+- Android 发包契约：[docs/release/android.md](./docs/release/android.md)
+- Vercel 发布契约：[docs/release/vercel.md](./docs/release/vercel.md)
+- `v0.0.1` 审计记录：[docs/release/v0.0.1-audit.md](./docs/release/v0.0.1-audit.md)
 
 ## 后续建议
 

@@ -356,6 +356,8 @@ jobs:
       - name: Run tests
         uses: reactivecircus/android-emulator-runner@v2
         timeout-minutes: 30
+        env:
+          MATRIX_CUTOUT: ${{ matrix.cutout || 'none' }}
         with:
           api-level: ${{ matrix.api }}
           target: ${{ matrix.target }}
@@ -369,7 +371,9 @@ jobs:
             adb shell wm density ${{ matrix.density }}
 
             # Configure display cutout if specified
-            case "${{ matrix.cutout }}" in
+            case "$MATRIX_CUTOUT" in
+              ""|"none")
+                ;;
               "default")
                 adb shell cmd overlay enable com.android.internal.display.cutout.emulation.normal
                 ;;

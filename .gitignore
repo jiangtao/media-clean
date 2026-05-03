@@ -5,7 +5,8 @@ node_modules/
 
 # Expo
 .expo/
-dist/
+/dist/
+/page/dist/
 web-build/
 expo-env.d.ts
 
@@ -44,4 +45,5 @@ docs/archive/tmp/
 # generated native folders
 /ios
 /android
+/artifacts/
 *.drawio

@@ -20,7 +20,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.jt.mistapmediacleaner"
+      "package": "com.jt.mistapmediacleaner",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -57,6 +58,7 @@
           "color": "#173944"
         }
       ],
+      "./plugins/withAndroidReleaseSigning",
       "./plugins/withBackgroundScan",
       "expo-video"
     ]

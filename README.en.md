@@ -2,120 +2,110 @@
 
 [中文 README](./README.md)
 
-Media Clean is an Android-first local photo-library recognition and cleanup tool. It targets accidental videos, blurry photos, similar photos, duplicates, and low-information media in family phone libraries. The product goal is to make “scan -> recognize -> review -> clean -> report” stable, recoverable, local, and explainable.
-
-## Official Product Introduction
-
-Public landing-page copy:
-
-> Media Clean helps you quickly identify and clean duplicate, blurry, and similar photos, keeping your library tidy and freeing more storage space.
+Media Clean is a local photo-library recognition and cleanup tool. It is built for the accidental videos, blurry photos, similar photos, duplicate content, and low-information media that accumulate in family phone libraries. The product goal is to make "scan -> recognize -> review -> clean -> report" stable, recoverable, and explainable as a local cleanup flow.
 
 Product website: [https://mc.jerret.me](https://mc.jerret.me)
-
-The public page positions Media Clean as a smart photo-library management tool with the headline “refresh your photo library”. It emphasizes local safety, one-tap cleanup, speed, and explainable abnormal-media results. The publishing page lives in [page](./page/README.en.md); the Chinese page documentation is [page/README.md](./page/README.md).
 
 <video controls width="100%" src="./page/public/promo-video-60fps.mp4">
   This reader does not support embedded video playback.
 </video>
 
-Video file: [page/public/promo-video-60fps.mp4](./page/public/promo-video-60fps.mp4)
-
-The current page includes:
-
-1. Hero: smart photo-library management positioning, value proposition, and Google Play CTA.
-2. Phone mock: scanning state, media counts, progress, and Photos / Recycle Bin / Settings navigation.
-3. Feature cards: smart scan, one-tap cleanup, privacy safety, and speed.
-4. Video intro: embedded `promo-video-60fps.mp4`.
-5. Interface gallery: three product showcase images.
-6. Bottom CTA: app download, product links, and support links.
-
 ## Current Product Capabilities
+
+![Media Clean expected next-version design](./design/assets/media-clean-light-simple-flow-boss-v5-tightened.png)
+
+The image above is the expected light design direction for the next version. Future UI and product-page adjustments should use this visual direction as the reference.
+
+Media Clean's current capabilities can be summarized into four product threads: local scan and recognition, explainable abnormal-media results, in-app recycle-bin cleanup, and recoverable Android scanning. The product goal is to "refresh your photo library"; with local safety as the baseline, it turns accidental videos, blurry photos, similar photos, duplicate content, and low-information media into candidates that users can review, restore, and finally clean.
+
+<details>
+<summary>Product Details</summary>
 
 ### Scan And Recognition
 
-1. Requests photo and video permissions, then reads media metadata locally.
+1. Requests photo and video read permissions, then reads media metadata locally.
 2. Scans the latest 12 months by default; Settings supports `1 / 2 / 3 / 6 / 12` month windows.
-3. Each batch has an explicit time range and uses both `createdAfter` and `createdBefore` boundaries.
-4. After the current window completes, continuing the scan backfills older months instead of repeatedly scanning completed batches.
-5. After historical coverage is complete, the app enters a full-coverage state; newly added media can then trigger incremental scanning.
-6. Supports Android local scan recovery: when the user switches screens or the app is interrupted, re-entering can reattach to the active batch.
-7. UI progress and Android notification progress share the same batch numerator/denominator contract.
+3. Each active batch has an explicit time range and uses `createdAfter` and `createdBefore` to control the window boundaries.
+4. After the current window is completed, continuing the scan backfills older months instead of repeatedly scanning completed batches.
+5. After the full history is completed, the app enters the "full scan completed" state; if new media appears later, it enters incremental scanning.
+6. Supports Android local scan recovery: when the user switches screens or the app is interrupted by the system, re-entering can reattach to the active scan batch.
+7. UI progress and Android notification progress use the same batch numerator/denominator contract to avoid split display states.
 
 ### Local Recognition
 
-The first implementation does not call external AI APIs. Recognition is based on local heuristics and lightweight features:
+The first version in this repository does not call external AI APIs. Recognition is based on local heuristics and lightweight features:
 
-1. Blur and low-quality detection use visual metrics such as brightness, contrast, and edge density.
-2. Duplicate and near-duplicate detection preserve content hashes, difference hashes, image fingerprints, and video keyframe fingerprints.
-3. Accidental and abnormal-media detection combines media type, duration, dimensions, file size, visual metrics, and rule thresholds.
-4. Grouping and explanations show confidence, reasons, media metadata, previews, and duplicate-group context.
-5. Durable results, candidate views, user decisions, and recycle-bin state are persisted in local SQLite.
+1. Blur and low quality: generates quality judgments from visual metrics such as brightness, contrast, and edge density.
+2. Duplicates and near duplicates: preserves content hashes, difference hashes, image fingerprints, and video keyframe fingerprints.
+3. Accidental and abnormal media: combines media type, duration, dimensions, file size, visual metrics, and rule thresholds to produce candidates.
+4. Grouping and explanations: candidates show confidence, trigger reasons, media information, previews, and duplicate-group context.
+5. Result persistence: recognition results, candidate views, user decisions, and recycle-bin state are written to local SQLite.
 
 ### Cleanup And Recycle Bin
 
-1. Candidates are never permanently deleted immediately.
+1. Candidate media is never permanently deleted directly.
 2. High-confidence candidates can be moved into the in-app recycle bin in bulk.
-3. The Recycle Bin screen owns the “keep and clean” workflow, including restore, keep, and final deletion.
-4. Permanent deletion requires confirmation and calls the system media deletion API.
-5. User decisions are written to `user_decision`; future scans should not overwrite keep, recycle, restore, delete, or failed decisions.
-6. The recycle bin shows a cumulative cleanup report, including cleaned count, cleaned size, and last cleanup time.
+3. The Recycle Bin screen owns the "keep and clean" flow, including restore, continue keeping, and final deletion.
+4. Permanent deletion requires a second user confirmation and calls the system media deletion capability.
+5. User decisions are written to `user_decision`; later scans must not overwrite user-made keep, recycle, restore, or delete decisions.
+6. The recycle-bin footer provides a cumulative cleanup report, including total cleaned count, total cleaned size, and latest cleanup time.
 
-### Settings, Reminders, And UX
+### Settings, Reminders, And Experience
 
-1. Supports `zh-CN / en-US`, following the system language by default with manual override in Settings.
-2. Supports light, dark, and system appearance modes.
+1. Supports `zh-CN / en-US`, follows the system language by default, and can be manually switched in Settings.
+2. Supports dark, light, and system-following themes.
 3. Supports local cleanup reminders with configurable frequency, weekday, and time.
 4. Supports scan-completion notifications, Android foreground scan notifications, and local reminder notifications.
-5. Adapts to safe areas, notches, hole-punch screens, and foldable layout constraints.
-6. Android splash, app icons, and publishing-page icons use the current brand assets.
+5. Adapts layout strategies for notches, hole-punch screens, safe areas, and foldables.
+6. Android splash screens, app icons, and publishing-page icons use the current brand assets.
 
 ### Publishing Page
 
-1. The publishing page lives in `page/` and is decoupled from Expo Android/iOS builds.
-2. Set the Vercel Root Directory to `page` to deploy it independently.
+1. The publishing page lives independently in `page/` and is decoupled from Expo Android/iOS builds.
+2. Set Vercel Root Directory to `page` to deploy it independently.
 3. Recommended Vercel project name: `mc`; preview domain: `mc.vercel.app`; production domain target: `mc.jerret.me`.
-4. Deployment contract: [docs/release/vercel.en.md](./docs/release/vercel.en.md); Chinese version: [docs/release/vercel.md](./docs/release/vercel.md).
+4. Detailed deployment contract: [docs/release/vercel.en.md](./docs/release/vercel.en.md); Chinese version: [docs/release/vercel.md](./docs/release/vercel.md).
+
+</details>
 
 ## Technical Architecture
 
-Media Clean is an Expo / React Native app with Android as the primary acceptance target. The JS layer owns the control plane, UI, result aggregation, and persistence coordination. The Android native layer owns background scan execution, foreground notifications, and local media enumeration. SQLite is the local source of truth for scan runtime state and user decisions.
+Media Clean is currently an Expo / React Native app, with Android as the primary acceptance path. The JS layer owns the control plane, UI, result aggregation, and persistence coordination. The Android native layer owns background scan execution, foreground notifications, and local media enumeration. SQLite is the local source of truth for scan runtime state and user decisions.
 
 ![Media Clean architecture diagram](./design/assets/media-clean-architecture.svg)
 
-Editable Draw.io source: [design/assets/media-clean-architecture.drawio](./design/assets/media-clean-architecture.drawio).
-
 ### Module Responsibilities
 
-1. `src/application/`: app bootstrap, preferences, error boundary, reminder bootstrap, and observability fallback.
+1. `src/application/`: app startup, preferences, error boundary, reminder bootstrap, and observability fallback.
 2. `src/navigation/`: Photos, Recycle Bin, and Settings tab navigation.
-3. `src/ui/`: UI components, photo grid, scan progress, candidate cards, detail preview, and layout adaptation.
+3. `src/ui/`: UI components, photo grid, scan progress, candidate cards, detail preview, and page-layout adaptation.
 4. `src/domain/recognition/`: recognition types, visual metrics, scoring, and candidate generation.
-5. `src/features/scan/`: scan range, media loading, Android native scan facade, batch progress, runtime recovery, and staging importer.
-6. `src/features/cleanup/`: cleanup state machine for keep, recycle, restore, and delete actions.
-7. `src/features/reminders/`: cleanup reminder copy, scheduling, background task, and runtime reconciliation.
-8. `src/services/storage/`: AsyncStorage compatibility, SQLite operational store, scan job checkpoints, scan range, and preference storage.
-9. `src/services/media/`: visual analysis and generated analysis-file cache management. Durable product truth should remain results plus original media URIs, not temporary files.
-10. `plugins/withBackgroundScan.js`: Expo config plugin that injects Android background-scan native modules, foreground service, and permissions.
-11. `android/`: current prebuilt Android native project for device builds, debugging, and verification.
-12. `page/`: standalone Vercel static publishing page.
-13. `docs/` and `design/`: goals, standards, release contracts, Android-first scan design, and product-page documentation.
+5. `src/features/scan/`: scan ranges, media loading, Android native scan facade, batch progress, runtime recovery, and staging importer.
+6. `src/features/cleanup/`: candidate cleanup state machine and keep, recycle, restore, and delete actions.
+7. `src/features/reminders/`: cleanup reminder copy, scheduling, background tasks, and runtime reconciliation.
+8. `src/services/storage/`: AsyncStorage compatibility layer, SQLite operational store, scan job checkpoints, scan range storage, and preference storage.
+9. `src/services/media/`: visual analysis and temporary analysis-file cache management. Durable truth should only store results and original media URIs; temporary files are not product data.
+10. `plugins/withBackgroundScan.js`: Expo config plugin that injects Android background-scan native modules, foreground service, and permissions into the native project.
+11. `android/`: current prebuilt Android native project for real-device builds, debugging, and verification.
+12. `page/`: independent Vercel static publishing page.
+13. `docs/` and `design/`: goals, standards, release contracts, Android-first scan design, and product page documentation.
 
 ## Data And State Contract
 
-The project follows one principle: scan state, recognition results, and user actions must not rely on UI state as the source of truth.
+This project maintains one principle: scan state, recognition results, and user actions must not rely on the UI layer as the source of truth.
 
-Key tables and states:
+Current key tables and states include:
 
-1. `scan_batch`: batch mode, time range, phase, progress, and completion state.
-2. `scan_batch_item`: per-asset stage, failure reason, and heartbeat inside a batch.
-3. `asset_manifest`: MediaStore-derived metadata such as URI, type, dimensions, duration, size, capture time, bucket, and video fields.
-4. `media_analysis`: per-asset analysis cache, including signature, fingerprint, hashes, frame fingerprints, and visual metrics.
-5. `candidate_view`: direct candidate projection for UI consumption.
-6. `recognition_group / recognition_member`: durable duplicate or near-duplicate grouping.
-7. `user_decision`: keep, recycle, restore, delete, and failed decisions.
+1. `scan_batch`: the mode, time range, phase, progress, and completion state of one scan batch.
+2. `scan_batch_item`: each asset's analysis phase, failure reason, and heartbeat inside a batch.
+3. `asset_manifest`: media metadata enumerated from Android, including URI, type, dimensions, duration, file size, capture time, bucket, video fields, and related fields.
+4. `media_analysis`: per-asset analysis cache, including signatures, fingerprints, hashes, frame fingerprints, and visual metrics.
+5. `candidate_view`: the candidate view directly consumed by the UI.
+6. `recognition_group / recognition_member`: durable source of truth for duplicate and near-duplicate groups.
+7. `user_decision`: user decisions such as keep, recycle, restore, delete, and failed.
 8. `recycle_bin_state`: in-app recycle-bin state.
-9. `cleanup_report`: cumulative cleaned item count, cleaned size, and last cleanup time.
-10. `scan_job`: active scan recovery checkpoint.
+9. `cleanup_report`: cumulative cleaned count, cleaned size, and latest cleanup time.
+10. `scan_job`: recovery checkpoint for the active scan job.
 
 ## Development Environment
 
@@ -123,8 +113,8 @@ Recommended environment:
 
 1. Node.js and npm.
 2. Expo SDK 54 / React Native 0.81.5.
-3. Android Studio, Android SDK, JDK, and a connected Android device.
-4. Vercel CLI, only when deploying `page/`.
+3. Android Studio, Android SDK, JDK, and a connected Android real device.
+4. Vercel CLI, only when publishing `page/`.
 
 Install dependencies:
 
@@ -150,7 +140,7 @@ Run the iOS compatibility path:
 npm run ios
 ```
 
-Android remains the primary acceptance path for the current release. iOS remains Expo-compatible but is not the first release target.
+The current primary acceptance path remains Android. iOS keeps Expo-layer compatibility, but it is not the first-version release acceptance focus.
 
 ## Common Commands
 
@@ -168,7 +158,11 @@ npm run build:android:debug
 npm run build:android:release
 ```
 
-If Gradle daemon or Kotlin daemon errors mention locks, caches, or daemon compilation, first classify whether the root cause is environment locking, disk pressure, network repository access, or actual code failure.
+`build:android:debug` and `build:android:release` now both produce APK artifacts directly. Use `npm run run:android:debug` when you specifically want to install and run on a device.
+
+Android debug / release packaging, signing verification, and CI/CD pipeline details: [docs/release/android.en.md](./docs/release/android.en.md); Chinese version: [docs/release/android.md](./docs/release/android.md).
+
+If Gradle daemon or Kotlin daemon errors mention locks, caches, or compile-daemon failures, first clean or restart the Gradle daemon, then classify whether the issue is an environment lock, disk pressure, network repository access, or a code error.
 
 ### Publishing Page
 
@@ -184,11 +178,11 @@ Production deployment:
 npm run page:deploy:prod
 ```
 
-Vercel configuration: [docs/release/vercel.en.md](./docs/release/vercel.en.md).
+Vercel configuration: [docs/release/vercel.en.md](./docs/release/vercel.en.md); Chinese version: [docs/release/vercel.md](./docs/release/vercel.md).
 
 ## Quality And Acceptance
 
-Before delivery, run at least:
+Before committing, run at least:
 
 ```bash
 npm run test -- --run
@@ -204,36 +198,37 @@ adb shell am force-stop com.jt.mistapmediacleaner
 adb shell monkey -p com.jt.mistapmediacleaner 1
 ```
 
-For publishing-page work, also run:
+For publishing-page changes, also run:
 
 ```bash
 npm run page:preview
 curl -sSI http://127.0.0.1:4173/
 ```
 
-Acceptance checks:
+Acceptance should focus on:
 
-1. Switching away during a scan and returning should still show the active scan state, not the permission entry state.
-2. UI progress and Android notification progress should share the same batch numerator/denominator.
-3. Completed batches should not be rescanned; recognition results should be reused.
-4. Full-coverage completion should not loop into repeated scans; newly added media should trigger incremental scanning.
-5. Recycle Bin should load, restore, and permanently delete correctly.
-6. Reminder settings should not surface user-visible errors when a background task was not previously registered.
-7. The publishing page should not overflow, over-space sections, or deform CTAs on desktop or mobile.
+1. Switching away during a scan and returning still shows the current scan state instead of falling back to the permission entry.
+2. UI progress and Android notification progress use the same batch numerator/denominator.
+3. Completed batches are not scanned repeatedly; recognition results are reused directly.
+4. After full-history completion, scans do not continue in a loop; incremental scanning is only prompted when new media appears.
+5. Recycle Bin can load, restore, and permanently delete normally.
+6. Reminder toggles in Settings do not surface user-visible errors when a task does not exist.
+7. The publishing page has no obvious overflow, excessive spacing, or CTA deformation on desktop or mobile.
 
 ## Documentation
 
-1. Product page content: [docs/product/page-home.en.md](./docs/product/page-home.en.md), Chinese version [docs/product/page-home.md](./docs/product/page-home.md).
-2. Vercel release contract: [docs/release/vercel.en.md](./docs/release/vercel.en.md), Chinese version [docs/release/vercel.md](./docs/release/vercel.md).
-3. Android scan and recognition design: [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md), Chinese version [design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md).
-4. Execution standard: [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md), Chinese version [docs/standards/execution-standards.md](./docs/standards/execution-standards.md).
-5. Team-mode standard: [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md), Chinese version [docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md).
-6. Publishing page directory: [page/README.en.md](./page/README.en.md), Chinese version [page/README.md](./page/README.md).
+1. Product publishing page docs: [docs/product/page-home.en.md](./docs/product/page-home.en.md); Chinese version: [docs/product/page-home.md](./docs/product/page-home.md).
+2. Android release contract: [docs/release/android.en.md](./docs/release/android.en.md); Chinese version: [docs/release/android.md](./docs/release/android.md).
+3. Vercel release contract: [docs/release/vercel.en.md](./docs/release/vercel.en.md); Chinese version: [docs/release/vercel.md](./docs/release/vercel.md).
+4. Android scan and recognition design: [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md); Chinese version: [design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md).
+5. Execution standard: [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md); Chinese version: [docs/standards/execution-standards.md](./docs/standards/execution-standards.md).
+6. Team-mode standard: [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md); Chinese version: [docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md).
+7. Publishing page directory docs: [page/README.en.md](./page/README.en.md); Chinese version: [page/README.md](./page/README.md).
 
 ## Current Boundaries
 
-1. The current version validates Android first; iOS is not the first release acceptance path.
-2. Public copy may use “AI” as product positioning, but the current repository implementation is local heuristic recognition and does not call external AI APIs.
-3. Firebase / Crashlytics / Analytics are not part of the current Android-first release; observability can remain a noop fallback.
-4. After recognition, durable storage should keep results, metadata, and original media URIs. Thumbnails, frame images, and temporary analysis files should not become durable product data.
-5. The custom domain requires adding `mc.jerret.me` in Vercel Dashboard and configuring the DNS records Vercel provides.
+1. The current version prioritizes Android validation; iOS is not the first release acceptance path.
+2. If the public page uses "AI" wording, that is product-marketing positioning; the current repository implementation is still based on local heuristic recognition and does not integrate external AI APIs.
+3. Firebase / Crashlytics / Analytics are not included in the current Android-first version. Observability can remain a noop fallback for now.
+4. After recognition, durable storage should only keep results, metadata, and original media URIs. Thumbnails, frame images, and temporary analysis files should not become durable product data.
+5. The Vercel custom domain requires adding `mc.jerret.me` in the Vercel Dashboard, then configuring DNS according to Vercel's instructions.

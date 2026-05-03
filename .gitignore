@@ -2,10 +2,12 @@
 
 # dependencies
 node_modules/
+!/package-lock.json
 
 # Expo
 .expo/
-dist/
+/dist/
+/page/dist/
 web-build/
 expo-env.d.ts
 
@@ -39,3 +41,5 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+/artifacts/
+*.drawio

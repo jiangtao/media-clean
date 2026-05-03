@@ -2,7 +2,7 @@
   "expo": {
     "name": "MediaClean",
     "slug": "mistap-media-cleaner",
-    "version": "1.0.0",
+    "version": "0.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -23,7 +23,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.jt.mistapmediacleaner"
+      "package": "com.jt.mistapmediacleaner",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -47,6 +48,7 @@
           "color": "#173944"
         }
       ],
+      "./plugins/withAndroidReleaseSigning",
       "expo-video"
     ]
   }

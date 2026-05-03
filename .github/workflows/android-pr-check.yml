@@ -1,0 +1,92 @@
+name: Android Release PR Check
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/android-pr-check.yml"
+      - ".github/workflows/android-release.yml"
+      - ".github/workflows/android-debug.yml"
+      - "app.json"
+      - "package.json"
+      - "plugins/**"
+      - "scripts/android/**"
+      - "android/**"
+      - "docs/release/android.md"
+      - "docs/release/android.en.md"
+      - "README.md"
+      - "README.en.md"
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - ".github/workflows/android-pr-check.yml"
+      - ".github/workflows/android-release.yml"
+      - ".github/workflows/android-debug.yml"
+      - "app.json"
+      - "package.json"
+      - "plugins/**"
+      - "scripts/android/**"
+      - "android/**"
+      - "docs/release/android.md"
+      - "docs/release/android.en.md"
+      - "README.md"
+      - "README.en.md"
+
+permissions:
+  contents: read
+
+jobs:
+  release-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck -- --pretty false
+
+      - name: Build temp-signed APK
+        run: bash scripts/android/build-release-apk.sh --temp-keystore --skip-install
+
+      - name: Build debug APK
+        run: bash scripts/android/build-debug-apk.sh --skip-install
+
+      - name: Upload smoke artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-smoke
+          if-no-files-found: error
+          path: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/apk/debug/app-debug.apk
+            artifacts/android-release/app-release.signing.txt
+            artifacts/android-release/app-release.sha256
+            artifacts/android-release/release-metadata.json
+            artifacts/android-debug/app-debug.signing.txt
+            artifacts/android-debug/app-debug.sha256
+            artifacts/android-debug/debug-metadata.json

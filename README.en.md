@@ -194,6 +194,7 @@ For Android native scan, notifications, splash, or permission changes, also veri
 
 ```bash
 npm run build:android:debug
+npm run test:maestro:smoke
 adb shell am force-stop com.jt.mistapmediacleaner
 adb shell monkey -p com.jt.mistapmediacleaner 1
 ```
@@ -219,11 +220,16 @@ Acceptance should focus on:
 
 1. Product publishing page docs: [docs/product/page-home.en.md](./docs/product/page-home.en.md); Chinese version: [docs/product/page-home.md](./docs/product/page-home.md).
 2. Android release contract: [docs/release/android.en.md](./docs/release/android.en.md); Chinese version: [docs/release/android.md](./docs/release/android.md).
-3. Vercel release contract: [docs/release/vercel.en.md](./docs/release/vercel.en.md); Chinese version: [docs/release/vercel.md](./docs/release/vercel.md).
-4. Android scan and recognition design: [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md); Chinese version: [design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md).
-5. Execution standard: [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md); Chinese version: [docs/standards/execution-standards.md](./docs/standards/execution-standards.md).
-6. Team-mode standard: [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md); Chinese version: [docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md).
-7. Publishing page directory docs: [page/README.en.md](./page/README.en.md); Chinese version: [page/README.md](./page/README.md).
+3. Maestro acceptance contract: [docs/release/maestro.en.md](./docs/release/maestro.en.md); Chinese version: [docs/release/maestro.md](./docs/release/maestro.md).
+4. Vercel release contract: [docs/release/vercel.en.md](./docs/release/vercel.en.md); Chinese version: [docs/release/vercel.md](./docs/release/vercel.md).
+5. Android scan and recognition design: [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md); Chinese version: [design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md).
+6. Execution standard: [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md); Chinese version: [docs/standards/execution-standards.md](./docs/standards/execution-standards.md).
+7. Team-mode standard: [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md); Chinese version: [docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md).
+8. Publishing page directory docs: [page/README.en.md](./page/README.en.md); Chinese version: [page/README.md](./page/README.md).
+
+Automated interactive smoke workflow:
+
+1. [.github/workflows/android-maestro-smoke.yml](./.github/workflows/android-maestro-smoke.yml)
 
 ## Current Boundaries
 

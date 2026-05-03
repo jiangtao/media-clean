@@ -546,6 +546,7 @@ export function SettingsScreen() {
                   styles.scanRangeOption,
                   scanRange === range && styles.scanRangeOptionActive,
                 ]}
+                testID={`scan-range-option-${range}`}
               >
                 <Text
                   style={[
@@ -586,6 +587,7 @@ export function SettingsScreen() {
                 true: theme.buttonPrimaryBackground,
               }}
               thumbColor={theme.buttonPrimaryText}
+              testID="reminder-settings-toggle"
             />
           </View>
           <Text style={styles.reminderHint}>
@@ -703,6 +705,7 @@ export function SettingsScreen() {
                 languagePreference === option.value && styles.languageOptionActive,
                 index === languageOptions.length - 1 && styles.languageOptionLast,
               ]}
+              testID={`language-option-${option.value}`}
             >
               <Text
                 style={[
@@ -731,6 +734,7 @@ export function SettingsScreen() {
                 themePreference === pref && styles.themeOptionActive,
                 index === APP_THEME_PREFERENCES.length - 1 && styles.themeOptionLast,
               ]}
+              testID={`theme-option-${pref}`}
             >
               <View style={styles.themeOptionLeft}>
                 <View

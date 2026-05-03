@@ -9,6 +9,7 @@
     "web": "expo start --web",
     "test": "vitest",
     "test:observability": "vitest --run src/services/observability src/application/__tests__/AppErrorBoundary.test.tsx src/application/__tests__/AppObservabilityBootstrap.test.tsx",
+    "test:maestro:smoke": "bash scripts/android/run-maestro-smoke.sh",
     "typecheck": "tsc --noEmit",
     "page:build": "cd page && npm run build",
     "page:dev": "cd page && npm run dev",

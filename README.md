@@ -194,6 +194,7 @@ npm run page:build
 
 ```bash
 npm run build:android:debug
+npm run test:maestro:smoke
 adb shell am force-stop com.jt.mistapmediacleaner
 adb shell monkey -p com.jt.mistapmediacleaner 1
 ```
@@ -219,11 +220,16 @@ curl -sSI http://127.0.0.1:4173/
 
 1. 产品发布页说明：[docs/product/page-home.md](./docs/product/page-home.md)，英文版 [docs/product/page-home.en.md](./docs/product/page-home.en.md)。
 2. Android 发包契约：[docs/release/android.md](./docs/release/android.md)，英文版 [docs/release/android.en.md](./docs/release/android.en.md)。
-2. Vercel 发布契约：[docs/release/vercel.md](./docs/release/vercel.md)，英文版 [docs/release/vercel.en.md](./docs/release/vercel.en.md)。
-3. Android 扫描与识别设计：[design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md)，英文版 [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md)。
-4. 执行标准：[docs/standards/execution-standards.md](./docs/standards/execution-standards.md)，英文版 [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md)。
-5. 团队模式标准：[docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md)，英文版 [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md)。
-6. 发布页目录说明：[page/README.md](./page/README.md)，英文版 [page/README.en.md](./page/README.en.md)。
+3. Maestro 验收契约：[docs/release/maestro.md](./docs/release/maestro.md)，英文版 [docs/release/maestro.en.md](./docs/release/maestro.en.md)。
+4. Vercel 发布契约：[docs/release/vercel.md](./docs/release/vercel.md)，英文版 [docs/release/vercel.en.md](./docs/release/vercel.en.md)。
+5. Android 扫描与识别设计：[design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md)，英文版 [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md)。
+6. 执行标准：[docs/standards/execution-standards.md](./docs/standards/execution-standards.md)，英文版 [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md)。
+7. 团队模式标准：[docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md)，英文版 [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md)。
+8. 发布页目录说明：[page/README.md](./page/README.md)，英文版 [page/README.en.md](./page/README.en.md)。
+
+自动化交互 smoke workflow：
+
+1. [.github/workflows/android-maestro-smoke.yml](./.github/workflows/android-maestro-smoke.yml)
 
 ## 当前边界
 

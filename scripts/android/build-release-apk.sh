@@ -19,7 +19,6 @@ KEY_PASSWORD="${ANDROID_KEY_PASSWORD:-}"
 DNAME="${ANDROID_SIGNING_DNAME:-CN=com.jt.mistapmediacleaner,OU=Mobile,O=JT,L=Shanghai,ST=Shanghai,C=CN}"
 TEMP_KEYSTORE_DIR="${ANDROID_TEMP_KEYSTORE_DIR:-${HOME}/android-sign-demo}"
 TEMP_KEYSTORE_PASSWORD="${ANDROID_TEMP_KEYSTORE_PASSWORD:-jerret@media.clean}"
-TEMP_WORK_DIR=""
 
 usage() {
   cat <<'EOF'
@@ -55,16 +54,6 @@ require_command() {
   fi
 }
 
-decode_base64_to_file() {
-  local output_file="$1"
-
-  if printf '%s' "${KEYSTORE_BASE64}" | base64 --decode > "${output_file}" 2>/dev/null; then
-    return
-  fi
-
-  printf '%s' "${KEYSTORE_BASE64}" | base64 -D > "${output_file}"
-}
-
 ensure_temp_keystore() {
   require_command keytool
 
@@ -90,30 +79,17 @@ ensure_temp_keystore() {
     -dname "${DNAME}"
 }
 
-materialize_base64_keystore() {
-  if [[ -z "${KEYSTORE_BASE64}" ]]; then
-    return
-  fi
-
-  TEMP_WORK_DIR="$(mktemp -d)"
-  KEYSTORE_FILE="${TEMP_WORK_DIR}/${KEYSTORE_FILENAME}"
-
-  decode_base64_to_file "${KEYSTORE_FILE}"
-}
-
 resolve_keystore_config() {
   if [[ "${TEMP_KEYSTORE}" -eq 1 ]]; then
     ensure_temp_keystore
-  elif [[ -z "${KEYSTORE_FILE}" && -n "${KEYSTORE_BASE64}" ]]; then
-    materialize_base64_keystore
   fi
 
-  if [[ -z "${KEYSTORE_FILE}" ]]; then
+  if [[ -z "${KEYSTORE_FILE}" && -z "${KEYSTORE_BASE64}" ]]; then
     echo "缺少 keystore 输入。请传 --temp-keystore、--keystore /abs/path/file，或设置 ANDROID_KEYSTORE_BASE64。" >&2
     exit 1
   fi
 
-  if [[ ! -f "${KEYSTORE_FILE}" ]]; then
+  if [[ -n "${KEYSTORE_FILE}" && ! -f "${KEYSTORE_FILE}" ]]; then
     echo "keystore 文件不存在: ${KEYSTORE_FILE}" >&2
     exit 1
   fi
@@ -140,8 +116,12 @@ resolve_keystore_config() {
     esac
   fi
 
-  export ANDROID_KEYSTORE_BASE64
-  ANDROID_KEYSTORE_BASE64="$(base64 < "${KEYSTORE_FILE}" | tr -d '\n')"
+  if [[ -n "${KEYSTORE_FILE}" ]]; then
+    export ANDROID_KEYSTORE_BASE64
+    ANDROID_KEYSTORE_BASE64="$(base64 < "${KEYSTORE_FILE}" | tr -d '\n')"
+  else
+    export ANDROID_KEYSTORE_BASE64="${KEYSTORE_BASE64}"
+  fi
   export ANDROID_KEYSTORE_FILENAME="${KEYSTORE_FILENAME}"
   export ANDROID_KEYSTORE_PASSWORD="${STORE_PASSWORD}"
   export ANDROID_KEY_ALIAS="${KEY_ALIAS}"
@@ -174,9 +154,7 @@ run_release_pipeline() {
 }
 
 cleanup() {
-  if [[ -n "${TEMP_WORK_DIR}" && -d "${TEMP_WORK_DIR}" ]]; then
-    rm -rf "${TEMP_WORK_DIR}"
-  fi
+  :
 }
 
 ensure_android_sdk() {

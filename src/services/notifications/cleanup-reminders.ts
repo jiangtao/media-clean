@@ -9,8 +9,15 @@ import {
   formatReminderTime,
   type ReminderSettings,
 } from '../../features/reminders/reminder-settings';
-import { loadLastScanMeta } from '../storage/app-storage';
-import { buildScanRangeStartAt, loadScanRange } from '../storage/scan-range-storage';
+import {
+  loadLastValidScanBaseline,
+  type LastValidScanBaseline,
+} from '../storage/app-storage';
+import {
+  buildScanRangeStartAt,
+  loadScanRange,
+  normalizeScanRange,
+} from '../storage/scan-range-storage';
 
 export const REMINDER_CHANNEL_ID = 'cleanup-reminders';
 
@@ -35,6 +42,12 @@ type ReminderScheduleLike = Pick<
 export interface ReminderScheduleSyncResult {
   notificationId: string | null;
   nextTriggerAt: number | null;
+}
+
+export interface CleanupReminderEvaluationContext {
+  scanRangeMonths: number;
+  latestEligibleAssetAt: number | null;
+  baseline: LastValidScanBaseline | null;
 }
 
 interface ReminderChannelCopy {
@@ -140,28 +153,134 @@ async function loadLatestEligibleAssetCreatedAt(createdAfter: number) {
   return page.assets[0]?.creationTime ?? null;
 }
 
-async function evaluateCleanupReminderTrigger(enabled: boolean) {
-  const [scanRange, lastScanMeta] = await Promise.all([
-    loadScanRange(),
-    loadLastScanMeta(),
+export async function loadCleanupReminderEvaluationContext(): Promise<CleanupReminderEvaluationContext> {
+  const scanRangeMonths = await loadScanRange();
+  const [baseline, latestEligibleAssetAt] = await Promise.all([
+    loadLastValidScanBaseline(),
+    loadLatestEligibleAssetCreatedAt(buildScanRangeStartAt(scanRangeMonths)),
   ]);
-  const latestEligibleAssetAt = await loadLatestEligibleAssetCreatedAt(
-    buildScanRangeStartAt(scanRange),
-  );
 
+  return {
+    scanRangeMonths,
+    latestEligibleAssetAt,
+    baseline,
+  };
+}
+
+export function assessCleanupReminderSchedule(
+  enabled: boolean,
+  context: CleanupReminderEvaluationContext,
+) {
   return assessReminderTrigger({
     enabled,
-    scanRangeMonths: scanRange,
-    latestEligibleAssetAt,
-    lastScanAt: lastScanMeta?.scannedAt ?? null,
+    scanRangeMonths: context.scanRangeMonths,
+    latestEligibleAssetAt: context.latestEligibleAssetAt,
+    lastScanAt: context.baseline?.scannedAt ?? null,
+    lastValidScanBaseline: context.baseline,
   });
+}
+
+export function evaluateCleanupReminderTriggerInBackground(input: {
+  enabled: boolean;
+  scanRangeMonths: number;
+  latestEligibleAssetAt: number | null;
+  lastScanAt: number | null;
+  lastValidScanBaseline: LastValidScanBaseline | null;
+  nowInput?: number;
+}) {
+  const baseline =
+    input.lastValidScanBaseline ?? (
+      Number.isFinite(input.lastScanAt)
+        ? {
+            scannedAt: input.lastScanAt as number,
+            scannedCount: 0,
+            candidateCount: 0,
+            scanRangeMonths: input.scanRangeMonths,
+            latestEligibleAssetAt: input.lastScanAt,
+            ledgerUpdatedAt: input.lastScanAt as number,
+          }
+        : null
+    );
+
+  return assessReminderTrigger({
+    enabled: input.enabled,
+    scanRangeMonths: input.scanRangeMonths,
+    latestEligibleAssetAt: input.latestEligibleAssetAt,
+    lastScanAt: input.lastScanAt,
+    lastValidScanBaseline: baseline,
+    nowInput: input.nowInput,
+  });
+}
+
+export async function evaluateCleanupReminderTriggerInForeground(enabled: boolean) {
+  if (!enabled) {
+    const scanRangeMonths = await loadScanRange();
+    const baseline = await loadLastValidScanBaseline();
+
+    return evaluateCleanupReminderTriggerInBackground({
+      enabled,
+      scanRangeMonths,
+      latestEligibleAssetAt: null,
+      lastScanAt: baseline?.scannedAt ?? null,
+      lastValidScanBaseline: baseline,
+    });
+  }
+
+  return assessCleanupReminderSchedule(
+    enabled,
+    await loadCleanupReminderEvaluationContext(),
+  );
+}
+
+export async function evaluateCleanupReminderTrigger(enabled: boolean) {
+  return evaluateCleanupReminderTriggerInForeground(enabled);
+}
+
+export async function captureLastValidScanBaseline(input: {
+  scannedAt: number;
+  scannedCount: number;
+  candidateCount: number;
+  ledgerUpdatedAt?: number;
+}, options?: {
+  scanRangeMonths?: number;
+  createdAfter?: number;
+}): Promise<LastValidScanBaseline> {
+  const scanRangeMonths = options?.scanRangeMonths ?? (await loadScanRange());
+  const latestEligibleAssetAt = await loadLatestEligibleAssetCreatedAt(
+    options?.createdAfter ?? buildScanRangeStartAt(normalizeScanRange(scanRangeMonths)),
+  );
+
+  return {
+    scannedAt: input.scannedAt,
+    scannedCount: input.scannedCount,
+    candidateCount: input.candidateCount,
+    scanRangeMonths,
+    latestEligibleAssetAt,
+    ledgerUpdatedAt: input.ledgerUpdatedAt ?? input.scannedAt,
+  };
+}
+
+async function scheduleCleanupReminderNotification(
+  settings: ReminderScheduleLike,
+  copy: ReminderCopy,
+) {
+  const request = buildCleanupReminderRequest(settings, copy);
+  const [notificationId, nextTriggerAt] = await Promise.all([
+    Notifications.scheduleNotificationAsync(request),
+    Notifications.getNextTriggerDateAsync(request.trigger),
+  ]);
+
+  return {
+    notificationId,
+    nextTriggerAt: typeof nextTriggerAt === 'number' ? nextTriggerAt : null,
+  };
 }
 
 export async function syncCleanupReminderNotification(
   settings: ReminderScheduleLike,
   copy: ReminderCopy,
   channelCopy?: ReminderChannelCopy,
-) : Promise<ReminderScheduleSyncResult> {
+): Promise<ReminderScheduleSyncResult> {
   await configureCleanupReminderChannel(channelCopy);
 
   if (settings.previousNotificationId) {
@@ -175,7 +294,7 @@ export async function syncCleanupReminderNotification(
     };
   }
 
-  const triggerAssessment = await evaluateCleanupReminderTrigger(settings.enabled);
+  const triggerAssessment = await evaluateCleanupReminderTriggerInForeground(settings.enabled);
   if (!triggerAssessment.shouldSchedule) {
     return {
       notificationId: null,
@@ -183,16 +302,7 @@ export async function syncCleanupReminderNotification(
     };
   }
 
-  const request = buildCleanupReminderRequest(settings, copy);
-  const [notificationId, nextTriggerAt] = await Promise.all([
-    Notifications.scheduleNotificationAsync(request),
-    Notifications.getNextTriggerDateAsync(request.trigger),
-  ]);
-
-  return {
-    notificationId,
-    nextTriggerAt: typeof nextTriggerAt === 'number' ? nextTriggerAt : null,
-  };
+  return scheduleCleanupReminderNotification(settings, copy);
 }
 
 export async function reconcileCleanupReminderNotification(
@@ -209,7 +319,7 @@ export async function reconcileCleanupReminderNotification(
     };
   }
 
-  const triggerAssessment = await evaluateCleanupReminderTrigger(settings.enabled);
+  const triggerAssessment = await evaluateCleanupReminderTriggerInForeground(settings.enabled);
   if (!triggerAssessment.shouldSchedule) {
     if (settings.notificationId) {
       await Notifications.cancelScheduledNotificationAsync(settings.notificationId);
@@ -238,14 +348,5 @@ export async function reconcileCleanupReminderNotification(
     }
   }
 
-  const request = buildCleanupReminderRequest(settings, copy);
-  const [notificationId, nextTriggerAt] = await Promise.all([
-    Notifications.scheduleNotificationAsync(request),
-    Notifications.getNextTriggerDateAsync(request.trigger),
-  ]);
-
-  return {
-    notificationId,
-    nextTriggerAt: typeof nextTriggerAt === 'number' ? nextTriggerAt : null,
-  };
+  return scheduleCleanupReminderNotification(settings, copy);
 }

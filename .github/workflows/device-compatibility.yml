@@ -28,7 +28,7 @@ on:
     - cron: '0 2 * * *'
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '24.11.0'
   JAVA_VERSION: '17'
   ANDROID_API: '33'
   EMULATOR_TIMEOUT: '600'

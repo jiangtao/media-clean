@@ -8,7 +8,7 @@ describe('TabBar', () => {
 
   const defaultTabs = [
     { name: 'Photos', label: '照片', icon: 'images-outline', badge: undefined },
-    { name: 'RecycleBin', label: '回收站', icon: 'trash-outline', badge: undefined },
+    { name: 'RecycleBin', label: '保留和清理', icon: 'trash-outline', badge: undefined },
     { name: 'Settings', label: '设置', icon: 'settings-outline', badge: undefined },
   ];
 
@@ -21,7 +21,7 @@ describe('TabBar', () => {
       // Verify all 3 tabs exist with their labels
       expect(defaultTabs).toHaveLength(3);
       expect(defaultTabs[0].label).toBe('照片');
-      expect(defaultTabs[1].label).toBe('回收站');
+      expect(defaultTabs[1].label).toBe('保留和清理');
       expect(defaultTabs[2].label).toBe('设置');
     });
 
@@ -77,7 +77,7 @@ describe('TabBar', () => {
     it('should display badge with count when badge value is provided', () => {
       const tabsWithBadge = [
         { name: 'Photos', label: '照片', icon: 'images-outline', badge: undefined },
-        { name: 'RecycleBin', label: '回收站', icon: 'trash-outline', badge: 5 },
+        { name: 'RecycleBin', label: '保留和清理', icon: 'trash-outline', badge: 5 },
         { name: 'Settings', label: '设置', icon: 'settings-outline', badge: undefined },
       ];
 
@@ -102,7 +102,7 @@ describe('TabBar', () => {
     it('should not display badge when badge value is 0', () => {
       const tabsWithZeroBadge = [
         { name: 'Photos', label: '照片', icon: 'images-outline', badge: undefined },
-        { name: 'RecycleBin', label: '回收站', icon: 'trash-outline', badge: 0 },
+        { name: 'RecycleBin', label: '保留和清理', icon: 'trash-outline', badge: 0 },
         { name: 'Settings', label: '设置', icon: 'settings-outline', badge: undefined },
       ];
 
@@ -137,7 +137,7 @@ describe('TabBar', () => {
     it('should render tab labels for screen readers', () => {
       // All labels should be rendered as text
       expect(defaultTabs[0].label).toBe('照片');
-      expect(defaultTabs[1].label).toBe('回收站');
+      expect(defaultTabs[1].label).toBe('保留和清理');
       expect(defaultTabs[2].label).toBe('设置');
     });
   });

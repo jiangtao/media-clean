@@ -12,9 +12,11 @@ import {
 const loadRecycleBinIdsMock = vi.hoisted(() => vi.fn());
 const loadRecycleBinCandidateCacheMock = vi.hoisted(() => vi.fn());
 const loadRecycleBinSnapshotCacheMock = vi.hoisted(() => vi.fn());
+const loadCleanupReportSnapshotMock = vi.hoisted(() => vi.fn());
 const saveRecycleBinIdsMock = vi.hoisted(() => vi.fn());
 const saveRecycleBinCandidateCacheMock = vi.hoisted(() => vi.fn());
 const saveRecycleBinSnapshotCacheMock = vi.hoisted(() => vi.fn());
+const syncPersistedMediaLedgerMock = vi.hoisted(() => vi.fn());
 const scanMediaLibraryMock = vi.hoisted(() => vi.fn());
 const deleteAssetsAsyncMock = vi.hoisted(() => vi.fn());
 
@@ -69,6 +71,7 @@ vi.mock('@react-navigation/native', () => {
 
 vi.mock('../../../application/AppPreferencesContext', () => ({
   useAppPreferences: () => ({
+    language: 'zh-CN',
     copy: {
       alerts: {
         scanFailed: '扫描失败',
@@ -79,10 +82,10 @@ vi.mock('../../../application/AppPreferencesContext', () => ({
       },
       screens: {
         recycleBin: {
-          title: '回收站',
-          emptyTitle: '回收站还是空的',
-          emptyBody: '自动清理或手动清理的媒体会在这里集中管理。',
-          expireHint: (days: number) => `移入回收站的媒体会在 ${days} 天后彻底删除。`,
+          title: '保留和清理',
+          emptyTitle: '这里还没有待最终处理的项目',
+          emptyBody: '自动清理或手动移入应用内回收站后的项目，会在这里统一决定保留还是彻底清理。',
+          expireHint: (days: number) => `已移入应用内回收站的媒体会在 ${days} 天后彻底删除。`,
           selectedItems: (count: number) => `已选择 ${count} 项`,
           cancel: '取消',
           restore: '恢复',
@@ -108,12 +111,14 @@ vi.mock('../../../application/AppPreferencesContext', () => ({
 }));
 
 vi.mock('../../../services/storage/app-storage', () => ({
+  loadCleanupReportSnapshot: loadCleanupReportSnapshotMock,
   loadRecycleBinCandidateCache: loadRecycleBinCandidateCacheMock,
   loadRecycleBinIds: loadRecycleBinIdsMock,
   loadRecycleBinSnapshotCache: loadRecycleBinSnapshotCacheMock,
   saveRecycleBinCandidateCache: saveRecycleBinCandidateCacheMock,
   saveRecycleBinIds: saveRecycleBinIdsMock,
   saveRecycleBinSnapshotCache: saveRecycleBinSnapshotCacheMock,
+  syncPersistedMediaLedger: syncPersistedMediaLedgerMock,
 }));
 
 vi.mock('../../../features/scan/scan-media-library', () => ({
@@ -264,6 +269,18 @@ function createScanResult(recycleBin: CleanupCandidate[]) {
   };
 }
 
+function createCleanupReportSnapshot(
+  cleanedItemCount: number,
+  cleanedBytes: number,
+  lastCleanedAt: number | null,
+) {
+  return {
+    cleanedItemCount,
+    cleanedBytes,
+    lastCleanedAt,
+  };
+}
+
 function flattenText(children: React.ReactNode): string {
   if (typeof children === 'string' || typeof children === 'number') {
     return String(children);
@@ -324,6 +341,7 @@ describe('RecycleBinScreen', () => {
     loadRecycleBinIdsMock.mockResolvedValue([]);
     loadRecycleBinCandidateCacheMock.mockResolvedValue([]);
     loadRecycleBinSnapshotCacheMock.mockResolvedValue(null);
+    loadCleanupReportSnapshotMock.mockResolvedValue(createCleanupReportSnapshot(0, 0, null));
     saveRecycleBinIdsMock.mockResolvedValue(undefined);
     saveRecycleBinCandidateCacheMock.mockResolvedValue(undefined);
     saveRecycleBinSnapshotCacheMock.mockResolvedValue(undefined);
@@ -335,20 +353,22 @@ describe('RecycleBinScreen', () => {
     const copy = {
       screens: {
         recycleBin: {
-          title: 'Recycle Bin',
-          emptyTitle: 'The recycle bin is still empty',
-          emptyBody: 'Items moved by auto cleanup or manual cleanup will be managed here.',
+          title: 'Keep & clean',
+          emptyTitle: 'Nothing is waiting for a final decision yet',
+          emptyBody:
+            'Items moved into the app recycle bin by auto cleanup or manual cleanup are finalized here: keep or delete forever.',
           expireHint: (days: number) =>
-            `Items in the recycle bin will be permanently deleted after ${days} days.`,
+            `Items already moved into the app recycle bin will be permanently deleted after ${days} days.`,
         },
       },
     };
 
     expect(buildRecycleBinTexts(copy as never, 30)).toEqual({
-      title: 'Recycle Bin',
-      emptyTitle: 'The recycle bin is still empty',
-      emptyBody: 'Items moved by auto cleanup or manual cleanup will be managed here.',
-      expireHint: 'Items in the recycle bin will be permanently deleted after 30 days.',
+      title: 'Keep & clean',
+      emptyTitle: 'Nothing is waiting for a final decision yet',
+      emptyBody:
+        'Items moved into the app recycle bin by auto cleanup or manual cleanup are finalized here: keep or delete forever.',
+      expireHint: 'Items already moved into the app recycle bin will be permanently deleted after 30 days.',
     });
   });
 
@@ -401,7 +421,31 @@ describe('RecycleBinScreen', () => {
 
     expect(renderer.root.findByProps({ testID: 'mock-photo-grid' })).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'candidate-label-recycle-1' })).toBeTruthy();
-    expect(findTextNode(renderer, '加载回收站…')).toBeUndefined();
+    expect(findTextNode(renderer, '加载保留和清理…')).toBeUndefined();
+  });
+
+  it('renders the SQLite cumulative cleanup report in the footer on initial load', async () => {
+    const cachedCandidate = createCandidate('recycle-1');
+    const report = createCleanupReportSnapshot(12, 5 * 1024 * 1024, new Date('2026-04-22T09:30:00+08:00').getTime());
+
+    loadRecycleBinIdsMock.mockResolvedValueOnce(['recycle-1']);
+    loadRecycleBinSnapshotCacheMock.mockResolvedValueOnce({
+      ids: ['recycle-1'],
+      candidates: [cachedCandidate],
+      updatedAt: new Date('2026-04-19T08:00:00+08:00').getTime(),
+      source: 'manual',
+    });
+    loadCleanupReportSnapshotMock.mockResolvedValueOnce(report);
+    scanMediaLibraryMock.mockResolvedValueOnce(createScanResult([cachedCandidate]));
+
+    const renderer = await renderRecycleBinScreen();
+
+    expect(renderer.root.findByProps({ testID: 'cleanup-report-card' })).toBeTruthy();
+    expect(findTextNode(renderer, '累计清理报告')).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'cleanup-report-count' }).props.children).toBe(12);
+    expect(findTextNode(renderer, '累计清理体积')).toBeTruthy();
+    expect(findTextNode(renderer, '5.0 MB')).toBeTruthy();
+    expect(findTextNode(renderer, '最近清理 · 2026-04-22 09:30')).toBeTruthy();
   });
 
   it('renders the persisted recycle-bin snapshot before recycle-bin ids finish loading, then refreshes in the background', async () => {
@@ -486,12 +530,65 @@ describe('RecycleBinScreen', () => {
     });
 
     expect(() => renderer.root.findByProps({ testID: 'candidate-label-recycle-2' })).toThrow();
+    expect(syncPersistedMediaLedgerMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        activeCandidates: [first],
+        recycleBinCandidates: [],
+        deletedIds: ['recycle-2'],
+      }),
+    );
     expect(saveRecycleBinSnapshotCacheMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
         ids: [],
         candidates: [],
       }),
     );
+  });
+
+  it('keeps the cleanup report stable on restore and refreshes it after hard delete', async () => {
+    const first = createCandidate('recycle-1');
+    const second = createCandidate('recycle-2');
+    const initialReport = createCleanupReportSnapshot(
+      2,
+      12 * 1024 * 1024,
+      new Date('2026-04-21T08:00:00+08:00').getTime(),
+    );
+    const updatedReport = createCleanupReportSnapshot(
+      3,
+      13 * 1024 * 1024,
+      new Date('2026-04-22T08:00:00+08:00').getTime(),
+    );
+
+    loadRecycleBinIdsMock.mockResolvedValueOnce(['recycle-1', 'recycle-2']);
+    loadCleanupReportSnapshotMock.mockResolvedValueOnce(initialReport);
+    loadCleanupReportSnapshotMock.mockResolvedValueOnce(updatedReport);
+    scanMediaLibraryMock.mockResolvedValueOnce(createScanResult([first, second]));
+
+    const renderer = await renderRecycleBinScreen();
+
+    expect(renderer.root.findByProps({ testID: 'cleanup-report-count' }).props.children).toBe(2);
+    expect(findTextNode(renderer, '12.0 MB')).toBeTruthy();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'candidate-press-recycle-1' }).props.onLongPress();
+    });
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'recycle-restore-selected-button' }).props.onPress();
+    });
+
+    expect(loadCleanupReportSnapshotMock).toHaveBeenCalledTimes(1);
+    expect(renderer.root.findByProps({ testID: 'cleanup-report-count' }).props.children).toBe(2);
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'candidate-press-recycle-2' }).props.onLongPress();
+    });
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'recycle-delete-selected-button' }).props.onPress();
+    });
+
+    expect(loadCleanupReportSnapshotMock).toHaveBeenCalledTimes(2);
+    expect(renderer.root.findByProps({ testID: 'cleanup-report-count' }).props.children).toBe(3);
+    expect(findTextNode(renderer, '13.0 MB')).toBeTruthy();
   });
 
   it('opens recycle-bin media in detail instead of staying in the grid only', async () => {
@@ -542,6 +639,13 @@ describe('RecycleBinScreen', () => {
     });
 
     expect(() => renderer.root.findByProps({ testID: 'candidate-label-recycle-2' })).toThrow();
+    expect(syncPersistedMediaLedgerMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        activeCandidates: [first],
+        recycleBinCandidates: [],
+        deletedIds: ['recycle-2'],
+      }),
+    );
     expect(saveRecycleBinSnapshotCacheMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
         ids: [],
@@ -622,6 +726,38 @@ describe('RecycleBinScreen', () => {
 
     expect(findTextNode(renderer, '恢复 (2)')).toBeTruthy();
     expect(renderer.root.findAllByProps({ testID: 'mock-detail-screen' })).toHaveLength(0);
+  });
+
+  it('toggles select all and deselect all for recycle-bin selection mode', async () => {
+    const first = createCandidate('recycle-1');
+    const second = createCandidate('recycle-2');
+    loadRecycleBinIdsMock.mockResolvedValueOnce(['recycle-1', 'recycle-2']);
+    scanMediaLibraryMock.mockResolvedValueOnce(createScanResult([first, second]));
+
+    const renderer = await renderRecycleBinScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'candidate-press-recycle-1' }).props.onLongPress();
+    });
+
+    expect(findTextNode(renderer, '恢复 (1)')).toBeTruthy();
+    expect(findTextNode(renderer, '全选')).toBeTruthy();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'recycle-selection-toggle-button' }).props.onPress();
+    });
+
+    expect(findTextNode(renderer, '恢复 (2)')).toBeTruthy();
+    expect(findTextNode(renderer, '删除 (2)')).toBeTruthy();
+    expect(findTextNode(renderer, '取消全选')).toBeTruthy();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'recycle-selection-toggle-button' }).props.onPress();
+    });
+
+    expect(findTextNode(renderer, '恢复 (2)')).toBeUndefined();
+    expect(findTextNode(renderer, '删除 (2)')).toBeUndefined();
+    expect(() => renderer.root.findByProps({ testID: 'recycle-selection-toggle-button' })).toThrow();
   });
 
   it('closes detail back to the recycle-bin grid', async () => {

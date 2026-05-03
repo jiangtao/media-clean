@@ -27,6 +27,11 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+.tmp/
+.claude/
+**/plans/
+docs/tmp/
+docs/archive/tmp/
 
 # macOS
 .DS_Store

@@ -6,6 +6,7 @@ import './shims/immediate-shim';
 import './shims/websocket-shim';
 import './shims/window-shim';
 import './shims/performance-shim';
+import './src/features/reminders/reminder-background-task';
 
 import { registerRootComponent } from 'expo';
 

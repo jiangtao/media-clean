@@ -22,7 +22,7 @@ export function normalizeScanRange(value: number | string | null | undefined): S
     }
   }
 
-  return 3;
+  return 12;
 }
 
 export async function loadScanRange(): Promise<ScanRange> {

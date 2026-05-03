@@ -7,6 +7,7 @@ import type {
   MediaType,
 } from '../domain/recognition/types';
 import type { ScanSummary } from '../features/scan/scan-media-library';
+import { DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT } from '../features/scan/scan-config';
 import type { ReminderSettings } from '../features/reminders/reminder-settings';
 import type { AppLanguage } from './app-language';
 
@@ -42,6 +43,9 @@ interface LocalizedCopy {
     scannedCaption: string;
     candidatesLabel: string;
     candidatesCaption: string;
+    accidentalLabel: string;
+    abnormalLabel: string;
+    duplicateLabel: string;
     highConfidenceLabel: string;
     highConfidenceCaption: string;
     recycleLabel: string;
@@ -117,11 +121,14 @@ interface LocalizedCopy {
       scanProgressTitle: string;
       scanProgressValue: (current: number, total: number) => string;
       scanProgressFootnote: string;
+      scanBatchRange: (start: string, end: string) => string;
       scanCompleteTitle: string;
       scanResultSummary: (count: number) => string;
       scanResultFootnote: string;
       scanExhaustedTitle: string;
       scanExhaustedBody: string;
+      scanAllCompleteTitle: string;
+      scanAllCompleteBody: string;
       continueScan: string;
       selectedItems: (count: number) => string;
       cleanupSelected: string;
@@ -270,7 +277,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     hero: {
       kicker: 'Android 优先 MVP',
       title: '相册清理建议',
-      description: '本地扫描最近媒体，用可解释规则识别误触、异常与重复内容，并通过应用内回收站做安全清理。',
+      description: '本地分批扫描整个相册，用可解释规则识别误触、异常与重复内容，并通过应用内回收站做安全清理。',
       lastScan: '上次扫描',
       autoCleanupHint: '自动清理只会软删除，高风险操作始终二次确认。',
     },
@@ -279,10 +286,13 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       scannedCaption: '最近媒体总数',
       candidatesLabel: '识别结果',
       candidatesCaption: '待人工确认处理',
+      accidentalLabel: '误触',
+      abnormalLabel: '异常',
+      duplicateLabel: '重复',
       highConfidenceLabel: '高置信度',
       highConfidenceCaption: '适合自动清理',
-      recycleLabel: '回收站',
-      recycleCaption: '应用内软删除',
+      recycleLabel: '保留和清理',
+      recycleCaption: '最终决策区',
     },
     controls: {
       rescan: '重新扫描',
@@ -292,7 +302,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     info: {
       title: '首版识别说明',
       firstLine:
-        '当前默认扫描最近 360 项媒体，并额外保留应用内回收站中的已软删除条目。识别完全在本地完成：误触与异常依赖启发式评分，重复内容依赖图片缩略图指纹，以及视频按时长自适应采样的多帧缩略图与元数据近似分组。',
+        '当前默认扫描整个相册，并额外保留应用内回收站中的已软删除条目。识别完全在本地完成：误触与异常依赖启发式评分，重复内容依赖图片缩略图指纹，以及视频按时长自适应采样的多帧缩略图与元数据近似分组。扫描过程会分批推进，以控制内存占用与机身发热。',
       secondLine: '回收站是应用内软删除，不等同于系统回收站；卸载应用或清空本地存储后，软删除记录可能失效。',
     },
     reminder: {
@@ -337,7 +347,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     },
     tabs: {
       suggestions: '识别结果',
-      recycle: '回收站',
+      recycle: '保留和清理',
       photos: '照片',
       settings: '设置',
     },
@@ -348,28 +358,32 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
         filterVideo: '视频',
         permissionChecking: '正在检查权限...',
         scanPromptTitle: '本地扫描',
-        scanPromptBody: '最近媒体会在本地检查，结果直接留在本页。',
+        scanPromptBody: `最近 ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} 个月媒体会在本地分批做模糊、重复、近相似、误触和差质检查，结果直接留在本页。`,
         startScan: '开始扫描',
-        scanScopeSummary: (count: number) => `已选择 ${count} 个媒体`,
-        scanScopeHint: '默认扫描最近媒体，尽量把空间留给下方展示区。',
+        scanScopeSummary: (count: number) =>
+          count > 0 ? `已选择 ${count} 个媒体` : `最近 ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} 个月媒体`,
+        scanScopeHint: `默认先扫描最近 ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} 个月媒体；每次完成后会继续向更早媒体回填，直到整库覆盖完成。Android 会在后台继续当前批次，回到页面后自动接回真实进度。`,
         scanProgressTitle: '本地扫描',
         scanProgressValue: (current: number, total: number) => `${current}/${total}`,
-        scanProgressFootnote: '正常媒体会持续退场，异常结果直接留在下方。',
+        scanProgressFootnote: '模糊、重复、近相似、误触和差质候选会持续留在下方，正常媒体会逐步退场。',
+        scanBatchRange: (start: string, end: string) => `本批范围：${start} - ${end}`,
         scanCompleteTitle: '本地扫描',
         scanResultSummary: (count: number) => `发现 ${count} 个异常媒体`,
-        scanResultFootnote: '结果已留在当前页面，可继续筛选、查看并决定清理或保留。',
+        scanResultFootnote: '结果已按本地规则留在当前页面，可继续筛选、查看并决定清理或保留。',
         scanExhaustedTitle: '当前这一批已处理完成',
-        scanExhaustedBody: '可以继续扫描最近媒体，或等待新的媒体进入这一批范围。',
+        scanExhaustedBody: '继续扫描会从上一批之前的更早媒体接着回填；整库已覆盖时，只处理新增或变化媒体。',
+        scanAllCompleteTitle: '全部媒体已扫描完成',
+        scanAllCompleteBody: '当前媒体库已经完整覆盖；后续只有新增或变化媒体需要重新进入扫描。',
         continueScan: '继续扫描',
         selectedItems: (count) => `已选择 ${count} 项`,
         cleanupSelected: '清理',
         keepSelected: '保留',
       },
       recycleBin: {
-        title: '回收站',
-        emptyTitle: '回收站还是空的',
-        emptyBody: '自动清理或手动移入回收站后，会在这里统一管理。',
-        expireHint: (days) => `回收站中的项目将在 ${days} 天后自动彻底删除`,
+        title: '保留和清理',
+        emptyTitle: '这里还没有待最终处理的项目',
+        emptyBody: '自动清理或手动移入应用内回收站后的项目，会在这里统一决定保留还是彻底清理。',
+        expireHint: (days) => `已移入应用内回收站的项目将在 ${days} 天后自动彻底删除`,
         selectedItems: (count) => `已选择 ${count} 项`,
         cancel: '取消',
         restore: '恢复',
@@ -385,8 +399,8 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     empty: {
       suggestionsTitle: '当前没有待处理识别结果',
       suggestionsBody: '可以继续扫描，或等待后续引入更强识别规则。',
-      recycleTitle: '回收站还是空的',
-      recycleBody: '自动清理或手动移入回收站后，会在这里统一管理。',
+      recycleTitle: '这里还没有待最终处理的项目',
+      recycleBody: '自动清理或手动移入应用内回收站后的项目，会在这里统一决定保留还是彻底清理。',
     },
     actionBar: {
       selectedItems: (count) => `已选中 ${count} 项`,
@@ -531,7 +545,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     hero: {
       kicker: 'Android-first MVP',
       title: 'Media Cleanup Suggestions',
-      description: 'Scan recent media locally, explain accidental, anomalous, and duplicate media, and clean safely through an app-level recycle bin.',
+      description: 'Scan the whole library locally in batches, explain accidental, anomalous, and duplicate media, and clean safely through an app-level recycle bin.',
       lastScan: 'Last scan',
       autoCleanupHint: 'Auto cleanup only performs soft delete, and risky actions always require a second confirmation.',
     },
@@ -540,10 +554,13 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       scannedCaption: 'recent media checked',
       candidatesLabel: 'Recognition results',
       candidatesCaption: 'ready for review',
+      accidentalLabel: 'Accidental',
+      abnormalLabel: 'Anomalous',
+      duplicateLabel: 'Duplicate',
       highConfidenceLabel: 'High confidence',
       highConfidenceCaption: 'ready for auto cleanup',
-      recycleLabel: 'Recycle bin',
-      recycleCaption: 'soft-deleted in app',
+      recycleLabel: 'Keep & clean',
+      recycleCaption: 'final decision zone',
     },
     controls: {
       rescan: 'Scan again',
@@ -553,7 +570,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     info: {
       title: 'MVP Detection Notes',
       firstLine:
-        'The current MVP scans the most recent 360 media items and also keeps app-level recycle-bin entries visible. Detection stays fully on-device: accidental and anomalous media use heuristic scoring, while duplicate media uses image thumbnail fingerprints plus duration-adaptive multi-frame video thumbnails and metadata similarity.',
+        'The current MVP scans the whole library and also keeps app-level recycle-bin entries visible. Detection stays fully on-device: accidental and anomalous media use heuristic scoring, while duplicate media uses image thumbnail fingerprints plus duration-adaptive multi-frame video thumbnails and metadata similarity. Scanning advances in batches to keep memory usage and device heat under control.',
       secondLine:
         'The recycle bin is an app-level soft-delete concept, not the system recycle bin. If the app is uninstalled or local storage is cleared, those records may be lost.',
     },
@@ -600,7 +617,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     },
     tabs: {
       suggestions: 'Recognition results',
-      recycle: 'Recycle bin',
+      recycle: 'Keep & clean',
       photos: 'Photos',
       settings: 'Settings',
     },
@@ -611,28 +628,34 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
         filterVideo: 'Videos',
         permissionChecking: 'Checking permission...',
         scanPromptTitle: 'Local scan',
-        scanPromptBody: 'Recent media is checked locally and the results stay on this page.',
+        scanPromptBody: `Recent media from the last ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} months is checked locally in batches for blur, duplicates, near-similar, accidental, and poor-quality issues, and the results stay on this page.`,
         startScan: 'Start scan',
-        scanScopeSummary: (count: number) => `${count} media selected`,
-        scanScopeHint: 'The default recent-media scope stays compact so the gallery keeps most of the space.',
+        scanScopeSummary: (count: number) =>
+          count > 0 ? `${count} media selected` : `Recent ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} months`,
+        scanScopeHint: `The default scan starts with the last ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} months, then keeps backfilling older media after each completed batch until the whole library is covered. Android keeps the current batch running in the background and reattaches to the real progress when you return.`,
         scanProgressTitle: 'Local scan',
         scanProgressValue: (current: number, total: number) => `${current}/${total}`,
-        scanProgressFootnote: 'Normal items keep fading away while flagged results stay below.',
+        scanProgressFootnote: 'Blur, duplicate, near-similar, accidental, and poor-quality candidates stay below while normal media gradually drops out.',
+        scanBatchRange: (start: string, end: string) => `Batch range: ${start} - ${end}`,
         scanCompleteTitle: 'Local scan',
         scanResultSummary: (count: number) => `Found ${count} anomalous media items`,
-        scanResultFootnote: 'Results stay on the page so filtering, review, cleanup, or keep actions can continue immediately.',
+        scanResultFootnote: 'Results stay on the page under the local first-pass rules so filtering, review, cleanup, or keep actions can continue immediately.',
         scanExhaustedTitle: 'This batch is fully processed',
-        scanExhaustedBody: 'You can continue scanning recent media or wait for new media to enter this range.',
+        scanExhaustedBody: 'Continuing the scan picks up from media older than the previous batch; once the whole library is covered, only new or changed media is processed.',
+        scanAllCompleteTitle: 'All media has been scanned',
+        scanAllCompleteBody: 'The current media library is fully covered. Only new or changed media needs another scan later.',
         continueScan: 'Scan again',
         selectedItems: (count) => `${count} selected`,
         cleanupSelected: 'Clean up',
         keepSelected: 'Keep',
       },
       recycleBin: {
-        title: 'Recycle Bin',
-        emptyTitle: 'The recycle bin is still empty',
-        emptyBody: 'Items moved by auto cleanup or manual cleanup will be managed here.',
-        expireHint: (days) => `Items in the recycle bin will be permanently deleted after ${days} days.`,
+        title: 'Keep & clean',
+        emptyTitle: 'Nothing is waiting for a final decision yet',
+        emptyBody:
+          'Items moved into the app recycle bin by auto cleanup or manual cleanup are finalized here: keep or delete forever.',
+        expireHint: (days) =>
+          `Items already moved into the app recycle bin will be permanently deleted after ${days} days.`,
         selectedItems: (count) => `${count} selected`,
         cancel: 'Cancel',
         restore: 'Restore',
@@ -648,8 +671,9 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     empty: {
       suggestionsTitle: 'No recognition results right now',
       suggestionsBody: 'You can scan again later or wait for stronger detection rules in a future version.',
-      recycleTitle: 'The recycle bin is still empty',
-      recycleBody: 'Items moved by auto cleanup or manual cleanup will be managed here.',
+      recycleTitle: 'Nothing is waiting for a final decision yet',
+      recycleBody:
+        'Items moved into the app recycle bin by auto cleanup or manual cleanup are finalized here: keep or delete forever.',
     },
     actionBar: {
       selectedItems: (count) => `${count} selected`,
@@ -1085,8 +1109,8 @@ export function buildRecentScanReminderContent(
 
   const detail =
     language === 'zh-CN'
-      ? `本次扫描共检查 ${latestScan.scannedCount} 项媒体，其中 ${latestScan.highConfidenceCount} 项高置信度、${latestScan.mediumConfidenceCount} 项中置信度，回收站里还有 ${latestScan.recycleBinCount} 项待处理。`
-      : `This scan checked ${latestScan.scannedCount} media items: ${latestScan.highConfidenceCount} high-confidence, ${latestScan.mediumConfidenceCount} medium-confidence, and ${latestScan.recycleBinCount} still waiting in the recycle bin.`;
+      ? `本次扫描共检查 ${latestScan.scannedCount} 项媒体，其中 ${latestScan.highConfidenceCount} 项高置信度、${latestScan.mediumConfidenceCount} 项中置信度，保留和清理页里还有 ${latestScan.recycleBinCount} 项待处理。`
+      : `This scan checked ${latestScan.scannedCount} media items: ${latestScan.highConfidenceCount} high-confidence, ${latestScan.mediumConfidenceCount} medium-confidence, and ${latestScan.recycleBinCount} still waiting in keep & clean.`;
 
   return {
     title: resolveReminderTitle(settings.summary, language),

@@ -11,6 +11,7 @@ import type { CleanupCandidate, MediaAssetSnapshot, MediaType } from '../../doma
 import type { CleanupState } from '../cleanup/cleanup-state';
 import { analyzeVisualsForAsset } from '../../services/media/analyze-visuals';
 import {
+  loadFalsePositiveCandidateIds,
   loadMediaAnalysisCache,
   saveMediaAnalysisCache,
   type MediaAnalysisCache,
@@ -19,12 +20,12 @@ import {
 import { DEFAULT_SCAN_LIMIT } from './scan-config';
 
 const PAGE_SIZE = 60;
-const MAX_SCAN_ASSETS = DEFAULT_SCAN_LIMIT;
 const ANALYSIS_CONCURRENCY = 4;
 export const ACTIONABLE_SCAN_THRESHOLD = 55;
 const ANALYSIS_CACHE_SIGNATURE_VERSION = 'v1';
-// Expo/RN in this repo does not have a dedicated worker pipeline wired in yet,
-// so scan analysis must fall back to cooperative yielding on the JS thread.
+// Scan analysis still runs through the JS pipeline in this repo.
+// Android may keep that pipeline alive in the background via a native foreground
+// service, but the analysis work itself still uses cooperative yielding here.
 export const SCAN_ANALYSIS_EXECUTION_STRATEGY = 'cooperative-yield' as const;
 
 export interface ScanSummary {
@@ -54,12 +55,25 @@ export interface ScanProgress {
 
 export type ScanProgressCallback = (progress: ScanProgress) => void;
 
+export interface ScanCheckpoint {
+  current: number;
+  total: number;
+  currentFileName: string | null;
+  processedCount: number;
+  lastProcessedAssetId: string | null;
+  analyzedInputs?: readonly AnalyzedMediaInput[];
+}
+
 export interface ScanMediaLibraryOptions {
   onProgress?: ScanProgressCallback;
+  onCheckpoint?: (checkpoint: ScanCheckpoint) => Promise<void> | void;
   analysisConcurrency?: number;
   yieldToMainThread?: () => Promise<void>;
   falsePositiveIds?: readonly string[];
   recycleBinCandidateCache?: readonly CleanupCandidate[];
+  resumeAfterAssetId?: string | null;
+  createdAfter?: number | null;
+  createdBefore?: number | null;
 }
 
 function normalizeMediaType(value: MediaLibrary.MediaTypeValue): MediaType | null {
@@ -79,6 +93,7 @@ async function mapWithConcurrency<T, R>(
   concurrency: number,
   worker: (item: T) => Promise<R>,
   onItemComplete?: (item: T, result: R) => void,
+  onChunkComplete?: (chunk: T[], results: R[]) => Promise<void> | void,
   yieldToMainThread?: () => Promise<void>,
 ): Promise<R[]> {
   const results: R[] = [];
@@ -93,6 +108,8 @@ async function mapWithConcurrency<T, R>(
       }),
     );
     results.push(...chunkResults);
+
+    await onChunkComplete?.(chunk, chunkResults);
 
     if (index + concurrency < items.length) {
       await yieldToMainThread?.();
@@ -113,21 +130,60 @@ function defaultYieldToMainThread() {
   });
 }
 
-async function fetchRecentAssets() {
+export async function loadRecentScanAssets(options?: {
+  limit?: number;
+  excludedAssetIds?: readonly string[];
+  createdAfter?: number | null;
+  createdBefore?: number | null;
+}) {
   const assets: MediaLibrary.Asset[] = [];
+  const excludedAssetIds = new Set(options?.excludedAssetIds ?? []);
+  const requestedLimit = options?.limit ?? DEFAULT_SCAN_LIMIT;
+  const hasBoundedLimit = Number.isFinite(requestedLimit) && requestedLimit > 0;
+  const limit = hasBoundedLimit ? requestedLimit : null;
+  const createdAfter = options?.createdAfter ?? null;
+  const createdBefore = options?.createdBefore ?? null;
   let cursor: string | undefined;
+  let reachedWindowBoundary = false;
 
-  while (assets.length < MAX_SCAN_ASSETS) {
+  while (!reachedWindowBoundary && (limit === null || assets.length < limit)) {
+    const remaining = limit === null ? PAGE_SIZE : Math.max(limit - assets.length, 0);
     const page = await MediaLibrary.getAssetsAsync({
-      first: Math.min(PAGE_SIZE, MAX_SCAN_ASSETS - assets.length),
+      first: Math.max(1, Math.min(PAGE_SIZE, remaining)),
       after: cursor,
       mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
       sortBy: [[MediaLibrary.SortBy.creationTime, false]],
     });
 
-    assets.push(...page.assets);
+    for (const asset of page.assets) {
+      if (
+        createdBefore !== null &&
+        Number.isFinite(asset.creationTime) &&
+        asset.creationTime >= createdBefore
+      ) {
+        continue;
+      }
 
-    if (!page.hasNextPage) {
+      if (
+        createdAfter !== null &&
+        Number.isFinite(asset.creationTime) &&
+        asset.creationTime < createdAfter
+      ) {
+        reachedWindowBoundary = true;
+        break;
+      }
+
+      if (excludedAssetIds.has(asset.id)) {
+        continue;
+      }
+
+      assets.push(asset);
+      if (limit !== null && assets.length >= limit) {
+        break;
+      }
+    }
+
+    if (reachedWindowBoundary || !page.hasNextPage) {
       break;
     }
 
@@ -260,7 +316,7 @@ function buildAnalyzedInputFromCache(
   return {
     asset: {
       ...context.snapshot,
-      previewUri: entry.previewUri || context.localUri,
+      previewUri: context.localUri,
     },
     metrics: entry.metrics,
     fingerprint: entry.fingerprint,
@@ -278,7 +334,7 @@ function buildMediaAnalysisCacheEntry(
   return {
     assetId: analyzedInput.asset.id,
     signature,
-    previewUri: analyzedInput.asset.previewUri ?? analyzedInput.asset.uri,
+    previewUri: analyzedInput.asset.uri,
     fingerprint: analyzedInput.fingerprint,
     differenceHash: analyzedInput.differenceHash ?? null,
     contentHash: analyzedInput.contentHash ?? null,
@@ -336,7 +392,7 @@ async function analyzeAsset(
   return {
     asset: {
       ...context.snapshot,
-      previewUri: analysis.previewUri,
+      previewUri: context.localUri,
     },
     metrics: analysis.metrics,
     fingerprint: analysis.fingerprint,
@@ -345,6 +401,23 @@ async function analyzeAsset(
     frameFingerprints: analysis.frameFingerprints,
     analysisStatus: analysis.status,
   };
+}
+
+async function hydrateAnalyzedInputFromCache(
+  asset: MediaLibrary.Asset,
+  analysisCache: MediaAnalysisCache,
+): Promise<AnalyzedMediaInput | null> {
+  const context = await buildAssetAnalysisContext(asset);
+  if (!context) {
+    return null;
+  }
+
+  const cachedEntry = analysisCache[asset.id];
+  if (!cachedEntry?.signature || cachedEntry.signature !== context.signature) {
+    return null;
+  }
+
+  return buildAnalyzedInputFromCache(context, cachedEntry);
 }
 
 function pruneAnalysisCacheEntries(
@@ -385,6 +458,63 @@ function mergeRecycleBinCandidates(
     .filter((candidate): candidate is CleanupCandidate => Boolean(candidate));
 }
 
+export interface BuildScanOutputFromAnalyzedInputsOptions {
+  falsePositiveIds?: readonly string[];
+  recycleBinCandidateCache?: readonly CleanupCandidate[];
+  scannedAt?: number;
+  scannedCount?: number;
+}
+
+export function buildScanOutputFromAnalyzedInputs(
+  analyzedInputs: readonly AnalyzedMediaInput[],
+  recycleBinIds: readonly string[],
+  options: BuildScanOutputFromAnalyzedInputsOptions = {},
+): ScanOutput {
+  const falsePositiveSet = new Set(options.falsePositiveIds ?? []);
+  const recycleBinSet = new Set(recycleBinIds);
+  const recognizedById = new Map(
+    buildCleanupCandidates([...analyzedInputs]).map((candidate) => [candidate.id, candidate]),
+  );
+  const allCandidates = [...analyzedInputs].map(({ asset }) =>
+    recognizedById.get(asset.id) ?? createFallbackCandidate(asset),
+  );
+  const activeCandidates = sortCandidatesByScore(
+    allCandidates.filter((candidate): candidate is CleanupCandidate => {
+      return (
+        candidate.score >= ACTIONABLE_SCAN_THRESHOLD &&
+        !recycleBinSet.has(candidate.id) &&
+        !falsePositiveSet.has(candidate.id)
+      );
+    }),
+  );
+  const recycleBin = sortCandidatesByScore(
+    mergeRecycleBinCandidates(
+      recycleBinIds,
+      (options.recycleBinCandidateCache ?? []).filter((candidate) => !falsePositiveSet.has(candidate.id)),
+      allCandidates.filter((candidate) => recycleBinSet.has(candidate.id)),
+    ),
+  );
+  const candidates = [...activeCandidates, ...recycleBin];
+  const scannedAt = options.scannedAt ?? Date.now();
+  const scannedCount = options.scannedCount ?? analyzedInputs.length;
+
+  return {
+    state: {
+      activeCandidates,
+      recycleBin,
+      selectedIds: [],
+    },
+    summary: {
+      scannedAt,
+      scannedCount,
+      candidateCount: candidates.length,
+      highConfidenceCount: candidates.filter((candidate) => candidate.confidence === 'high').length,
+      mediumConfidenceCount: candidates.filter((candidate) => candidate.confidence === 'medium').length,
+      recycleBinCount: recycleBin.length,
+    },
+  };
+}
+
 export async function scanMediaLibrary(recycleBinIds: string[]): Promise<ScanOutput>;
 export async function scanMediaLibrary(
   recycleBinIds: string[],
@@ -412,14 +542,34 @@ export async function scanMediaLibrary(
       : onProgressOrOptions.yieldToMainThread ?? defaultYieldToMainThread;
   const falsePositiveIds =
     typeof onProgressOrOptions === 'function'
-      ? []
-      : [...(onProgressOrOptions.falsePositiveIds ?? [])];
+      ? await loadFalsePositiveCandidateIds()
+      : onProgressOrOptions.falsePositiveIds
+        ? [...onProgressOrOptions.falsePositiveIds]
+        : await loadFalsePositiveCandidateIds();
+  const onCheckpoint =
+    typeof onProgressOrOptions === 'function'
+      ? undefined
+      : onProgressOrOptions.onCheckpoint;
   const recycleBinCandidateCache =
     typeof onProgressOrOptions === 'function'
       ? []
       : [...(onProgressOrOptions.recycleBinCandidateCache ?? [])];
+  const resumeAfterAssetId =
+    typeof onProgressOrOptions === 'function'
+      ? null
+      : onProgressOrOptions.resumeAfterAssetId ?? null;
 
-  const recentAssets = await fetchRecentAssets();
+  const recentAssets = await loadRecentScanAssets({
+    excludedAssetIds: falsePositiveIds,
+    createdAfter:
+      typeof onProgressOrOptions === 'function'
+        ? null
+        : onProgressOrOptions.createdAfter ?? null,
+    createdBefore:
+      typeof onProgressOrOptions === 'function'
+        ? null
+        : onProgressOrOptions.createdBefore ?? null,
+  });
   const recycleBinAssets = await fetchPinnedRecycleBinAssets(recycleBinIds, recentAssets);
   const assets = Array.from(
     new Map([...recentAssets, ...recycleBinAssets].map((asset) => [asset.id, asset])).values(),
@@ -429,13 +579,53 @@ export async function scanMediaLibrary(
   const total = assets.length;
   let completed = 0;
   let lastFileName = '';
+  let lastProcessedAssetId: string | null = null;
   const recycleBinSet = new Set(recycleBinIds);
   const falsePositiveSet = new Set(falsePositiveIds);
   const recycleBinCandidateCacheMap = new Map(
     recycleBinCandidateCache.map((candidate) => [candidate.id, candidate]),
   );
+  const resumeIndex =
+    resumeAfterAssetId === null
+      ? -1
+      : assets.findIndex((asset) => asset.id === resumeAfterAssetId);
+  const resumePrefix = resumeIndex >= 0 ? assets.slice(0, resumeIndex + 1) : [];
+  const warmStartAnalyzedInputs: AnalyzedMediaInput[] = [];
+
+  if (resumePrefix.length > 0) {
+    for (const asset of resumePrefix) {
+      const cachedInput = await hydrateAnalyzedInputFromCache(asset, analysisCache);
+
+      if (!cachedInput) {
+        break;
+      }
+
+      warmStartAnalyzedInputs.push(cachedInput);
+    }
+
+    completed = warmStartAnalyzedInputs.length;
+
+    if (completed > 0) {
+      const lastWarmAsset = resumePrefix[completed - 1];
+      lastFileName = resolveAssetFileName(lastWarmAsset);
+      lastProcessedAssetId = lastWarmAsset.id;
+
+      onProgress?.({
+        current: completed,
+        total,
+        currentFileName: lastFileName,
+        isScanning: completed < total,
+        percentage: total > 0 ? Math.min(Math.round((completed / total) * 100), 100) : 0,
+        analyzedAssetId: lastProcessedAssetId,
+        analyzedInput: warmStartAnalyzedInputs[completed - 1] ?? null,
+        analyzedMediaType: normalizeMediaType(lastWarmAsset.mediaType),
+      });
+    }
+  }
+
+  const remainingAssets = assets.slice(completed);
   const analyzed = await mapWithConcurrency(
-    assets,
+    remainingAssets,
     analysisConcurrency,
     async (asset) => {
       if (falsePositiveSet.has(asset.id)) {
@@ -467,6 +657,7 @@ export async function scanMediaLibrary(
     (asset, result) => {
       completed += 1;
       lastFileName = resolveAssetFileName(asset);
+      lastProcessedAssetId = asset.id;
 
       onProgress?.({
         current: completed,
@@ -479,6 +670,20 @@ export async function scanMediaLibrary(
         analyzedMediaType: normalizeMediaType(asset.mediaType),
       });
     },
+    async () => {
+      if (analysisCacheDirty) {
+        await saveMediaAnalysisCache(analysisCache);
+        analysisCacheDirty = false;
+      }
+
+      await onCheckpoint?.({
+        current: completed,
+        total,
+        currentFileName: lastFileName || null,
+        processedCount: completed,
+        lastProcessedAssetId,
+      });
+    },
     yieldToMainThread,
   );
   if (pruneAnalysisCacheEntries(analysisCache, new Set(assets.map((asset) => asset.id)))) {
@@ -487,31 +692,16 @@ export async function scanMediaLibrary(
   if (analysisCacheDirty) {
     await saveMediaAnalysisCache(analysisCache);
   }
-  const analyzedAssets = analyzed.filter((candidate): candidate is AnalyzedMediaInput => Boolean(candidate));
-  const recognizedById = new Map(
-    buildCleanupCandidates(analyzedAssets).map((candidate) => [candidate.id, candidate]),
-  );
-  const allCandidates = analyzedAssets.map(({ asset }) =>
-    recognizedById.get(asset.id) ?? createFallbackCandidate(asset),
-  );
-  const activeCandidates = sortCandidatesByScore(
-    allCandidates.filter((candidate): candidate is CleanupCandidate => {
-      return (
-        candidate.score >= ACTIONABLE_SCAN_THRESHOLD &&
-        !recycleBinSet.has(candidate.id) &&
-        !falsePositiveSet.has(candidate.id)
-      );
-    }),
-  );
-  const recycleBin = sortCandidatesByScore(
-    mergeRecycleBinCandidates(
-      recycleBinIds,
-      recycleBinCandidateCache.filter((candidate) => !falsePositiveSet.has(candidate.id)),
-      allCandidates.filter((candidate) => recycleBinSet.has(candidate.id)),
-    ),
-  );
-  const candidates = [...activeCandidates, ...recycleBin];
-  const scannedAt = Date.now();
+  const analyzedAssets = [
+    ...warmStartAnalyzedInputs,
+    ...analyzed.filter((candidate): candidate is AnalyzedMediaInput => Boolean(candidate)),
+  ];
+  const output = buildScanOutputFromAnalyzedInputs(analyzedAssets, recycleBinIds, {
+    falsePositiveIds,
+    recycleBinCandidateCache,
+    scannedAt: Date.now(),
+    scannedCount: total,
+  });
 
   if (onProgress) {
     onProgress({
@@ -523,19 +713,5 @@ export async function scanMediaLibrary(
     });
   }
 
-  return {
-    state: {
-      activeCandidates,
-      recycleBin,
-      selectedIds: [],
-    },
-    summary: {
-      scannedAt,
-      scannedCount: assets.length,
-      candidateCount: candidates.length,
-      highConfidenceCount: candidates.filter((candidate) => candidate.confidence === 'high').length,
-      mediumConfidenceCount: candidates.filter((candidate) => candidate.confidence === 'medium').length,
-      recycleBinCount: recycleBin.length,
-    },
-  };
+  return output;
 }

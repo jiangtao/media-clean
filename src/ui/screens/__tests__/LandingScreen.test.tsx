@@ -10,6 +10,7 @@ vi.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',
   Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
   },
@@ -85,7 +86,7 @@ describe('LandingScreen', () => {
     runtime.replace.mockReset();
   });
 
-  it('renders a restrained media-cleanup landing page', () => {
+  it('renders the five-step product flow and trust points', () => {
     let renderer!: ReturnType<typeof TestRenderer.create>;
 
     act(() => {
@@ -99,12 +100,27 @@ describe('LandingScreen', () => {
     });
 
     const texts = collectTexts(renderer);
+    const stepCards = renderer.root.findAllByProps({ testID: 'landing-step' });
+    const trustCards = renderer.root.findAllByProps({ testID: 'landing-trust-point' });
 
-    expect(texts).toContain('MediaClean');
-    expect(texts).toContain('媒体清理');
-    expect(texts).toContain('进入媒体清理');
-    expect(texts).toContain('先看结果，再做决定。扫描、筛选、保留都在本机完成。');
+    expect(texts).toContain('本地相册助手');
+    expect(texts).toContain('五步完成清理');
+    expect(texts).toContain('扫描、识别、筛选、清理、报告，一条清晰的本地处理流程。');
+    expect(texts).toContain('扫描');
+    expect(texts).toContain('识别');
+    expect(texts).toContain('筛选');
+    expect(texts).toContain('清理');
+    expect(texts).toContain('报告');
+    expect(texts).toContain('本地优先');
+    expect(texts).toContain('安全清理');
+    expect(texts).toContain('后台处理');
+    expect(texts).toContain('继续进入 Main');
     expect(renderer.root.findByProps({ testID: 'landing-screen' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'landing-scroll-view' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'landing-step-list' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'landing-trust-list' })).toBeTruthy();
+    expect(stepCards).toHaveLength(5);
+    expect(trustCards).toHaveLength(3);
     expect(renderer.root.findByProps({ testID: 'landing-primary-action' })).toBeTruthy();
   });
 

@@ -79,7 +79,7 @@ vi.mock('../../application/AppPreferencesContext', () => ({
     copy: {
       tabs: {
         photos: '照片',
-        recycle: '回收站',
+        recycle: '保留和清理',
         settings: '设置',
       },
     },

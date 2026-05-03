@@ -12,16 +12,23 @@ import { useAppPreferences } from '../../application/AppPreferencesContext';
 import type { CleanupCandidate } from '../../domain/recognition/types';
 import type { CleanupState } from '../../features/cleanup/cleanup-state';
 import { createInitialCleanupState, applyCleanupAction } from '../../features/cleanup/cleanup-state';
+import { formatLocalizedSize } from '../../i18n/app-copy';
+import type { AppLanguage } from '../../i18n/app-language';
 import type { AppThemePalette } from '../../theme/app-theme';
 import { scanMediaLibrary } from '../../features/scan/scan-media-library';
+import { buildDefaultScanWindowStartAt } from '../../features/scan/scan-config';
 import {
   loadRecycleBinSnapshotCache,
+  loadCleanupReportSnapshot,
   loadRecycleBinIds,
   saveRecycleBinIds,
   saveRecycleBinSnapshotCache,
+  syncPersistedMediaLedger,
+  type CleanupReportSnapshot,
 } from '../../services/storage/app-storage';
 import {
   buildPhotoGridContentPadding,
+  buildFloatingActionBarInsets,
   buildRecycleBinHeaderInsets,
   buildRecycleBinTexts,
 } from './screen-layout';
@@ -95,6 +102,48 @@ function filterRecycleBinCandidateCache(
   return candidates.filter((candidate) => recycleBinIdSet.has(candidate.id));
 }
 
+function buildSelectionToggleLabel(language: string, isAllSelected: boolean) {
+  if (language === 'en-US') {
+    return isAllSelected ? 'Deselect All' : 'Select All';
+  }
+
+  return isAllSelected ? '取消全选' : '全选';
+}
+
+const ZERO_CLEANUP_REPORT: CleanupReportSnapshot = {
+  cleanedItemCount: 0,
+  cleanedBytes: 0,
+  lastCleanedAt: null,
+};
+
+function buildCleanupReportCopy(language: string) {
+  if (language === 'en-US') {
+    return {
+      title: 'Cleanup report',
+      itemCountLabel: 'Cleaned items',
+      sizeLabel: 'Cleaned size',
+      lastCleanedLabel: 'Last cleaned',
+      emptyLabel: 'No cleanup yet',
+    };
+  }
+
+  return {
+    title: '累计清理报告',
+    itemCountLabel: '累计清理条目',
+    sizeLabel: '累计清理体积',
+    lastCleanedLabel: '最近清理',
+    emptyLabel: '暂无清理记录',
+  };
+}
+
+function formatCleanupReportTime(timestamp: number, language: string) {
+  const date = new Date(timestamp);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return language === 'en-US'
+    ? `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+    : `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 type RecycleBinScreenProps = {
   recycleBinIds?: string[];
   onRecycleBinIdsChange?: (ids: string[]) => void;
@@ -105,18 +154,34 @@ export function RecycleBinScreen({
   onRecycleBinIdsChange,
 }: RecycleBinScreenProps = {}) {
   const { copy, theme, language } = useAppPreferences();
+  const appLanguage: AppLanguage = language === 'en-US' ? 'en-US' : 'zh-CN';
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme, insets), [insets, theme]);
-  const contentPadding = useMemo(() => buildPhotoGridContentPadding(insets), [insets]);
+  const baseContentPadding = useMemo(() => buildPhotoGridContentPadding(insets), [insets]);
+  const contentPadding = useMemo(
+    () => ({
+      ...baseContentPadding,
+      bottom: baseContentPadding.bottom + 180,
+    }),
+    [baseContentPadding],
+  );
   const recycleBinTexts = useMemo(() => buildRecycleBinTexts(copy, EXPIRATION_DAYS), [copy]);
-  const loadingLabel = language === 'zh-CN' ? '加载回收站…' : 'Loading recycle bin…';
+  const cleanupReportCopy = useMemo(() => buildCleanupReportCopy(appLanguage), [appLanguage]);
+  const loadingLabel = appLanguage === 'zh-CN' ? '加载保留和清理…' : 'Loading keep and clean…';
 
   const [state, setState] = useState<CleanupState>(createInitialCleanupState([]));
   const [previewCandidate, setPreviewCandidate] = useState<CleanupCandidate | null>(null);
+  const [cleanupReport, setCleanupReport] = useState<CleanupReportSnapshot>(ZERO_CLEANUP_REPORT);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
   const [hasHydrated, setHasHydrated] = useState(false);
   const isSelectionMode = state.selectedIds.length > 0;
+  const isAllRecycleBinSelected =
+    state.recycleBin.length > 0 &&
+    state.recycleBin.every((candidate) => state.selectedIds.includes(candidate.id));
+  const cleanupReportBottom = isSelectionMode
+    ? buildFloatingActionBarInsets(insets).bottom
+    : 16 + insets.bottom;
   const previewDuplicateCandidates = useMemo(
     () => getDuplicateGroupCandidates(state.recycleBin, previewCandidate),
     [previewCandidate, state.recycleBin],
@@ -131,17 +196,23 @@ export function RecycleBinScreen({
         setErrorMessage(null);
 
         try {
+          const cleanupReportPromise = loadCleanupReportSnapshot().catch(() => ZERO_CLEANUP_REPORT);
           const recycleBinSnapshotPromise = loadRecycleBinSnapshotCache();
           const recycleBinSourceIdsPromise =
             recycleBinIds && recycleBinIds.length > 0
               ? Promise.resolve(recycleBinIds)
               : loadRecycleBinIds();
-          const recycleBinSnapshot = await recycleBinSnapshotPromise;
+          const [cleanupReportSnapshot, recycleBinSnapshot] = await Promise.all([
+            cleanupReportPromise,
+            recycleBinSnapshotPromise,
+          ]);
           const cachedRecycleBin = recycleBinSnapshot?.candidates ?? [];
 
           if (!isActive) {
             return;
           }
+
+          setCleanupReport(cleanupReportSnapshot);
 
           if (cachedRecycleBin.length > 0) {
             setState(buildHydratedRecycleBinState([], cachedRecycleBin));
@@ -174,6 +245,7 @@ export function RecycleBinScreen({
           }
 
           const result = await scanMediaLibrary(persistedRecycleBinIds, {
+            createdAfter: buildDefaultScanWindowStartAt(),
             recycleBinCandidateCache: cachedRecycleBinForRefresh,
           });
 
@@ -239,8 +311,21 @@ export function RecycleBinScreen({
     setPreviewCandidate(candidate);
   }, [isSelectionMode]);
 
+  const handleToggleSelectAll = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      selectedIds: isAllRecycleBinSelected ? [] : prev.recycleBin.map((candidate) => candidate.id),
+    }));
+  }, [isAllRecycleBinSelected]);
+
   const persistRecycleBinState = useCallback(
-    async (nextState: CleanupState) => {
+    async (
+      nextState: CleanupState,
+      options?: {
+        restoredIds?: readonly string[];
+        deletedIds?: readonly string[];
+      },
+    ) => {
       const nextRecycleBinIds = normalizeIds(nextState.recycleBin.map((candidate) => candidate.id));
       await Promise.all([
         saveRecycleBinIds(nextRecycleBinIds),
@@ -250,7 +335,19 @@ export function RecycleBinScreen({
           updatedAt: Date.now(),
           source: 'manual',
         }),
+        syncPersistedMediaLedger({
+          activeCandidates: nextState.activeCandidates,
+          recycleBinCandidates: nextState.recycleBin,
+          restoredIds: options?.restoredIds,
+          deletedIds: options?.deletedIds,
+        }),
       ]);
+
+      if ((options?.deletedIds?.length ?? 0) > 0) {
+        const nextCleanupReport = await loadCleanupReportSnapshot().catch(() => ZERO_CLEANUP_REPORT);
+        setCleanupReport(nextCleanupReport);
+      }
+
       onRecycleBinIdsChange?.(nextRecycleBinIds);
     },
     [onRecycleBinIdsChange],
@@ -263,7 +360,9 @@ export function RecycleBinScreen({
 
     try {
       const nextState = applyCleanupAction(state, { type: 'restore', ids });
-      await persistRecycleBinState(nextState);
+      await persistRecycleBinState(nextState, {
+        restoredIds: ids,
+      });
 
       setState(nextState);
       setPreviewCandidate((current) =>
@@ -284,7 +383,9 @@ export function RecycleBinScreen({
       await MediaLibrary.deleteAssetsAsync(ids);
 
       const nextState = applyCleanupAction(state, { type: 'hard-delete', ids });
-      await persistRecycleBinState(nextState);
+      await persistRecycleBinState(nextState, {
+        deletedIds: ids,
+      });
 
       setState(nextState);
       setPreviewCandidate((current) =>
@@ -361,9 +462,49 @@ export function RecycleBinScreen({
         </View>
       )}
 
+      <View
+        style={[styles.cleanupReportCard, { bottom: cleanupReportBottom }]}
+        testID="cleanup-report-card"
+      >
+        <Text style={styles.cleanupReportTitle}>{cleanupReportCopy.title}</Text>
+        <View style={styles.cleanupReportMetricsRow}>
+          <View style={styles.cleanupReportMetric}>
+            <Text style={styles.cleanupReportMetricLabel}>{cleanupReportCopy.itemCountLabel}</Text>
+            <Text style={styles.cleanupReportMetricValue} testID="cleanup-report-count">
+              {cleanupReport.cleanedItemCount}
+            </Text>
+          </View>
+          <View style={styles.cleanupReportMetric}>
+            <Text style={styles.cleanupReportMetricLabel}>{cleanupReportCopy.sizeLabel}</Text>
+            <Text style={styles.cleanupReportMetricValue} testID="cleanup-report-bytes">
+              {formatLocalizedSize(cleanupReport.cleanedBytes, appLanguage)}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.cleanupReportFooterText} testID="cleanup-report-last-cleaned">
+          {cleanupReport.lastCleanedAt
+            ? `${cleanupReportCopy.lastCleanedLabel} · ${formatCleanupReportTime(
+                cleanupReport.lastCleanedAt,
+                appLanguage,
+              )}`
+            : cleanupReportCopy.emptyLabel}
+        </Text>
+      </View>
+
       {isSelectionMode && (
         <View style={styles.actionBar}>
           <View style={styles.selectionActionsRow}>
+            <TouchSurface
+              style={[styles.selectionActionButton, styles.selectionToggleButton]}
+              pressedStyle={styles.selectionToggleButtonPressed}
+              onPress={handleToggleSelectAll}
+              preset="pill"
+              testID="recycle-selection-toggle-button"
+            >
+              <Text style={[styles.selectionActionText, styles.selectionToggleText]}>
+                {buildSelectionToggleLabel(appLanguage, isAllRecycleBinSelected)}
+              </Text>
+            </TouchSurface>
             <TouchSurface
               style={[styles.selectionActionButton, styles.selectionRestoreButton]}
               pressedStyle={styles.selectionRestoreButtonPressed}
@@ -484,6 +625,54 @@ function createStyles(
       color: theme.noticeText,
       lineHeight: 20,
     },
+    cleanupReportCard: {
+      position: 'absolute',
+      left: 16 + insets.left,
+      right: 16 + insets.right,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderRadius: 18,
+      backgroundColor: theme.cardBackground,
+      borderWidth: 1,
+      borderColor: theme.cardBorder,
+      shadowColor: theme.shadowColor,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: theme.scheme === 'dark' ? 0.18 : 0.08,
+      shadowRadius: 14,
+      elevation: 3,
+    },
+    cleanupReportTitle: {
+      color: theme.pageTextPrimary,
+      fontSize: 16,
+      fontWeight: '800',
+      marginBottom: 10,
+    },
+    cleanupReportMetricsRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    cleanupReportMetric: {
+      flex: 1,
+      borderRadius: 14,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      backgroundColor: theme.cardMutedBackground,
+    },
+    cleanupReportMetricLabel: {
+      color: theme.pageTextMuted,
+      fontSize: 12,
+      marginBottom: 6,
+    },
+    cleanupReportMetricValue: {
+      color: theme.pageTextPrimary,
+      fontSize: 18,
+      fontWeight: '800',
+    },
+    cleanupReportFooterText: {
+      marginTop: 10,
+      color: theme.pageTextSecondary,
+      fontSize: 12,
+    },
     actionBar: {
       position: 'absolute',
       bottom: 0,
@@ -493,6 +682,28 @@ function createStyles(
       paddingBottom: Math.max(insets.bottom, 8) + 8,
       paddingHorizontal: 12,
       backgroundColor: 'transparent',
+    },
+    selectionToggleButton: {
+      minHeight: 40,
+      minWidth: 0,
+      paddingHorizontal: 14,
+      borderRadius: 999,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.buttonSecondaryBackground,
+      borderWidth: 1,
+      borderColor: theme.cardBorder,
+      shadowColor: theme.shadowColor,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: theme.scheme === 'dark' ? 0.16 : 0.08,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    selectionToggleButtonPressed: {
+      backgroundColor: theme.cardMutedBackground,
+    },
+    selectionToggleText: {
+      color: theme.pageTextPrimary,
     },
     selectionActionsRow: {
       flexDirection: 'row',

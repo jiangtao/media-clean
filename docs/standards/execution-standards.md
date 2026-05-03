@@ -8,14 +8,18 @@
 
 ## 一、目标文件与验收源
 
-1. [v0.1.md](../goal/v0.1.md) 是不可变目标文件，只能读取、对照、引用，不得改写。
-2. 每一轮执行结束时，必须同时对照以下验收源：
-   - `docs/goal/v0.1.md`
+1. `docs/goal/*.md` 全部是不可变目标文件，只能读取、对照、引用，不得改写。
+2. 当仓库存在多个版本目标文件时，由用户显式点名的最新目标版本成为当前活跃目标源。
+3. 当前活跃目标源为 `docs/goal/v0.3.md`；`docs/goal/v0.2.md` 与 `docs/goal/v0.1.md` 作为历史基线保留，只用于回看既有能力与演进边界，不再主导当前波次。
+4. 每一轮执行结束时，必须同时对照以下验收源：
+   - `docs/goal/v0.3.md`
+   - `docs/goal/v0.2.md`（仅用于上一波次能力回看）
+   - `docs/goal/v0.1.md`（仅用于历史差异回看）
    - 已生效的标准文档
    - 对应设计文档
    - 对应执行计划
    - 对应 BDD 场景或 `.feature` 文件
-3. 若代码、计划、标准三者不一致，以目标文件和已确认标准为先，不得以“代码先写了”为由倒逼目标让步。
+5. 若代码、计划、标准三者不一致，以当前活跃目标源和已确认标准为先，不得以“代码先写了”为由倒逼目标让步。
 
 ## 二、团队组织标准
 
@@ -98,25 +102,29 @@
 
 ## 七、当前默认 TODO 队列
 
-1. 第一队列：runtime 主线收口  
-   - 扫描缓存、主线程让渡、提醒 cold-start reconcile 的实现与测试继续对齐。
-2. 第二队列：扫描入口交互标准继续落地  
-   - 以照片页 scan entry 与结果页交互为主。
-3. 第三队列：遗留缺口收口  
-   - AppPreferences 统一
-   - 国际化与多主题覆盖
-   - 特殊屏适配与验证
-4. 第四队列：回收站真实数据流  
-   - 从 storage 加载
-   - badge 实时数量
-   - 详情查看链路
+1. 第一队列：`v0.3` 产品化主流程
+   - 升级标准/计划，使当前波次明确锚定 `docs/goal/v0.3.md`
+   - 首页必须突出“扫描 -> 识别 -> 筛选 -> 清理 -> 报告”主流程
+   - 扫描页必须显式展示识别分类摘要，而不是只有列表结果
+2. 第二队列：保留和清理与累计报告
+   - 回收站语义收紧为“保留和清理”
+   - 真删除必须写入 `SQLite` 累计清理报告
+   - 恢复动作不得回滚累计报告
+3. 第三队列：远程可观测性 foundation
+   - Firebase / Crashlytics / Analytics 不进入当前 Android 第一版
+   - 当前版本只保留本地错误兜底，不要求真机远程上报验收
+   - 后续版本重新启用时，必须补齐 service files、原生配置与真机验收
+4. 第四队列：后续终局能力
+   - Rust shared core、iOS adapter、skill / desktop 复用进入后续波次
+   - 不得反向阻塞当前产品化交付
 
 ## 八、当前交付阻断 TODO
 
-1. [RecycleBinScreen.tsx](/Users/jt/places/personal/app-cleaner/src/ui/screens/RecycleBinScreen.tsx:33) 的回收站真实数据加载未贯通。
-2. [MainTabNavigator.tsx](/Users/jt/places/personal/app-cleaner/src/navigation/MainTabNavigator.tsx:16) 的回收站 badge 仍未接真实状态。
-3. [RecycleBinScreen.tsx](/Users/jt/places/personal/app-cleaner/src/ui/screens/RecycleBinScreen.tsx:46) 的回收站详情链路未贯通。
-4. 上述三项未收口前，回收站页不得宣称“完备交付”。
+1. [src/ui/screens/LandingScreen.tsx](/Users/jt/places/personal/app-cleaner/src/ui/screens/LandingScreen.tsx:1) 尚未承担 `v0.3` 要求的五步产品流程首页。
+2. [src/ui/screens/PhotoGridScreen.tsx](/Users/jt/places/personal/app-cleaner/src/ui/screens/PhotoGridScreen.tsx:1) 缺少“识别分类摘要”这一显式产品化状态层。
+3. [src/ui/screens/RecycleBinScreen.tsx](/Users/jt/places/personal/app-cleaner/src/ui/screens/RecycleBinScreen.tsx:1) 尚未展示基于 `SQLite` 的累计清理报告。
+4. Firebase / Crashlytics / Analytics 已从当前 Android 第一版交付阻断项中移出；不得把 noop fallback 警告当作当前版本缺陷。
+5. 上述前三项未收口前，不得宣称 `docs/goal/v0.3.md` 的当前 Android 第一版交付完成。
 
 ## 九、文档纪律
 
@@ -125,10 +133,12 @@
 3. 更新标准时，必须同步更新相关设计、计划或 BDD 场景，避免标准独走。
 4. 文档不得脱离代码现状；若文档写了但 live 路径未接，视为未完成。
 
+团队模式的实际运行细节，见 [agent-team-mode.md](./agent-team-mode.md)。
+
 ## 十、完成定义
 
 1. 通过质量闸。
-2. 对齐目标文件。
+2. 对齐当前活跃目标源。
 3. 对齐标准与 BDD。
 4. 子成员验证证据完整。
 5. 无阻断性 TODO 残留在当前波次内。

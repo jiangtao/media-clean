@@ -6194,8 +6194,8 @@
                   class="flex items-center gap-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-full transition-colors">
                   <span>EN</span>
                 </a>
-                <button
-                  class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full hover:shadow-lg transition-shadow"><span>下载应用</span></button>
+                <a data-android-download-link
+                  class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full hover:shadow-lg transition-shadow inline-flex items-center justify-center"><span>下载 Android</span></a>
               </div>
             </div>
           </header>
@@ -6218,7 +6218,7 @@
                 <p class="text-xl text-gray-600 mb-8 max-w-xl">Media Clean 帮助您快速识别和清理重复、模糊、相似的照片，让相册保持干净整洁，释放更多存储空间。</p>
                 <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                   <!-- Apple 版本暂不支持
-                  <button class="bg-black text-white px-8 py-4 rounded-2xl flex items-center gap-3 hover:bg-gray-800 transition-colors">
+                  <a data-android-download-link class="bg-black text-white px-8 py-4 rounded-2xl flex items-center gap-3 hover:bg-gray-800 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                       class="lucide lucide-download size-5">
@@ -6241,10 +6241,10 @@
                       <line x1="12" x2="12" y1="15" y2="3"></line>
                     </svg>
                     <div class="text-left">
-                      <div class="text-xs opacity-80">下载于</div>
-                      <div class="font-semibold">Google Play</div>
+                      <div class="text-xs opacity-80">正式发布</div>
+                      <div class="font-semibold">Android APK</div>
                     </div>
-                  </button>
+                  </a>
                 </div>
                 <!--
                 <div class="flex items-center gap-6 mt-8 justify-center lg:justify-start">
@@ -6563,7 +6563,7 @@
                   </div>
                 </button>
                 -->
-                <button class="bg-white text-purple-600 px-8 py-4 rounded-2xl flex items-center gap-3 hover:bg-gray-100 transition-colors justify-center">
+                <a data-android-download-link class="bg-white text-purple-600 px-8 py-4 rounded-2xl flex items-center gap-3 hover:bg-gray-100 transition-colors justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                     class="lucide lucide-download size-5">
@@ -6572,10 +6572,10 @@
                     <line x1="12" x2="12" y1="15" y2="3"></line>
                   </svg>
                   <div class="text-left">
-                    <div class="text-xs opacity-80">下载于</div>
-                    <div class="font-semibold">Google Play</div>
+                    <div class="text-xs opacity-80">正式发布</div>
+                    <div class="font-semibold">Android APK</div>
                   </div>
-                </button>
+                </a>
               </div>
             </div>
           </section>
@@ -6616,8 +6616,8 @@
                   <ul class="space-y-2 text-gray-400">
                     <li><a href="https://github.com/jiangtao/media-clean/blob/main/README.en.md"
                         class="hover:text-white transition-colors"><span>功能特性</span></a></li>
-                    <li><a href="https://github.com/jiangtao/media-clean/blob/main/README.en.md"
-                        class="hover:text-white transition-colors"><span>下载应用</span></a></li>
+                    <li><a data-android-download-link
+                        class="hover:text-white transition-colors"><span>下载 Android</span></a></li>
                   </ul>
                 </div>
                 <div>
@@ -6652,6 +6652,17 @@
   </div>
 
   <script>
+    const ANDROID_RELEASE_LATEST_URL = 'https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk';
+
+    function wireAndroidDownloadLinks() {
+      document.querySelectorAll('[data-android-download-link]').forEach((link) => {
+        link.setAttribute('href', ANDROID_RELEASE_LATEST_URL);
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+        link.setAttribute('aria-label', '下载最新正式版 Android APK');
+      });
+    }
+
     // Fetch GitHub Stars
     async function fetchGitHubStars() {
       try {
@@ -6668,6 +6679,7 @@
         console.log('Failed to fetch GitHub stars:', e);
       }
     }
+    wireAndroidDownloadLinks();
     fetchGitHubStars();
 
     // Toast notification

@@ -32,3 +32,4 @@ npm run page:deploy:prod
 3. 输出目录是 `dist`。
 4. 预览域名建议为 `mc.vercel.app`。
 5. 正式域名规划为 `mc.jerret.me`。
+6. 页面中的 Android 下载按钮统一指向 `https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk`，正式 APK 由 `.github/workflows/android-release.yml` 维护，不在 page 目录内重复存放。

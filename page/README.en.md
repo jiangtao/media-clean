@@ -32,3 +32,4 @@ npm run page:deploy:prod
 3. The output directory is `dist`.
 4. Recommended preview domain: `mc.vercel.app`.
 5. Planned production domain: `mc.jerret.me`.
+6. Every Android download button points to `https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk`; the formal APK is maintained by `.github/workflows/android-release.yml` and is not duplicated inside `page/`.

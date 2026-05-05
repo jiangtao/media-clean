@@ -46,6 +46,20 @@ usage() {
 EOF
 }
 
+enforce_local_release_policy() {
+  if [[ "${CI:-}" != "1" && "${TEMP_KEYSTORE}" -ne 1 ]]; then
+    cat >&2 <<'EOF'
+本地禁止生成正式 Android release APK。
+正式 release 仅允许通过 GitHub Actions .github/workflows/android-release.yml 产出，
+以保证签名来源与对外下载入口唯一。
+
+本地如需验证 release 链路，请使用:
+  bash scripts/android/build-release-apk.sh --temp-keystore --skip-install
+EOF
+    exit 1
+  fi
+}
+
 require_command() {
   local command_name="$1"
   if ! command -v "${command_name}" >/dev/null 2>&1; then
@@ -226,6 +240,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+enforce_local_release_policy
 resolve_keystore_config
 run_release_pipeline
 

@@ -2,15 +2,15 @@
 
 [中文版本](./android.md)
 
-This document defines the repository-native Android debug / release APK pipeline for Media Clean, including CI/CD integration, signing verification, and artifact transparency. The goal is not only to produce an APK, but to make both debug and release outputs, signing sources, verification results, and metadata reproducible and auditable.
+This document defines the repository-native Android debug / release APK pipeline for Media Clean, including CI/CD integration, signing verification, public download entry, and artifact transparency. The goal is not only to produce an APK, but to make both debug and release outputs, signing sources, verification results, public download URLs, and metadata reproducible and auditable.
 
 ## Release Entry
 
-Repository entry point:
+Formal release entry:
 
-```bash
-bash scripts/android/build-release-apk.sh --skip-install
-```
+- GitHub Actions: `.github/workflows/android-release.yml`
+- Trigger: `workflow_dispatch`
+- Canonical public Android download URL: `https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk`
 
 Debug APK:
 
@@ -23,6 +23,12 @@ Temporary local smoke path:
 ```bash
 bash scripts/android/build-release-apk.sh --temp-keystore --skip-install
 ```
+
+Notes:
+
+1. Generating a formally signed release APK is blocked on local machines.
+2. Local release validation is limited to the temp-keystore smoke path.
+3. Formal signing, formal release assets, and the page download entry are maintained only by the workflow so the APK provenance stays unique.
 
 ## Pipeline
 
@@ -38,7 +44,13 @@ bash scripts/android/build-release-apk.sh --temp-keystore --skip-install
 Official release workflow:
 
 - `.github/workflows/android-release.yml`
-- Triggered by `workflow_dispatch`, `main/master` pushes, or `android-v*` tags
+- Triggered by `workflow_dispatch`
+- Publish result:
+  1. create or update the GitHub Release
+  2. upload versioned asset `media-clean-android-v<version>.apk`
+  3. upload stable page asset `media-clean-android-latest.apk`
+  4. keep the page download buttons pinned to `releases/latest/download/media-clean-android-latest.apk`
+  5. includes `verify:release:page-contract` so the release asset name and the page download entry cannot drift apart
 
 Official debug workflow:
 
@@ -74,6 +86,8 @@ Release:
 2. Signing report: `artifacts/android-release/app-release.signing.txt`
 3. SHA256: `artifacts/android-release/app-release.sha256`
 4. Metadata: `artifacts/android-release/release-metadata.json`
+5. Versioned GitHub Release asset: `artifacts/android-release/media-clean-android-v<version>.apk`
+6. Stable page asset on GitHub Release: `artifacts/android-release/media-clean-android-latest.apk`
 
 Debug:
 
@@ -89,3 +103,4 @@ Debug:
 3. Metadata must include version, `versionCode`, package name, and checksum
 4. The debug workflow must stably produce `app-debug.apk` and its signing report
 5. The PR check must validate both release and debug pipelines even without production credentials
+6. Every Android download entry on the page must resolve to `releases/latest/download/media-clean-android-latest.apk`

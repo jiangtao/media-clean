@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const runtime = vi.hoisted(() => ({
   replace: vi.fn(),
+  saveHasEnteredWorkspace: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
@@ -54,6 +55,10 @@ vi.mock('../../../application/AppPreferencesContext', () => ({
   }),
 }));
 
+vi.mock('../../../services/storage/workspace-entry-storage', () => ({
+  saveHasEnteredWorkspace: (...args: unknown[]) => runtime.saveHasEnteredWorkspace(...args),
+}));
+
 import { LandingScreen } from '../LandingScreen';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -84,6 +89,8 @@ function collectTexts(renderer: ReturnType<typeof TestRenderer.create>) {
 describe('LandingScreen', () => {
   beforeEach(() => {
     runtime.replace.mockReset();
+    runtime.saveHasEnteredWorkspace.mockReset();
+    runtime.saveHasEnteredWorkspace.mockResolvedValue(undefined);
   });
 
   it('renders the five-step product flow and trust points', () => {
@@ -124,7 +131,7 @@ describe('LandingScreen', () => {
     expect(renderer.root.findByProps({ testID: 'landing-primary-action' })).toBeTruthy();
   });
 
-  it('replaces the landing page with the main workspace when the CTA is pressed', () => {
+  it('persists workspace entry and replaces the landing page when the CTA is pressed', async () => {
     let renderer!: ReturnType<typeof TestRenderer.create>;
 
     act(() => {
@@ -137,10 +144,11 @@ describe('LandingScreen', () => {
       );
     });
 
-    act(() => {
-      renderer.root.findByProps({ testID: 'landing-primary-action' }).props.onPress();
+    await act(async () => {
+      await renderer.root.findByProps({ testID: 'landing-primary-action' }).props.onPress();
     });
 
+    expect(runtime.saveHasEnteredWorkspace).toHaveBeenCalledWith(true);
     expect(runtime.replace).toHaveBeenCalledWith('Main');
   });
 });

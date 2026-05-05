@@ -32,6 +32,7 @@ import {
   buildRecycleBinHeaderInsets,
   buildRecycleBinTexts,
 } from './screen-layout';
+import { ensureMediaLibraryDeletePermissionsAsync } from '../../services/media-library-permissions';
 
 const EXPIRATION_DAYS = 30;
 
@@ -380,6 +381,11 @@ export function RecycleBinScreen({
     }
 
     try {
+      const deletePermission = await ensureMediaLibraryDeletePermissionsAsync();
+      if (!deletePermission.granted) {
+        throw new Error(copy.alerts.deleteFailedBody);
+      }
+
       await MediaLibrary.deleteAssetsAsync(ids);
 
       const nextState = applyCleanupAction(state, { type: 'hard-delete', ids });
@@ -426,7 +432,9 @@ export function RecycleBinScreen({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{recycleBinTexts.title}</Text>
+        <Text style={styles.headerTitle} testID="recycle-bin-header-title">
+          {recycleBinTexts.title}
+        </Text>
         <Text style={styles.expireHint}>{recycleBinTexts.expireHint}</Text>
       </View>
 
@@ -446,18 +454,24 @@ export function RecycleBinScreen({
           onItemPress={handleItemPress}
           theme={theme}
           mediaType="all"
+          gridTestID="recycle-bin-grid"
+          itemTestID="recycle-bin-item"
           contentPadding={contentPadding}
         />
       ) : !hasHydrated && isHydrating ? (
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>{loadingLabel}</Text>
+          <Text style={styles.loadingText} testID="recycle-bin-loading-label">
+            {loadingLabel}
+          </Text>
         </View>
       ) : (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconWrap}>
             <Ionicons name="trash-outline" size={42} color={theme.pageTextMuted} />
           </View>
-          <Text style={styles.emptyTitle}>{recycleBinTexts.emptyTitle}</Text>
+          <Text style={styles.emptyTitle} testID="recycle-bin-empty-title">
+            {recycleBinTexts.emptyTitle}
+          </Text>
           <Text style={styles.emptyBody}>{recycleBinTexts.emptyBody}</Text>
         </View>
       )}

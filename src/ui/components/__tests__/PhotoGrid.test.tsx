@@ -486,6 +486,26 @@ describe('PhotoGrid', () => {
       expect(onSelect).not.toHaveBeenCalled();
     });
 
+    it('supports custom item test ids for observability probes', () => {
+      let renderer!: ReturnType<typeof TestRenderer.create>;
+
+      act(() => {
+        renderer = TestRenderer.create(
+          <PhotoGrid
+            candidates={[createMockCandidate('1', 'photo')]}
+            selectedIds={[]}
+            onSelect={vi.fn()}
+            onItemPress={vi.fn()}
+            itemTestID="scan-result-grid-item"
+            theme={mockTheme}
+          />,
+        );
+      });
+
+      expect(renderer.root.findByProps({ testID: 'scan-result-grid-item' })).toBeTruthy();
+      expect(renderer.root.findAllByProps({ testID: 'photo-grid-item' })).toHaveLength(0);
+    });
+
     it('enters selection mode on long press and suppresses the follow-up detail tap', () => {
       const onSelect = vi.fn();
       const onItemPress = vi.fn();

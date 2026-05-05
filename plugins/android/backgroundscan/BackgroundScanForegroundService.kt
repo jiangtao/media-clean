@@ -24,6 +24,7 @@ class BackgroundScanForegroundService : Service() {
   override fun onCreate() {
     super.onCreate()
     ensureNotificationChannel()
+    isStarting.set(false)
     isRunning.set(true)
     startForegroundWithNotification(
       buildNotification(
@@ -44,11 +45,17 @@ class BackgroundScanForegroundService : Service() {
       )
     }
 
+    if (stopRequestedBeforeStart.compareAndSet(true, false)) {
+      stopSelf()
+    }
+
     return START_NOT_STICKY
   }
 
   override fun onDestroy() {
     isRunning.set(false)
+    isStarting.set(false)
+    stopRequestedBeforeStart.set(false)
     resetNotificationThrottle()
     stopForeground(STOP_FOREGROUND_REMOVE)
     releaseWakeLock()
@@ -184,6 +191,8 @@ class BackgroundScanForegroundService : Service() {
     private const val DEFAULT_TITLE = "扫描进行中"
     private const val DEFAULT_BODY = "离开应用后仍会继续扫描。"
     private val isRunning = AtomicBoolean(false)
+    private val isStarting = AtomicBoolean(false)
+    private val stopRequestedBeforeStart = AtomicBoolean(false)
     private val notificationLock = Any()
     @Volatile private var lastNotifiedPayload: NotificationPayload? = null
 
@@ -205,7 +214,17 @@ class BackgroundScanForegroundService : Service() {
       )
 
       synchronized(notificationLock) {
-        if (isRunning.compareAndSet(false, true)) {
+        if (isRunning.get()) {
+          if (!force && lastNotifiedPayload == payload) {
+            return
+          }
+
+          lastNotifiedPayload = payload
+          updateNotification(context, payload)
+          return
+        }
+
+        if (isStarting.compareAndSet(false, true)) {
           lastNotifiedPayload = payload
 
           val intent = Intent(context, BackgroundScanForegroundService::class.java).apply {
@@ -226,14 +245,27 @@ class BackgroundScanForegroundService : Service() {
         }
 
         lastNotifiedPayload = payload
+        if (!isRunning.get()) {
+          return
+        }
       }
 
       updateNotification(context, payload)
     }
 
     fun stop(context: Context) {
+      if (!isRunning.get() && isStarting.get()) {
+        stopRequestedBeforeStart.set(true)
+        lastNotifiedPayload = null
+        resetNotificationThrottle()
+        return
+      }
+
+      stopRequestedBeforeStart.set(false)
       isRunning.set(false)
+      isStarting.set(false)
       resetNotificationThrottle()
+      lastNotifiedPayload = null
       context.stopService(Intent(context, BackgroundScanForegroundService::class.java))
     }
 

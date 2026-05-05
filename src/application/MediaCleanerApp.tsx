@@ -74,6 +74,11 @@ import {
   type AppThemePalette,
   type AppThemePreference,
 } from '../theme/app-theme';
+import {
+  ensureMediaLibraryDeletePermissionsAsync,
+  getMediaLibraryPermissionsAsync,
+  requestMediaLibraryPermissionsAsync,
+} from '../services/media-library-permissions';
 import { CandidateCard } from '../ui/CandidateCard';
 import { PreviewModal } from '../ui/PreviewModal';
 import {
@@ -356,7 +361,7 @@ export function MediaCleanerApp() {
         loadThemePreference(),
         loadLastScanMeta(),
         loadRecycleBinIds(),
-        MediaLibrary.getPermissionsAsync(false, ['photo', 'video']),
+        getMediaLibraryPermissionsAsync(),
         loadReminderSettings(),
         Notifications.getPermissionsAsync(),
       ]);
@@ -402,7 +407,7 @@ export function MediaCleanerApp() {
   }, [bootstrap]);
 
   const requestPermission = useCallback(async () => {
-    const permission = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
+    const permission = await requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       setPermissionState('denied');
       return;
@@ -420,6 +425,11 @@ export function MediaCleanerApp() {
       }
 
       try {
+        const deletePermission = await ensureMediaLibraryDeletePermissionsAsync();
+        if (!deletePermission.granted) {
+          throw new Error(copy.alerts.deleteFailedBody);
+        }
+
         await MediaLibrary.deleteAssetsAsync(ids);
         await commitCleanupAction({ type: 'hard-delete', ids });
         setPreviewCandidate(null);

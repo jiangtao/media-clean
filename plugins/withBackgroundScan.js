@@ -40,6 +40,7 @@ function writeBackgroundScanSources(projectRoot, androidPackage) {
   fs.mkdirSync(targetDir, { recursive: true });
 
   for (const fileName of [
+    'AndroidMediaStoreEnumeratorModule.kt',
     'AndroidNativeScanExecutor.kt',
     'AndroidNativeScanExecutorModule.kt',
     'BackgroundScanForegroundService.kt',

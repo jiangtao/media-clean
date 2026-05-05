@@ -155,12 +155,14 @@ npm run typecheck -- --pretty false
 
 ```bash
 npm run build:android:debug
-npm run build:android:release
+npm run build:android:release:smoke
 ```
 
-`build:android:debug` and `build:android:release` now both produce APK artifacts directly. Use `npm run run:android:debug` when you specifically want to install and run on a device.
+`build:android:debug` produces the debug APK directly. For local release-pipeline smoke validation, use `build:android:release:smoke` to generate a temp-signed APK. The formal release APK is workflow-only so signing provenance and the page download entry stay unique. Use `npm run run:android:debug` when you specifically want to install and run on a device.
 
 Android debug / release packaging, signing verification, and CI/CD pipeline details: [docs/release/android.en.md](./docs/release/android.en.md); Chinese version: [docs/release/android.md](./docs/release/android.md).
+
+The primary Android device-observability contract: [docs/release/agent-device.en.md](./docs/release/agent-device.en.md); Chinese version: [docs/release/agent-device.md](./docs/release/agent-device.md).
 
 If Gradle daemon or Kotlin daemon errors mention locks, caches, or compile-daemon failures, first clean or restart the Gradle daemon, then classify whether the issue is an environment lock, disk pressure, network repository access, or a code error.
 
@@ -194,10 +196,21 @@ For Android native scan, notifications, splash, or permission changes, also veri
 
 ```bash
 npm run build:android:debug
+npm run verify:android:observability
+npm run verify:android:acceptance
+npm run seed:android:media -- --clean
+npm run verify:android:scan-probe
 npm run test:maestro:smoke
 adb shell am force-stop com.jt.mistapmediacleaner
 adb shell monkey -p com.jt.mistapmediacleaner 1
 ```
+
+Where:
+
+1. `npm run verify:android:observability` is the primary device-observability entry point. The repository-level npm entry currently installs the current debug APK before capturing `snapshot`, `screenshot`, `logs`, `network`, `perf`, and optional `react-devtools` evidence.
+2. `npm run verify:android:acceptance` is the first-run acceptance entry point. It covers the landing page, media permission, Settings, the reminder toggle, and notification-permission return flow.
+3. `npm run verify:android:scan-probe` is the scan-main-flow probe. Paired with `npm run seed:android:media -- --clean`, it validates scan denominators, numerators, and scan result states against a fixed sample-media set.
+4. `npm run test:maestro:smoke` is the secondary fallback smoke for quickly re-clicking the minimum flow. It no longer acts as the primary observability truth source.
 
 For publishing-page changes, also run:
 
@@ -220,16 +233,18 @@ Acceptance should focus on:
 
 1. Product publishing page docs: [docs/product/page-home.en.md](./docs/product/page-home.en.md); Chinese version: [docs/product/page-home.md](./docs/product/page-home.md).
 2. Android release contract: [docs/release/android.en.md](./docs/release/android.en.md); Chinese version: [docs/release/android.md](./docs/release/android.md).
-3. Maestro acceptance contract: [docs/release/maestro.en.md](./docs/release/maestro.en.md); Chinese version: [docs/release/maestro.md](./docs/release/maestro.md).
-4. Vercel release contract: [docs/release/vercel.en.md](./docs/release/vercel.en.md); Chinese version: [docs/release/vercel.md](./docs/release/vercel.md).
-5. Android scan and recognition design: [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md); Chinese version: [design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md).
-6. Execution standard: [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md); Chinese version: [docs/standards/execution-standards.md](./docs/standards/execution-standards.md).
-7. Team-mode standard: [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md); Chinese version: [docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md).
-8. Publishing page directory docs: [page/README.en.md](./page/README.en.md); Chinese version: [page/README.md](./page/README.md).
+3. Agent Device device-observability contract: [docs/release/agent-device.en.md](./docs/release/agent-device.en.md); Chinese version: [docs/release/agent-device.md](./docs/release/agent-device.md).
+4. Maestro acceptance contract: [docs/release/maestro.en.md](./docs/release/maestro.en.md); Chinese version: [docs/release/maestro.md](./docs/release/maestro.md).
+5. Vercel release contract: [docs/release/vercel.en.md](./docs/release/vercel.en.md); Chinese version: [docs/release/vercel.md](./docs/release/vercel.md).
+6. Android scan and recognition design: [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md); Chinese version: [design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md).
+7. Execution standard: [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md); Chinese version: [docs/standards/execution-standards.md](./docs/standards/execution-standards.md).
+8. Team-mode standard: [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md); Chinese version: [docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md).
+9. Publishing page directory docs: [page/README.en.md](./page/README.en.md); Chinese version: [page/README.md](./page/README.md).
 
-Automated interactive smoke workflow:
+Android device observability workflows:
 
-1. [.github/workflows/android-maestro-smoke.yml](./.github/workflows/android-maestro-smoke.yml)
+1. Primary device-observability workflow: [.github/workflows/android-agent-device-observability.yml](./.github/workflows/android-agent-device-observability.yml)
+2. Secondary Maestro smoke workflow: [.github/workflows/android-maestro-smoke.yml](./.github/workflows/android-maestro-smoke.yml)
 
 ## Current Boundaries
 

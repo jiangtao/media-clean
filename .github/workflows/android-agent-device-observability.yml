@@ -1,0 +1,265 @@
+name: Android Agent Device Observability
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_real_device_core:
+        description: "Run the self-hosted real-device-core lane"
+        required: false
+        default: false
+        type: boolean
+      real_device_serial:
+        description: "Android device serial for the real-device-core lane"
+        required: false
+        default: "d28739dc"
+        type: string
+  pull_request:
+    paths:
+      - ".github/workflows/android-agent-device-observability.yml"
+      - "app.json"
+      - "package.json"
+      - "scripts/android/**"
+      - "scripts/device/**"
+      - "src/application/**"
+      - "src/features/**"
+      - "src/navigation/**"
+      - "src/services/**"
+      - "src/ui/**"
+      - "android/**"
+      - "README.md"
+      - "README.en.md"
+      - "docs/release/agent-device.md"
+      - "docs/release/agent-device.en.md"
+      - "docs/release/device-validation-lanes.md"
+      - "docs/release/device-validation-lanes.en.md"
+      - "docs/release/maestro.md"
+      - "docs/release/maestro.en.md"
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - ".github/workflows/android-agent-device-observability.yml"
+      - "app.json"
+      - "package.json"
+      - "scripts/android/**"
+      - "scripts/device/**"
+      - "src/application/**"
+      - "src/features/**"
+      - "src/navigation/**"
+      - "src/services/**"
+      - "src/ui/**"
+      - "android/**"
+      - "README.md"
+      - "README.en.md"
+      - "docs/release/agent-device.md"
+      - "docs/release/agent-device.en.md"
+      - "docs/release/device-validation-lanes.md"
+      - "docs/release/device-validation-lanes.en.md"
+      - "docs/release/maestro.md"
+      - "docs/release/maestro.en.md"
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.11.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck -- --pretty false
+
+      - name: Observability contract tests
+        run: npm run test:observability
+
+  android-emulator-core:
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.11.0
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build debug APK
+        run: bash scripts/android/build-debug-apk.sh --skip-install
+
+      - name: Run android emulator core lane
+        uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 25
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            npm run verify:device:lane:android:emulator-core -- \
+              --serial emulator-5554 \
+              --artifact-root artifacts/device-validation/android/emulator-core
+
+      - name: Upload android emulator core artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-emulator-core-observability
+          if-no-files-found: warn
+          path: |
+            artifacts/device-validation/android/emulator-core/**
+            android/app/build/outputs/apk/debug/app-debug.apk
+            artifacts/android-debug/app-debug.signing.txt
+            artifacts/android-debug/app-debug.sha256
+            artifacts/android-debug/debug-metadata.json
+
+  android-emulator-seeded:
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.11.0
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build debug APK
+        run: bash scripts/android/build-debug-apk.sh --skip-install
+
+      - name: Run android emulator seeded lane
+        uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 35
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            npm run verify:device:lane:android:emulator-seeded -- \
+              --serial emulator-5554 \
+              --artifact-root artifacts/device-validation/android/emulator-seeded
+
+      - name: Upload android emulator seeded artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-emulator-seeded-observability
+          if-no-files-found: warn
+          path: |
+            artifacts/device-validation/android/emulator-seeded/**
+            android/app/build/outputs/apk/debug/app-debug.apk
+            artifacts/android-debug/app-debug.signing.txt
+            artifacts/android-debug/app-debug.sha256
+            artifacts/android-debug/debug-metadata.json
+
+  android-real-device-core:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_real_device_core == 'true' }}
+    needs: static
+    runs-on: self-hosted
+    timeout-minutes: 90
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.11.0
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Print adb devices
+        run: adb devices -l
+
+      - name: Build debug APK
+        run: bash scripts/android/build-debug-apk.sh --skip-install
+
+      - name: Run android real-device core lane
+        run: |
+          npm run verify:device:lane:android:real-device-core -- \
+            --serial "${{ github.event.inputs.real_device_serial }}"
+
+      - name: Upload android real-device core artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-real-device-core-observability
+          if-no-files-found: warn
+          path: |
+            artifacts/device-validation/android/real-device-core/**
+            android/app/build/outputs/apk/debug/app-debug.apk
+            artifacts/android-debug/app-debug.signing.txt
+            artifacts/android-debug/app-debug.sha256
+            artifacts/android-debug/debug-metadata.json

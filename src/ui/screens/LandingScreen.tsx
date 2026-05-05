@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppPreferences } from '../../application/AppPreferencesContext';
 import type { AppLanguage } from '../../i18n/app-language';
+import { saveHasEnteredWorkspace } from '../../services/storage/workspace-entry-storage';
 import type { AppThemePalette } from '../../theme/app-theme';
 
 interface LandingNavigation {
@@ -147,7 +148,13 @@ export function LandingScreen({ navigation }: { navigation: LandingNavigation })
           </View>
 
           <Pressable
-            onPress={() => navigation.replace('Main')}
+            onPress={async () => {
+              try {
+                await saveHasEnteredWorkspace(true);
+              } finally {
+                navigation.replace('Main');
+              }
+            }}
             style={styles.actionButton}
             testID="landing-primary-action"
           >

@@ -155,12 +155,14 @@ npm run typecheck -- --pretty false
 
 ```bash
 npm run build:android:debug
-npm run build:android:release
+npm run build:android:release:smoke
 ```
 
-当前 `build:android:debug` 与 `build:android:release` 都会直接产出 APK；若你要安装到设备调试，使用 `npm run run:android:debug`。
+当前 `build:android:debug` 会直接产出 debug APK；本地若要验证 release 链路，使用 `build:android:release:smoke` 生成临时签名 APK。正式 release APK 只允许通过 GitHub Actions workflow 生成，以保证签名来源与 page 下载入口唯一。若你要安装到设备调试，使用 `npm run run:android:debug`。
 
 Android debug / release 发包、签名验签与 CI/CD 流水线见 [docs/release/android.md](./docs/release/android.md)，英文版 [docs/release/android.en.md](./docs/release/android.en.md)。
+
+Android 主设备观测契约见 [docs/release/agent-device.md](./docs/release/agent-device.md)，英文版 [docs/release/agent-device.en.md](./docs/release/agent-device.en.md)。
 
 如 Gradle daemon 或 Kotlin daemon 报锁、缓存或编译 daemon 异常，优先清理/重启 Gradle daemon，再区分是环境锁、磁盘空间、网络仓库还是代码错误。
 
@@ -194,10 +196,21 @@ npm run page:build
 
 ```bash
 npm run build:android:debug
+npm run verify:android:observability
+npm run verify:android:acceptance
+npm run seed:android:media -- --clean
+npm run verify:android:scan-probe
 npm run test:maestro:smoke
 adb shell am force-stop com.jt.mistapmediacleaner
 adb shell monkey -p com.jt.mistapmediacleaner 1
 ```
+
+其中：
+
+1. `npm run verify:android:observability` 是主设备观测入口。当前仓库暴露的 npm 入口默认会安装当前 debug APK，并负责 `snapshot`、`screenshot`、`logs`、`network`、`perf` 与可选 `react-devtools` 证据。
+2. `npm run verify:android:acceptance` 是首启验收入口，覆盖 landing、媒体权限、Settings、提醒开关和通知权限回流。
+3. `npm run verify:android:scan-probe` 是扫描主流程探针入口，配合 `npm run seed:android:media -- --clean` 固定样例媒体，验证扫描中的分母/分子口径与结果态。
+4. `npm run test:maestro:smoke` 是次级 fallback smoke，用来快速复点最小交互流，不再承担主观测真值职责。
 
 涉及发布页时，还需要：
 
@@ -220,16 +233,18 @@ curl -sSI http://127.0.0.1:4173/
 
 1. 产品发布页说明：[docs/product/page-home.md](./docs/product/page-home.md)，英文版 [docs/product/page-home.en.md](./docs/product/page-home.en.md)。
 2. Android 发包契约：[docs/release/android.md](./docs/release/android.md)，英文版 [docs/release/android.en.md](./docs/release/android.en.md)。
-3. Maestro 验收契约：[docs/release/maestro.md](./docs/release/maestro.md)，英文版 [docs/release/maestro.en.md](./docs/release/maestro.en.md)。
-4. Vercel 发布契约：[docs/release/vercel.md](./docs/release/vercel.md)，英文版 [docs/release/vercel.en.md](./docs/release/vercel.en.md)。
-5. Android 扫描与识别设计：[design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md)，英文版 [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md)。
-6. 执行标准：[docs/standards/execution-standards.md](./docs/standards/execution-standards.md)，英文版 [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md)。
-7. 团队模式标准：[docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md)，英文版 [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md)。
-8. 发布页目录说明：[page/README.md](./page/README.md)，英文版 [page/README.en.md](./page/README.en.md)。
+3. Agent Device 设备观测契约：[docs/release/agent-device.md](./docs/release/agent-device.md)，英文版 [docs/release/agent-device.en.md](./docs/release/agent-device.en.md)。
+4. Maestro 验收契约：[docs/release/maestro.md](./docs/release/maestro.md)，英文版 [docs/release/maestro.en.md](./docs/release/maestro.en.md)。
+5. Vercel 发布契约：[docs/release/vercel.md](./docs/release/vercel.md)，英文版 [docs/release/vercel.en.md](./docs/release/vercel.en.md)。
+6. Android 扫描与识别设计：[design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md)，英文版 [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md)。
+7. 执行标准：[docs/standards/execution-standards.md](./docs/standards/execution-standards.md)，英文版 [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md)。
+8. 团队模式标准：[docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md)，英文版 [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md)。
+9. 发布页目录说明：[page/README.md](./page/README.md)，英文版 [page/README.en.md](./page/README.en.md)。
 
-自动化交互 smoke workflow：
+Android 设备观测 workflow：
 
-1. [.github/workflows/android-maestro-smoke.yml](./.github/workflows/android-maestro-smoke.yml)
+1. 主设备观测 workflow：[.github/workflows/android-agent-device-observability.yml](./.github/workflows/android-agent-device-observability.yml)
+2. 次级 Maestro smoke workflow：[.github/workflows/android-maestro-smoke.yml](./.github/workflows/android-maestro-smoke.yml)
 
 ## 当前边界
 

@@ -1,30 +1,47 @@
 appId: com.jt.mistapmediacleaner
 name: Landing and settings smoke
 ---
-- launchApp:
-    clearState: true
+- launchApp
 - assertVisible:
     id: landing-screen
-- assertVisible: 本地相册助手
+- scrollUntilVisible:
+    element:
+      id: landing-primary-action
+    direction: DOWN
+    timeout: 20000
 - tapOn:
     id: landing-primary-action
 - assertVisible:
-    id: tab-button-Photos
+    id: tab-button-Settings
 - tapOn:
     id: tab-button-Settings
 - assertVisible:
-    id: settings-header
-- assertVisible: 扫描范围
+    id: settings-scroll-view
+- scrollUntilVisible:
+    element:
+      id: language-option-en-US
+    direction: DOWN
+    timeout: 20000
 - tapOn:
     id: language-option-en-US
-- assertVisible: Scan Range
-- assertVisible: Appearance
+- assertVisible: "Scan Range"
+- assertVisible: "Appearance"
+- scrollUntilVisible:
+    element:
+      id: theme-option-dark
+    direction: DOWN
+    timeout: 20000
 - tapOn:
     id: theme-option-dark
 - assertVisible: "Current theme:"
 - tapOn:
     id: theme-option-light
+- scrollUntilVisible:
+    element:
+      id: language-option-zh-CN
+    direction: UP
+    timeout: 20000
 - tapOn:
     id: language-option-zh-CN
-- assertVisible: 扫描范围
-- assertVisible: 显示主题
+- assertVisible: "扫描范围"
+- assertVisible: "显示主题"

@@ -65,11 +65,36 @@ run_debug_pipeline() {
   npx expo prebuild --platform android --clean
   ensure_android_sdk
 
+  local gradle_attempt=1
+  local gradle_max_attempts=2
+  local gradle_log=""
+
+  gradle_log="$(mktemp)"
+
   (
     cd android
     chmod +x ./gradlew
-    ./gradlew assembleDebug
+    while true; do
+      if ./gradlew assembleDebug 2>&1 | tee "${gradle_log}"; then
+        break
+      fi
+
+      if [[ "${gradle_attempt}" -ge "${gradle_max_attempts}" ]]; then
+        rm -f "${gradle_log}"
+        exit 1
+      fi
+
+      if ! grep -q 'build_stdout_targets.txt (No such file or directory)' "${gradle_log}"; then
+        rm -f "${gradle_log}"
+        exit 1
+      fi
+
+      echo "检测到 Expo prebuild 后的 CMake 中间产物瞬时缺失，重试 assembleDebug（第 $((gradle_attempt + 1)) 次）..." >&2
+      gradle_attempt=$((gradle_attempt + 1))
+      sleep 2
+    done
   )
+  rm -f "${gradle_log}"
 
   node scripts/android/verify-debug-artifact.mjs "${APK_PATH}"
   node scripts/android/collect-debug-metadata.mjs "${APK_PATH}"

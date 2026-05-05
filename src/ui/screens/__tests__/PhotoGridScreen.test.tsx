@@ -4,8 +4,10 @@ import TestRenderer, { act } from 'react-test-renderer';
 
 const platformState = vi.hoisted(() => ({
   os: 'ios' as 'ios' | 'android',
+  version: 34,
   reset() {
     this.os = 'ios';
+    this.version = 34;
   },
 }));
 
@@ -60,6 +62,9 @@ vi.mock('react-native', () => {
       get OS() {
         return platformState.os;
       },
+      get Version() {
+        return platformState.version;
+      },
       select: <T,>(options: { ios?: T; android?: T; default?: T }) =>
         options[platformState.os] ?? options.default,
     },
@@ -101,6 +106,7 @@ const mediaLibraryApi = vi.hoisted(() => ({
 const storageApi = vi.hoisted(() => ({
   appendFalsePositiveCandidateIds: vi.fn(),
   loadAssetManifestEntries: vi.fn(),
+  loadPhotoScanBatch: vi.fn(),
   loadFalsePositiveCandidateIds: vi.fn(),
   loadLatestCompletedPhotoScanBatch: vi.fn(),
   loadLatestPhotoScanBatch: vi.fn(),
@@ -171,11 +177,22 @@ const photoScanSessionRuntimeApi = vi.hoisted(() => {
     }),
     reset() {
       state.snapshot = null;
-      this.getPhotoScanSessionRuntimeSnapshot.mockClear();
-      this.hydratePhotoScanSessionRuntimeSnapshot.mockClear();
-      this.persistPhotoScanSessionRuntimeSnapshot.mockClear();
-      this.stagePhotoScanSessionRuntimeSnapshot.mockClear();
-      this.clearPhotoScanSessionRuntimeSnapshot.mockClear();
+      this.getPhotoScanSessionRuntimeSnapshot.mockReset();
+      this.getPhotoScanSessionRuntimeSnapshot.mockImplementation(() => state.snapshot);
+      this.hydratePhotoScanSessionRuntimeSnapshot.mockReset();
+      this.hydratePhotoScanSessionRuntimeSnapshot.mockImplementation(async () => state.snapshot);
+      this.persistPhotoScanSessionRuntimeSnapshot.mockReset();
+      this.persistPhotoScanSessionRuntimeSnapshot.mockImplementation(async (snapshot) => {
+        state.snapshot = snapshot;
+      });
+      this.stagePhotoScanSessionRuntimeSnapshot.mockReset();
+      this.stagePhotoScanSessionRuntimeSnapshot.mockImplementation((snapshot) => {
+        state.snapshot = snapshot;
+      });
+      this.clearPhotoScanSessionRuntimeSnapshot.mockReset();
+      this.clearPhotoScanSessionRuntimeSnapshot.mockImplementation(async () => {
+        state.snapshot = null;
+      });
     },
   };
 });
@@ -483,6 +500,7 @@ const mockLoadPhotoScanResultCache = vi.mocked(storageApi.loadPhotoScanResultCac
 const mockLoadFalsePositiveCandidateIds = vi.mocked(storageApi.loadFalsePositiveCandidateIds);
 const mockAppendFalsePositiveCandidateIds = vi.mocked(storageApi.appendFalsePositiveCandidateIds);
 const mockLoadAssetManifestEntries = vi.mocked(storageApi.loadAssetManifestEntries);
+const mockLoadPhotoScanBatch = vi.mocked(storageApi.loadPhotoScanBatch);
 const mockLoadLatestCompletedPhotoScanBatch = vi.mocked(
   storageApi.loadLatestCompletedPhotoScanBatch,
 );
@@ -492,6 +510,7 @@ const mockLoadPhotoScanBatchItems = vi.mocked(storageApi.loadPhotoScanBatchItems
 const mockSaveRecycleBinIds = vi.mocked(storageApi.saveRecycleBinIds);
 const mockSaveRecycleBinCandidateCache = vi.mocked(storageApi.saveRecycleBinCandidateCache);
 const mockSavePhotoScanResultCache = vi.mocked(storageApi.savePhotoScanResultCache);
+const mockClearPhotoScanResultCache = vi.mocked(storageApi.clearPhotoScanResultCache);
 const mockSavePhotoScanBatch = vi.mocked(storageApi.savePhotoScanBatch);
 const mockSavePhotoScanBatchItems = vi.mocked(storageApi.savePhotoScanBatchItems);
 const mockSaveLastScanMeta = vi.mocked(storageApi.saveLastScanMeta);
@@ -866,6 +885,43 @@ describe('resolveConfiguredScanWindow', () => {
       windowDays: null,
     });
   });
+
+  it('does not treat a zero-denominator completed full batch as terminal coverage', () => {
+    const now = Date.UTC(2026, 3, 24, 0, 0, 0);
+    const rollingRangeStartAt = buildScanRangeStartAt(12, now);
+
+    expect(
+      resolveConfiguredScanWindow({
+        scanRangeMonths: 12,
+        latestCompletedBatch: {
+          batchId: 'batch-full-zero',
+          mode: 'full',
+          phase: 'completed',
+          windowDays: Math.round((now - rollingRangeStartAt) / DAY_MS),
+          rangeStartAt: rollingRangeStartAt,
+          rangeEndAt: now,
+          progressCurrent: 0,
+          progressTotal: 0,
+          enumeratedCount: 0,
+          dirtyCount: 0,
+          analyzedCount: 0,
+          candidateCount: 0,
+          startedAt: now,
+          lastHeartbeatAt: now,
+          completedAt: now,
+          lastError: null,
+          updatedAt: now,
+        },
+        nowInput: now,
+      }),
+    ).toEqual({
+      status: 'ready',
+      mode: 'rolling-window',
+      rangeStartAt: rollingRangeStartAt,
+      rangeEndAt: now,
+      windowDays: Math.round((now - rollingRangeStartAt) / DAY_MS),
+    });
+  });
 });
 
 describe('PhotoGridScreen', () => {
@@ -888,6 +944,7 @@ describe('PhotoGridScreen', () => {
     mockLoadPhotoScanResultCache.mockResolvedValue(null);
     mockLoadFalsePositiveCandidateIds.mockResolvedValue([]);
     mockLoadAssetManifestEntries.mockResolvedValue([]);
+    mockLoadPhotoScanBatch.mockResolvedValue(null);
     mockLoadLatestCompletedPhotoScanBatch.mockResolvedValue(null);
     mockLoadLatestPhotoScanBatch.mockResolvedValue(null);
     mockLoadMediaAnalysisCache.mockResolvedValue({});
@@ -896,6 +953,7 @@ describe('PhotoGridScreen', () => {
     mockSaveRecycleBinIds.mockResolvedValue(undefined);
     mockSaveRecycleBinCandidateCache.mockResolvedValue(undefined);
     mockSavePhotoScanResultCache.mockResolvedValue(undefined);
+    mockClearPhotoScanResultCache.mockResolvedValue(undefined);
     mockSavePhotoScanBatch.mockResolvedValue(undefined);
     mockSavePhotoScanBatchItems.mockResolvedValue(undefined);
     mockSaveLastScanMeta.mockResolvedValue(undefined);
@@ -1277,10 +1335,13 @@ describe('PhotoGridScreen', () => {
     expect(collectRenderedTexts(renderer)).not.toContain(
       appPreferencesState.copy.screens.photoGrid.scanPromptTitle,
     );
+    expect(
+      renderer.root.findByProps({ testID: 'photo-grid-request-permission-button' }),
+    ).toBeTruthy();
 
     await pressPrimaryButton(renderer);
 
-    expect(mockRequestPermissionsAsync).toHaveBeenCalledWith(false, ['photo', 'video']);
+    expect(mockRequestPermissionsAsync).toHaveBeenCalledWith(false);
     expect(mockGetAssetsAsync).toHaveBeenCalled();
     expect(collectRenderedTexts(renderer)).toContain('已选择 3 个媒体');
     expect(collectRenderedTexts(renderer)).toContain(
@@ -1296,6 +1357,7 @@ describe('PhotoGridScreen', () => {
     expect(collectRenderedTexts(renderer)).toContain('照片 2');
     expect(collectRenderedTexts(renderer)).toContain('视频 1');
     expect(collectRenderedTexts(renderer)).toContain('grid-count:3');
+    expect(renderer.root.findByProps({ testID: 'photo-grid-start-scan-button' })).toBeTruthy();
   });
 
   it('starts a scan after permission is granted and keeps progress and result summary inline', async () => {
@@ -1385,9 +1447,9 @@ describe('PhotoGridScreen', () => {
     expect(renderer.root.findAllByProps({ testID: 'photo-grid-scope-breakdown' })).toHaveLength(0);
     expect(renderedTexts).toContain('发现 1 个异常媒体');
     expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.scanResultFootnote);
-    expect(renderedTexts).toContain('全部 1');
-    expect(renderedTexts).toContain('照片 1');
-    expect(renderedTexts).toContain('视频 0');
+    expect(renderedTexts).toContain('全部 3');
+    expect(renderedTexts).toContain('照片 2');
+    expect(renderedTexts).toContain('视频 1');
     expect(renderedTexts).toContain('grid-count:1');
     expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-summary' })).toHaveLength(1);
     expect(renderedTexts).toContain('误触 0');
@@ -1517,9 +1579,9 @@ describe('PhotoGridScreen', () => {
 
     expect(renderer.root.findAllByProps({ testID: 'photo-grid-loading-overlay' })).toHaveLength(0);
     expect(renderedTexts).toContain('扫描完成');
-    expect(renderedTexts).toContain('全部 1');
-    expect(renderedTexts).toContain('照片 1');
-    expect(renderedTexts).toContain('视频 0');
+    expect(renderedTexts).toContain('全部 3');
+    expect(renderedTexts).toContain('照片 2');
+    expect(renderedTexts).toContain('视频 1');
     expect(renderedTexts).toContain('grid-count:1');
   });
 
@@ -1655,6 +1717,100 @@ describe('PhotoGridScreen', () => {
         scannedCount: 5,
       }),
     );
+    expect(collectRenderedTexts(renderer)).toContain('全部 5');
+    expect(collectRenderedTexts(renderer)).toContain('照片 3');
+    expect(collectRenderedTexts(renderer)).toContain('视频 2');
+  });
+
+  it('ignores a late Android checkpoint after completion so the batch denominator stays authoritative', async () => {
+    setPlatformOS('android');
+    const assets = [
+      createAndroidMediaStoreAsset('batch-photo-1'),
+      createAndroidMediaStoreAsset('batch-photo-2'),
+      createAndroidMediaStoreAsset('batch-photo-3'),
+      createAndroidMediaStoreAsset('batch-video-1', { mediaType: 'video' }),
+      createAndroidMediaStoreAsset('batch-video-2', { mediaType: 'video' }),
+    ];
+    const manifestEntries = assets.map((asset) => createManifestEntryFromAndroidAsset(asset));
+    mockEnumerateAndroidMediaStoreAssets
+      .mockResolvedValueOnce(assets)
+      .mockResolvedValueOnce(assets)
+      .mockResolvedValueOnce([]);
+    mockLoadAssetManifestEntries.mockResolvedValue(manifestEntries);
+    mockLoadMediaAnalysisCache.mockResolvedValue({
+      'batch-photo-1': createAnalyzedInput('batch-photo-1'),
+      'batch-photo-2': createAnalyzedInput('batch-photo-2'),
+      'batch-video-1': createAnalyzedInput('batch-video-1', { mediaType: 'video' }),
+    });
+
+    let lateCheckpoint:
+      | ((checkpoint: {
+          current: number;
+          total: number;
+          currentFileName: string | null;
+          processedCount: number;
+          lastProcessedAssetId: string | null;
+          analyzedInputs: readonly ReturnType<typeof createAnalyzedInput>[];
+        }) => Promise<void>)
+      | undefined;
+    mockExecuteAndroidNativeFirstScan.mockImplementationOnce(async (options: any) => {
+      lateCheckpoint = options.legacyOptions.onCheckpoint;
+      return {
+        mode: 'native',
+        fallbackReason: null,
+        output: {
+          state: {
+            activeCandidates: [createCleanupCandidate('batch-photo-3')],
+            recycleBin: [],
+            selectedIds: [],
+          },
+          summary: {
+            scannedAt: 1_710_000_000_000,
+            scannedCount: 2,
+            candidateCount: 1,
+            highConfidenceCount: 1,
+            mediumConfidenceCount: 0,
+            recycleBinCount: 0,
+          },
+        },
+      };
+    });
+
+    const renderer = await renderScreen();
+
+    await pressPrimaryButton(renderer);
+
+    expect(collectRenderedTexts(renderer)).toContain('全部 5');
+    expect(collectRenderedTexts(renderer)).toContain('照片 3');
+    expect(collectRenderedTexts(renderer)).toContain('视频 2');
+    expect(collectRenderedTexts(renderer)).toContain('grid-count:1');
+
+    await act(async () => {
+      await lateCheckpoint?.({
+        current: 2,
+        total: 2,
+        currentFileName: null,
+        processedCount: 2,
+        lastProcessedAssetId: 'batch-video-2',
+        analyzedInputs: [
+          createAnalyzedInput('batch-photo-3', {
+            width: 640,
+            height: 640,
+            fileSize: 80_000,
+            brightness: 0.03,
+            contrast: 0.04,
+            edgeDensity: 0.02,
+          }),
+          createAnalyzedInput('batch-video-2', { mediaType: 'video' }),
+        ],
+      });
+      await flushPromises();
+    });
+
+    expect(collectRenderedTexts(renderer)).toContain('全部 5');
+    expect(collectRenderedTexts(renderer)).toContain('照片 3');
+    expect(collectRenderedTexts(renderer)).toContain('视频 2');
+    expect(collectRenderedTexts(renderer)).toContain('grid-count:1');
   });
 
   it('does not start another Android scan once the latest completed batch already covers the full library', async () => {
@@ -1709,6 +1865,8 @@ describe('PhotoGridScreen', () => {
       expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.scanAllCompleteTitle);
       expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.scanAllCompleteBody);
       expect(renderedTexts).not.toContain(appPreferencesState.copy.screens.photoGrid.continueScan);
+      expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-all-complete-state' })).toHaveLength(1);
+      expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-all-complete-title' })).toHaveLength(1);
     } finally {
       dateNowSpy.mockRestore();
     }
@@ -1799,6 +1957,10 @@ describe('PhotoGridScreen', () => {
       });
       await flushPromises();
     });
+
+    expect(collectRenderedTexts(renderer)).toContain('全部 5');
+    expect(collectRenderedTexts(renderer)).toContain('照片 3');
+    expect(collectRenderedTexts(renderer)).toContain('视频 2');
   });
 
   it('slices Android backfill from the previous earliest boundary and keeps reminder baselines on the configured recent window', async () => {
@@ -2188,6 +2350,43 @@ describe('PhotoGridScreen', () => {
     }
   });
 
+  it('falls back to MediaLibrary assets when Android metadata enumeration returns empty during scan startup', async () => {
+    setPlatformOS('android');
+    const now = Date.UTC(2026, 3, 24, 0, 0, 0);
+    const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    mockGetAssetsAsync.mockResolvedValue({
+      assets: [
+        { ...createAsset('photo-1', mediaLibraryApi.MediaType.photo), creationTime: now - DAY_MS },
+        { ...createAsset('photo-2', mediaLibraryApi.MediaType.photo), creationTime: now - 2 * DAY_MS },
+        { ...createAsset('video-1', mediaLibraryApi.MediaType.video), creationTime: now - 3 * DAY_MS },
+      ],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+    mockEnumerateAndroidMediaStoreAssets
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    try {
+      const renderer = await renderScreen();
+
+      await pressPrimaryButton(renderer);
+
+      expect(mockExecuteAndroidNativeFirstScan).toHaveBeenCalledTimes(1);
+      expect(mockLoadAssetManifestEntries).toHaveBeenCalledWith(['photo-1', 'photo-2', 'video-1']);
+      expect(mockSavePhotoScanBatch.mock.calls[0]?.[0]).toEqual(
+        expect.objectContaining({
+          enumeratedCount: 3,
+          dirtyCount: 3,
+          progressTotal: 3,
+        }),
+      );
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+  });
+
   it('switches Android foreground sync ownership back to the JS legacy path when native-first falls back', async () => {
     setPlatformOS('android');
     mockGetPermissionsAsync.mockResolvedValueOnce({ granted: true });
@@ -2545,6 +2744,110 @@ describe('PhotoGridScreen', () => {
     expect(photoScanSessionRuntimeApi.hydratePhotoScanSessionRuntimeSnapshot).toHaveBeenCalled();
   });
 
+  it('drops an incoherent persisted completed snapshot on cold start and rehydrates authorized media', async () => {
+    setPlatformOS('android');
+    const assets = [
+      createAndroidMediaStoreAsset('photo-1'),
+      createAndroidMediaStoreAsset('photo-2'),
+      createAndroidMediaStoreAsset('video-1', { mediaType: 'video' }),
+    ];
+    mockEnumerateAndroidMediaStoreAssets.mockResolvedValueOnce(assets);
+    photoScanSessionRuntimeApi.getPhotoScanSessionRuntimeSnapshot.mockReturnValue(null);
+    photoScanSessionRuntimeApi.hydratePhotoScanSessionRuntimeSnapshot.mockResolvedValue({
+      permissionState: 'granted',
+      phase: 'completed',
+      authorizedCandidates: [
+        createCleanupCandidate('photo-1'),
+        createCleanupCandidate('photo-2'),
+        createCleanupCandidate('video-1', 'video'),
+      ],
+      visibleCandidates: [],
+      scanResultsCount: 0,
+      scanProgress: {
+        current: 0,
+        total: 0,
+        currentFileName: null,
+      },
+      scanScopeSelection: {
+        total: 0,
+        photo: 0,
+        video: 0,
+      },
+      scanBatchRange: {
+        startAt: 1_709_000_000_000,
+        endAt: 1_710_000_000_000,
+      },
+      summary: {
+        scannedAt: 1_710_000_000_000,
+        scannedCount: 0,
+        recycleBinCount: 0,
+      },
+      hasCompletedFullScan: true,
+      errorMessage: null,
+      updatedAt: Date.now(),
+    });
+
+    const renderer = await renderScreen();
+    await act(async () => {
+      await flushPromises();
+      await flushPromises();
+    });
+    const renderedTexts = collectRenderedTexts(renderer);
+
+    expect(photoScanSessionRuntimeApi.clearPhotoScanSessionRuntimeSnapshot).toHaveBeenCalledTimes(1);
+    expect(mockEnumerateAndroidMediaStoreAssets).toHaveBeenCalledTimes(1);
+    expect(renderedTexts).toContain('全部 3');
+    expect(renderedTexts).toContain('grid-count:3');
+  });
+
+  it('ignores a stale completed scan cache when current authorized media exceeds its denominator', async () => {
+    setPlatformOS('android');
+    const assets = [
+      createAndroidMediaStoreAsset('photo-1'),
+      createAndroidMediaStoreAsset('photo-2'),
+      createAndroidMediaStoreAsset('video-1', { mediaType: 'video' }),
+    ];
+    mockEnumerateAndroidMediaStoreAssets.mockResolvedValueOnce(assets);
+    mockLoadPhotoScanResultCache.mockResolvedValue({
+      activeCandidates: [],
+      summary: {
+        scannedAt: 1_710_000_000_000,
+        scannedCount: 0,
+        candidateCount: 0,
+        highConfidenceCount: 0,
+        mediumConfidenceCount: 0,
+        recycleBinCount: 0,
+      },
+    });
+    mockLoadLatestCompletedPhotoScanBatch.mockResolvedValue({
+      batchId: 'batch-zero-completed',
+      mode: 'full',
+      phase: 'completed',
+      windowDays: 365,
+      rangeStartAt: 1_709_000_000_000,
+      rangeEndAt: 1_710_000_000_000,
+      progressCurrent: 0,
+      progressTotal: 0,
+      enumeratedCount: 0,
+      dirtyCount: 0,
+      analyzedCount: 0,
+      candidateCount: 0,
+      startedAt: 1_710_000_000_000,
+      lastHeartbeatAt: 1_710_000_000_000,
+      completedAt: 1_710_000_000_000,
+      lastError: null,
+      updatedAt: 1_710_000_000_000,
+    });
+
+    const renderer = await renderScreen();
+    await act(async () => {
+      await flushPromises();
+    });
+    expect(mockEnumerateAndroidMediaStoreAssets).toHaveBeenCalledTimes(1);
+    expect(mockClearPhotoScanResultCache).toHaveBeenCalledTimes(1);
+    expect(renderer.root.findAllByProps({ testID: 'mock-photo-grid' })).toHaveLength(1);
+  });
+
   it('rebuilds Android resume state from the latest scan batch when no active scan job exists', async () => {
     setPlatformOS('android');
     mockLoadLatestPhotoScanBatch.mockResolvedValue({
@@ -2620,6 +2923,7 @@ describe('PhotoGridScreen', () => {
     const renderer = await renderScreen();
     await act(async () => {
       await flushPromises();
+      await flushPromises();
     });
     const renderedTexts = collectRenderedTexts(renderer);
 
@@ -2647,6 +2951,124 @@ describe('PhotoGridScreen', () => {
       });
       await flushPromises();
     });
+  });
+
+  it('rebuilds Android full-batch recovery from the persisted batch range instead of hydrated recent-window candidates', async () => {
+    setPlatformOS('android');
+    const now = Date.UTC(2026, 4, 4, 0, 0, 0);
+    const rollingRangeStartAt = buildScanRangeStartAt(12, now);
+    const expectedBackfillRangeStartAt = buildScanRangeStartAt(12, rollingRangeStartAt);
+    const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    const recoveryBatch = {
+      batchId: 'batch-recovery-full-1',
+      mode: 'full' as const,
+      phase: 'analysis' as const,
+      windowDays: Math.round((rollingRangeStartAt - expectedBackfillRangeStartAt) / DAY_MS),
+      rangeStartAt: expectedBackfillRangeStartAt,
+      rangeEndAt: rollingRangeStartAt,
+      progressCurrent: 0,
+      progressTotal: 5,
+      enumeratedCount: 5,
+      dirtyCount: 5,
+      analyzedCount: 0,
+      candidateCount: 0,
+      startedAt: now,
+      lastHeartbeatAt: now + 500,
+      completedAt: null,
+      lastError: null,
+      updatedAt: now + 500,
+    };
+
+    mockLoadLatestPhotoScanBatch.mockResolvedValue(recoveryBatch);
+    mockLoadPhotoScanBatch.mockResolvedValue(recoveryBatch);
+    mockLoadPhotoScanBatchItems.mockResolvedValue([
+      {
+        batchId: 'batch-recovery-full-1',
+        assetId: 'older-photo-1',
+        stage: 'queued',
+        mediaType: 'photo',
+        dirtyReason: 'new',
+        attemptCount: 0,
+        workerSlot: null,
+        lastHeartbeatAt: null,
+        lastError: null,
+        updatedAt: now + 500,
+      },
+    ]);
+    mockEnumerateAndroidMediaStoreAssets
+      .mockResolvedValueOnce([
+        createAndroidMediaStoreAsset('recent-photo-1', {
+          dateTaken: now - DAY_MS,
+          dateModified: now - DAY_MS,
+        }),
+      ])
+      .mockResolvedValueOnce([
+        createAndroidMediaStoreAsset('older-photo-1', {
+          dateTaken: expectedBackfillRangeStartAt + DAY_MS,
+          dateModified: expectedBackfillRangeStartAt + DAY_MS,
+        }),
+        createAndroidMediaStoreAsset('older-photo-2', {
+          dateTaken: expectedBackfillRangeStartAt + 2 * DAY_MS,
+          dateModified: expectedBackfillRangeStartAt + 2 * DAY_MS,
+        }),
+      ]);
+
+    let resolveScan: ((value: any) => void) | undefined;
+    mockExecuteAndroidNativeFirstScan.mockImplementationOnce(async (options: any) => ({
+      mode: 'native',
+      fallbackReason: null,
+      output: await new Promise((resolve) => {
+        expect(options.sourceCandidates).toEqual([
+          expect.objectContaining({ id: 'older-photo-1' }),
+          expect.objectContaining({ id: 'older-photo-2' }),
+        ]);
+        expect(options.legacyOptions).toEqual(
+          expect.objectContaining({
+            createdAfter: expectedBackfillRangeStartAt,
+            createdBefore: rollingRangeStartAt,
+          }),
+        );
+        resolveScan = resolve;
+      }),
+    }));
+
+    try {
+      const renderer = await renderScreen();
+      await act(async () => {
+        await flushPromises();
+        await flushPromises();
+      });
+
+      expect(mockLoadPhotoScanBatch).toHaveBeenCalledWith('batch-recovery-full-1');
+      expect(mockEnumerateAndroidMediaStoreAssets).toHaveBeenNthCalledWith(2, {
+        createdAfter: expectedBackfillRangeStartAt,
+        createdBefore: rollingRangeStartAt,
+      });
+      expect(mockExecuteAndroidNativeFirstScan).toHaveBeenCalledTimes(1);
+      expect(collectRenderedTexts(renderer)).toContain('扫描中');
+      expect(collectRenderedTexts(renderer)).toContain('0/5');
+
+      await act(async () => {
+        resolveScan?.({
+          state: {
+            activeCandidates: [],
+            recycleBin: [],
+            selectedIds: [],
+          },
+          summary: {
+            scannedAt: now,
+            scannedCount: 5,
+            candidateCount: 0,
+            highConfidenceCount: 0,
+            mediumConfidenceCount: 0,
+            recycleBinCount: 0,
+          },
+        });
+        await flushPromises();
+      });
+    } finally {
+      dateNowSpy.mockRestore();
+    }
   });
 
   it('does not resume past a gap in completed batch items when rebuilding Android resume state', async () => {
@@ -3301,6 +3723,8 @@ describe('PhotoGridScreen', () => {
     expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.continueScan);
     expect(renderedTexts).not.toContain('发现 0 个异常媒体');
     expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-summary' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-exhausted-state' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-exhausted-title' })).toHaveLength(1);
     expect(renderedTexts).toContain('误触 0');
     expect(renderedTexts).toContain('异常 0');
     expect(renderedTexts).toContain('重复 0');
@@ -3663,9 +4087,9 @@ describe('PhotoGridScreen', () => {
     expect(mockLoadPhotoScanResultCache).toHaveBeenCalledTimes(1);
     expect(mockScanMediaLibrary).not.toHaveBeenCalled();
     expect(renderedTexts).toContain('发现 1 个异常媒体');
-    expect(renderedTexts).toContain('全部 1');
-    expect(renderedTexts).toContain('照片 1');
-    expect(renderedTexts).toContain('视频 0');
+    expect(renderedTexts).toContain('全部 3');
+    expect(renderedTexts).toContain('照片 2');
+    expect(renderedTexts).toContain('视频 1');
     expect(renderedTexts).toContain('grid-count:1');
   });
 
@@ -3728,9 +4152,9 @@ describe('PhotoGridScreen', () => {
     const renderedTexts = collectRenderedTexts(renderer);
 
     expect(renderedTexts).toContain('grid-count:1');
-    expect(renderedTexts).toContain('全部 1');
-    expect(renderedTexts).toContain('照片 1');
-    expect(renderedTexts).toContain('视频 0');
+    expect(renderedTexts).toContain('全部 3');
+    expect(renderedTexts).toContain('照片 2');
+    expect(renderedTexts).toContain('视频 1');
     expect(renderedTexts).toContain('cached-visible');
     expect(renderedTexts).not.toContain('cached-hidden');
     expect(mockSavePhotoScanResultCache).toHaveBeenCalledWith(
@@ -3911,7 +4335,7 @@ describe('PhotoGridScreen', () => {
       ],
       summary: {
         scannedAt: 1_710_000_000_000,
-        scannedCount: 2,
+        scannedCount: 3,
         candidateCount: 2,
         highConfidenceCount: 2,
         mediumConfidenceCount: 0,
@@ -3980,7 +4404,7 @@ describe('PhotoGridScreen', () => {
       ],
       summary: {
         scannedAt: 1_710_000_000_000,
-        scannedCount: 2,
+        scannedCount: 3,
         candidateCount: 2,
         highConfidenceCount: 1,
         mediumConfidenceCount: 1,
@@ -4012,7 +4436,7 @@ describe('PhotoGridScreen', () => {
         ],
         summary: expect.objectContaining({
           candidateCount: 1,
-          scannedCount: 2,
+          scannedCount: 3,
         }),
       }),
     );
@@ -4064,7 +4488,7 @@ describe('PhotoGridScreen', () => {
       ],
       summary: {
         scannedAt: 1_710_000_000_000,
-        scannedCount: 2,
+        scannedCount: 3,
         candidateCount: 2,
         highConfidenceCount: 1,
         mediumConfidenceCount: 1,
@@ -4095,7 +4519,7 @@ describe('PhotoGridScreen', () => {
         ],
         summary: expect.objectContaining({
           candidateCount: 1,
-          scannedCount: 2,
+          scannedCount: 3,
         }),
       }),
     );
@@ -4268,6 +4692,93 @@ describe('PhotoGridScreen', () => {
     expect(renderedTexts).not.toContain('清理所选 (3)');
     expect(renderedTexts).not.toContain('保留 (3)');
     expect(() => renderer.root.findByProps({ testID: 'photo-selection-toggle-button' })).toThrow();
+  });
+
+  it('enters the all-complete state after cleaning the final full-batch results', async () => {
+    const now = Date.UTC(2026, 4, 4, 0, 0, 0);
+    const rollingRangeStartAt = buildScanRangeStartAt(12, now);
+    mockLoadPhotoScanResultCache.mockResolvedValueOnce({
+      activeCandidates: [
+        {
+          ...createCleanupCandidate('duplicate-final-1'),
+          duplicateGroup: {
+            groupId: 'duplicate-final-group',
+            representativeId: 'duplicate-final-1',
+            relation: 'exact',
+            size: 2,
+            similarity: 1,
+            representativeReason: 'higher-resolution',
+            representativeWidth: 3024,
+            representativeHeight: 4032,
+            representativeFileSize: 280_000,
+            representativeCreationTime: 1_710_000_000_000,
+          },
+        },
+        {
+          ...createCleanupCandidate('duplicate-final-2'),
+          duplicateGroup: {
+            groupId: 'duplicate-final-group',
+            representativeId: 'duplicate-final-1',
+            relation: 'exact',
+            size: 2,
+            similarity: 1,
+            representativeReason: 'higher-resolution',
+            representativeWidth: 3024,
+            representativeHeight: 4032,
+            representativeFileSize: 280_000,
+            representativeCreationTime: 1_710_000_000_000,
+          },
+        },
+      ],
+      summary: {
+        scannedAt: now,
+        scannedCount: 5,
+        candidateCount: 2,
+        highConfidenceCount: 2,
+        mediumConfidenceCount: 0,
+        recycleBinCount: 0,
+      },
+    });
+    mockLoadLatestCompletedPhotoScanBatch.mockResolvedValueOnce({
+      batchId: 'batch-full-final',
+      mode: 'full',
+      phase: 'completed',
+      windowDays: Math.round((now - rollingRangeStartAt) / DAY_MS),
+      rangeStartAt: rollingRangeStartAt,
+      rangeEndAt: now,
+      progressCurrent: 5,
+      progressTotal: 5,
+      enumeratedCount: 5,
+      dirtyCount: 5,
+      analyzedCount: 5,
+      candidateCount: 2,
+      startedAt: now,
+      lastHeartbeatAt: now,
+      completedAt: now,
+      lastError: null,
+      updatedAt: now,
+    });
+
+    const renderer = await renderScreen();
+
+    await longPressByTestId(renderer, 'mock-photo-grid-press-duplicate-final-1');
+    await pressByTestId(renderer, 'photo-selection-toggle-button');
+    await pressByTestId(renderer, 'cleanup-selected-button');
+
+    const renderedTexts = collectRenderedTexts(renderer);
+    expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.scanAllCompleteTitle);
+    expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.scanAllCompleteBody);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-all-complete-state' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-all-complete-title' })).toHaveLength(1);
+    expect(mockSavePhotoScanResultCache).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        activeCandidates: [],
+        summary: expect.objectContaining({
+          candidateCount: 0,
+          scannedCount: 5,
+        }),
+      }),
+    );
   });
 
   it('filters persisted false-positive media out of fresh scan results before showing them', async () => {

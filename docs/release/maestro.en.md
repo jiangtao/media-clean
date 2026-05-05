@@ -4,16 +4,17 @@
 
 ## Goal
 
-Add an executable Android interactive smoke layer for `v0.0.1`, covering cold start, primary navigation, and key settings toggles as the fourth layer beside build verification, runtime diagnostics, and business-truth verification.
+Keep an executable Android interactive smoke layer for `v0.0.1`, covering cold start, primary navigation, and key settings toggles as a secondary fallback after the primary `agent-device` device-observability layer.
 
 ## Layering
 
-1. Build layer: `npm run build:android:debug` / `npm run build:android:release`
+1. Build layer: `npm run build:android:debug` / `npm run build:android:release:smoke`
 2. Runtime layer: `adb logcat`, Metro, native crash evidence
 3. Business truth layer: SQLite, scan batches, recycle-bin state, user decisions
-4. Interactive acceptance layer: Maestro
+4. Primary device-observability layer: see [Agent Device Observability Contract](./agent-device.en.md)
+5. Secondary interactive smoke layer: Maestro
 
-Maestro answers whether the user-facing flow is still alive. It does not explain the underlying root cause by itself.
+Maestro answers whether the user-facing flow is still alive. It does not explain the underlying root cause by itself, and it no longer acts as the primary device-observability layer.
 
 ## Current smoke coverage
 
@@ -76,8 +77,8 @@ The repository now includes an emulator-based Maestro smoke workflow:
 
 Why this matters:
 
-1. If a local Xiaomi / MIUI device blocks the Maestro driver installation, CI can still provide an independent interactive-acceptance signal.
-2. The smoke flow becomes part of PR / branch automation instead of remaining a purely manual real-device check.
+1. If a local Xiaomi / MIUI device blocks the Maestro driver installation, CI can still provide a secondary interactive-acceptance signal.
+2. The smoke flow remains part of PR / branch automation, but the primary device-observability signal should come from `agent-device` artifacts.
 
 ## Recommended next additions
 

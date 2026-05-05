@@ -8,6 +8,7 @@ import com.facebook.react.uimanager.ViewManager
 class BackgroundScanPackage : ReactPackage {
   override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> =
     listOf(
+      AndroidMediaStoreEnumeratorModule(reactContext),
       AndroidNativeScanExecutorModule(reactContext),
       BackgroundScanForegroundServiceModule(reactContext),
     )

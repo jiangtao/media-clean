@@ -4,16 +4,17 @@
 
 ## 目标
 
-为 `v0.0.1` 建立一层可执行的 Android 交互验收 smoke，覆盖冷启动、主导航和关键设置切换，作为构建验证、运行时日志验证、业务真值验证之外的第四层。
+为 `v0.0.1` 保留一层可执行的 Android 交互验收 smoke，覆盖冷启动、主导航和关键设置切换，作为 `agent-device` 主设备观测层之后的次级 fallback。
 
 ## 分层定位
 
-1. 构建层：`npm run build:android:debug` / `npm run build:android:release`
+1. 构建层：`npm run build:android:debug` / `npm run build:android:release:smoke`
 2. 运行时层：`adb logcat`、Metro、native crash
 3. 业务真值层：SQLite、扫描批次、回收站与用户决策
-4. 交互验收层：Maestro
+4. 主设备观测层：见 [Agent Device 设备观测契约](./agent-device.md)
+5. 次级交互 smoke 层：Maestro
 
-Maestro 只回答“用户点出来的流程是否还活着”，不回答“底层为什么坏了”。
+Maestro 只回答“用户点出来的流程是否还活着”，不回答“底层为什么坏了”，也不再承担主设备观测职责。
 
 ## 当前 smoke 覆盖
 
@@ -76,8 +77,8 @@ INSTALL_FAILED_USER_RESTRICTED: Install canceled by user
 
 这条链路的价值在于：
 
-1. 本地 Xiaomi / MIUI 真机若拦截 Maestro driver，CI 仍可独立提供交互验收信号。
-2. 交互 smoke 能进入 PR / 主干自动化，而不是只停留在人工真机验证。
+1. 本地 Xiaomi / MIUI 真机若拦截 Maestro driver，CI 仍可独立提供次级交互 smoke 信号。
+2. 交互 smoke 仍可进入 PR / 主干自动化，但主设备观测应优先看 `agent-device` artifact。
 
 ## 下一步推荐补充
 

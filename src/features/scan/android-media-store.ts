@@ -47,6 +47,15 @@ function getAndroidMediaStoreEnumeratorModule() {
   return (NativeModules.AndroidMediaStoreEnumerator as AndroidMediaStoreEnumeratorModule | undefined) ?? null;
 }
 
+function logAndroidMediaStoreWarning(message: string, details?: Record<string, unknown>) {
+  if (details) {
+    console.warn(`[android-media-store] ${message}`, details);
+    return;
+  }
+
+  console.warn(`[android-media-store] ${message}`);
+}
+
 function normalizeNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
@@ -89,10 +98,16 @@ export async function isAndroidMediaStoreEnumerationSupported() {
 
   const nativeModule = getAndroidMediaStoreEnumeratorModule();
   if (!nativeModule?.isSupported) {
+    logAndroidMediaStoreWarning('Native module AndroidMediaStoreEnumerator is unavailable.');
     return false;
   }
 
-  return Promise.resolve(nativeModule.isSupported()).catch(() => false);
+  return Promise.resolve(nativeModule.isSupported()).catch((error) => {
+    logAndroidMediaStoreWarning('Failed to probe AndroidMediaStoreEnumerator support.', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  });
 }
 
 export async function enumerateAndroidMediaStoreAssets(
@@ -104,6 +119,7 @@ export async function enumerateAndroidMediaStoreAssets(
 
   const nativeModule = getAndroidMediaStoreEnumeratorModule();
   if (!nativeModule?.enumerate) {
+    logAndroidMediaStoreWarning('Native module AndroidMediaStoreEnumerator.enumerate is unavailable.');
     return [] as AndroidMediaStoreAssetMetadata[];
   }
 
@@ -123,7 +139,16 @@ export async function enumerateAndroidMediaStoreAssets(
       mediaTypes,
       limit: options.limit ?? null,
     }),
-  ).catch(() => []);
+  ).catch((error) => {
+    logAndroidMediaStoreWarning('Failed to enumerate Android MediaStore assets.', {
+      createdAfter: options.createdAfter ?? null,
+      createdBefore: options.createdBefore ?? null,
+      mediaTypes: [...mediaTypes],
+      limit: options.limit ?? null,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return [] as AndroidMediaStoreAssetMetadata[];
+  });
 
   return rawAssets.map((asset) => normalizeAssetMetadata(asset));
 }

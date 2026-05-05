@@ -19,6 +19,7 @@ const saveRecycleBinSnapshotCacheMock = vi.hoisted(() => vi.fn());
 const syncPersistedMediaLedgerMock = vi.hoisted(() => vi.fn());
 const scanMediaLibraryMock = vi.hoisted(() => vi.fn());
 const deleteAssetsAsyncMock = vi.hoisted(() => vi.fn());
+const ensureMediaLibraryDeletePermissionsAsyncMock = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', () => {
   const ReactModule = require('react') as typeof import('react');
@@ -127,6 +128,10 @@ vi.mock('../../../features/scan/scan-media-library', () => ({
 
 vi.mock('expo-media-library', () => ({
   deleteAssetsAsync: deleteAssetsAsyncMock,
+}));
+
+vi.mock('../../../services/media-library-permissions', () => ({
+  ensureMediaLibraryDeletePermissionsAsync: ensureMediaLibraryDeletePermissionsAsyncMock,
 }));
 
 vi.mock('../../components/PhotoGrid', () => {
@@ -347,6 +352,7 @@ describe('RecycleBinScreen', () => {
     saveRecycleBinSnapshotCacheMock.mockResolvedValue(undefined);
     scanMediaLibraryMock.mockResolvedValue(createScanResult([]));
     deleteAssetsAsyncMock.mockResolvedValue(undefined);
+    ensureMediaLibraryDeletePermissionsAsyncMock.mockResolvedValue({ granted: true });
   });
 
   it('uses English recycle-bin copy from the shared app copy', () => {
@@ -397,6 +403,7 @@ describe('RecycleBinScreen', () => {
     expect(loadRecycleBinIdsMock).toHaveBeenCalledTimes(1);
     expect(scanMediaLibraryMock).toHaveBeenCalledTimes(1);
     expect(scanMediaLibraryMock.mock.calls[0]?.[0]).toEqual(['recycle-1']);
+    expect(renderer.root.findByProps({ testID: 'recycle-bin-header-title' }).props.children).toBe('保留和清理');
     expect(renderer.root.findByProps({ testID: 'mock-photo-grid' })).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'candidate-label-recycle-1' })).toBeTruthy();
   });
@@ -446,6 +453,27 @@ describe('RecycleBinScreen', () => {
     expect(findTextNode(renderer, '累计清理体积')).toBeTruthy();
     expect(findTextNode(renderer, '5.0 MB')).toBeTruthy();
     expect(findTextNode(renderer, '最近清理 · 2026-04-22 09:30')).toBeTruthy();
+  });
+
+  it('renders stable loading and empty-state anchors for device observability', async () => {
+    const idsDeferred = createDeferred<string[]>();
+    loadRecycleBinIdsMock.mockReturnValueOnce(idsDeferred.promise);
+    const loadingRenderer = await renderRecycleBinScreen();
+
+    expect(loadingRenderer.root.findByProps({ testID: 'recycle-bin-loading-label' }).props.children).toBe('加载保留和清理…');
+
+    await act(async () => {
+      idsDeferred.resolve([]);
+      await Promise.resolve();
+    });
+    loadingRenderer.unmount();
+
+    loadRecycleBinIdsMock.mockResolvedValueOnce([]);
+    const emptyRenderer = await renderRecycleBinScreen();
+
+    expect(emptyRenderer.root.findByProps({ testID: 'recycle-bin-empty-title' }).props.children).toBe(
+      '这里还没有待最终处理的项目',
+    );
   });
 
   it('renders the persisted recycle-bin snapshot before recycle-bin ids finish loading, then refreshes in the background', async () => {
@@ -638,6 +666,7 @@ describe('RecycleBinScreen', () => {
       renderer.root.findByProps({ testID: 'detail-hard-delete' }).props.onPress();
     });
 
+    expect(ensureMediaLibraryDeletePermissionsAsyncMock).toHaveBeenCalledTimes(1);
     expect(() => renderer.root.findByProps({ testID: 'candidate-label-recycle-2' })).toThrow();
     expect(syncPersistedMediaLedgerMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -652,6 +681,27 @@ describe('RecycleBinScreen', () => {
         candidates: [],
       }),
     );
+  });
+
+  it('blocks hard delete when media-library write permission is not granted', async () => {
+    const candidate = createCandidate('recycle-1');
+    loadRecycleBinIdsMock.mockResolvedValueOnce(['recycle-1']);
+    scanMediaLibraryMock.mockResolvedValueOnce(createScanResult([candidate]));
+    ensureMediaLibraryDeletePermissionsAsyncMock.mockResolvedValueOnce({ granted: false });
+
+    const renderer = await renderRecycleBinScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'candidate-press-recycle-1' }).props.onPress();
+    });
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'detail-hard-delete' }).props.onPress();
+    });
+
+    expect(ensureMediaLibraryDeletePermissionsAsyncMock).toHaveBeenCalledTimes(1);
+    expect(deleteAssetsAsyncMock).not.toHaveBeenCalled();
+    expect(renderer.root.findByProps({ testID: 'mock-detail-screen' })).toBeTruthy();
+    expect(findTextNode(renderer, 'recycle-1')).toBeTruthy();
   });
 
   it('keeps detail open on the remaining related recycle-bin item after restoring the current one', async () => {

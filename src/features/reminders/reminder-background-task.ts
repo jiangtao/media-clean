@@ -96,6 +96,33 @@ async function isCleanupReminderBackgroundTaskRegisteredSafe() {
   }
 }
 
+function isTaskNotFoundError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return /TaskNotFoundException|not found/i.test(error.message);
+}
+
+async function unregisterCleanupReminderBackgroundTaskSafe() {
+  try {
+    await BackgroundTask.unregisterTaskAsync(CLEANUP_REMINDER_BACKGROUND_TASK);
+    return;
+  } catch (error) {
+    if (!isTaskNotFoundError(error)) {
+      throw error;
+    }
+  }
+
+  try {
+    await TaskManager.unregisterTaskAsync(CLEANUP_REMINDER_BACKGROUND_TASK);
+  } catch (error) {
+    if (!isTaskNotFoundError(error)) {
+      throw error;
+    }
+  }
+}
+
 export async function syncCleanupReminderBackgroundTaskRegistration(
   settings: ReminderSettings,
   options: {
@@ -115,7 +142,7 @@ export async function syncCleanupReminderBackgroundTaskRegistration(
     status !== BackgroundTask.BackgroundTaskStatus.Available
   ) {
     if (isRegistered) {
-      await BackgroundTask.unregisterTaskAsync(CLEANUP_REMINDER_BACKGROUND_TASK);
+      await unregisterCleanupReminderBackgroundTaskSafe();
     }
 
     return {
@@ -125,7 +152,7 @@ export async function syncCleanupReminderBackgroundTaskRegistration(
   }
 
   if (isRegistered) {
-    await BackgroundTask.unregisterTaskAsync(CLEANUP_REMINDER_BACKGROUND_TASK);
+    await unregisterCleanupReminderBackgroundTaskSafe();
   }
 
   await BackgroundTask.registerTaskAsync(CLEANUP_REMINDER_BACKGROUND_TASK, {

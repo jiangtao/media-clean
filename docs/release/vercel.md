@@ -12,15 +12,22 @@
 4. Install Command：默认即可
 5. Build Command：`npm run build`
 6. Output Directory：`dist`
-7. Preview Domain：`mc.vercel.app`
-8. Production Domain：`mc.jerret.me`
+7. 当前 Vercel 生产别名：`mc-khaki.vercel.app`
+8. 自定义生产域名：`mc.jerret.me`
+9. GitHub Actions Workflow：`.github/workflows/page-vercel.yml`
 
 ## 仓库配置
 
 1. `page/package.json` 提供 `build/dev/preview/deploy/deploy:prod` 命令。
-2. `page/vercel.json` 配置 `cleanUrls`、输出目录、静态资源缓存和 `/landing.html` 兼容 rewrite。
+2. `page/vercel.json` 负责静态资源缓存头。
 3. 根 `package.json` 提供 `page:build/page:dev/page:preview/page:deploy/page:deploy:prod` 便于从仓库根目录验证和发布。
-4. 不提交 `.vercel/`，项目 ID、组织 ID 与 token 由 Vercel Dashboard 或 CI secrets 管理。
+4. 不提交 `.vercel/`；当前已 link 的 `projectId/orgId` 已固定进 workflow，GitHub 只需提供 `VERCEL_TOKEN` secret。
+5. `page` 的 Android 下载入口统一指向：
+   `https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk`
+6. 以下变更会自动触发 page 生产部署：
+   - `page/**`
+   - `.github/workflows/android-release.yml`
+   - `scripts/release/verify-android-release-page-contract.mjs`
 
 ## DNS 接入
 
@@ -44,6 +51,18 @@ npm run page:deploy:prod
 
 如果本机 Vercel token 失效，先执行 `vercel login` 或在 CI 中配置 `VERCEL_TOKEN`，再重新执行生产发布命令。
 
+## GitHub Actions
+
+```bash
+gh secret set VERCEL_TOKEN --repo jiangtao/media-clean
+```
+
+配置完成后：
+
+1. push 到 `main/master` 且命中 page/release-page contract 路径时，会自动触发 `.github/workflows/page-vercel.yml`
+2. 也可以手动 `workflow_dispatch`
+3. workflow 会先校验 release-page contract，再 build，再 deploy production，最后回查 `mc-khaki.vercel.app`
+
 发布后检查：
 
 1. 首页中文默认打开。
@@ -51,3 +70,4 @@ npm run page:deploy:prod
 3. 手机 mock 背景图与 3 张界面展示图无 404。
 4. `apps/icons/manifest.json` 可访问，且 `start_url` 指向 `/`。
 5. `/landing.html` 能兼容回到首页。
+6. Android 下载按钮指向最新正式 APK。

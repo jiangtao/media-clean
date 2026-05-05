@@ -4,12 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const runtime = vi.hoisted(() => ({
   replace: vi.fn(),
+  saveHasEnteredWorkspace: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',
   Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
   },
@@ -53,6 +55,10 @@ vi.mock('../../../application/AppPreferencesContext', () => ({
   }),
 }));
 
+vi.mock('../../../services/storage/workspace-entry-storage', () => ({
+  saveHasEnteredWorkspace: (...args: unknown[]) => runtime.saveHasEnteredWorkspace(...args),
+}));
+
 import { LandingScreen } from '../LandingScreen';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -83,9 +89,11 @@ function collectTexts(renderer: ReturnType<typeof TestRenderer.create>) {
 describe('LandingScreen', () => {
   beforeEach(() => {
     runtime.replace.mockReset();
+    runtime.saveHasEnteredWorkspace.mockReset();
+    runtime.saveHasEnteredWorkspace.mockResolvedValue(undefined);
   });
 
-  it('renders a restrained media-cleanup landing page', () => {
+  it('renders the five-step product flow and trust points', () => {
     let renderer!: ReturnType<typeof TestRenderer.create>;
 
     act(() => {
@@ -99,16 +107,31 @@ describe('LandingScreen', () => {
     });
 
     const texts = collectTexts(renderer);
+    const stepCards = renderer.root.findAllByProps({ testID: 'landing-step' });
+    const trustCards = renderer.root.findAllByProps({ testID: 'landing-trust-point' });
 
-    expect(texts).toContain('MediaClean');
-    expect(texts).toContain('媒体清理');
-    expect(texts).toContain('进入媒体清理');
-    expect(texts).toContain('先看结果，再做决定。扫描、筛选、保留都在本机完成。');
+    expect(texts).toContain('本地相册助手');
+    expect(texts).toContain('五步完成清理');
+    expect(texts).toContain('扫描、识别、筛选、清理、报告，一条清晰的本地处理流程。');
+    expect(texts).toContain('扫描');
+    expect(texts).toContain('识别');
+    expect(texts).toContain('筛选');
+    expect(texts).toContain('清理');
+    expect(texts).toContain('报告');
+    expect(texts).toContain('本地优先');
+    expect(texts).toContain('安全清理');
+    expect(texts).toContain('后台处理');
+    expect(texts).toContain('继续进入 Main');
     expect(renderer.root.findByProps({ testID: 'landing-screen' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'landing-scroll-view' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'landing-step-list' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'landing-trust-list' })).toBeTruthy();
+    expect(stepCards).toHaveLength(5);
+    expect(trustCards).toHaveLength(3);
     expect(renderer.root.findByProps({ testID: 'landing-primary-action' })).toBeTruthy();
   });
 
-  it('replaces the landing page with the main workspace when the CTA is pressed', () => {
+  it('persists workspace entry and replaces the landing page when the CTA is pressed', async () => {
     let renderer!: ReturnType<typeof TestRenderer.create>;
 
     act(() => {
@@ -121,10 +144,11 @@ describe('LandingScreen', () => {
       );
     });
 
-    act(() => {
-      renderer.root.findByProps({ testID: 'landing-primary-action' }).props.onPress();
+    await act(async () => {
+      await renderer.root.findByProps({ testID: 'landing-primary-action' }).props.onPress();
     });
 
+    expect(runtime.saveHasEnteredWorkspace).toHaveBeenCalledWith(true);
     expect(runtime.replace).toHaveBeenCalledWith('Main');
   });
 });

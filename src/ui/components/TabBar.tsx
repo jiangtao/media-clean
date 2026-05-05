@@ -35,6 +35,8 @@ export function TabBar({ tabs, activeTab, onTabPress, theme }: TabBarProps) {
               style={styles.tabItem}
               onPress={() => onTabPress(tab.name)}
               preset="tab"
+              testID={`tab-button-${tab.name}`}
+              accessibilityLabel={`tab-button-${tab.name}`}
             >
               <View style={styles.iconContainer}>
                 <View style={[styles.iconSurface, isActive && styles.iconSurfaceActive]}>

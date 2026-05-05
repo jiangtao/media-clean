@@ -1,3 +1,4 @@
+import type { CleanupCandidate } from '../../domain/recognition/types';
 import { DEFAULT_SCAN_LIMIT } from '../../features/scan/scan-config';
 
 interface ScreenInsets {
@@ -17,6 +18,12 @@ interface PhotoGridCopy {
     body: string;
     action: string;
   };
+  summary: {
+    accidentalLabel: string;
+    abnormalLabel: string;
+    duplicateLabel: string;
+    highConfidenceLabel: string;
+  };
   screens: {
     photoGrid: {
       filterAll: string;
@@ -31,11 +38,14 @@ interface PhotoGridCopy {
       scanProgressTitle: string;
       scanProgressValue: (current: number, total: number) => string;
       scanProgressFootnote: string;
+      scanBatchRange: (start: string, end: string) => string;
       scanCompleteTitle: string;
       scanResultSummary: (count: number) => string;
       scanResultFootnote: string;
       scanExhaustedTitle: string;
       scanExhaustedBody: string;
+      scanAllCompleteTitle: string;
+      scanAllCompleteBody: string;
       continueScan: string;
       selectedItems: (count: number) => string;
       cleanupSelected: string;
@@ -58,6 +68,34 @@ interface PhotoGridScopeSelection {
   total: number;
   photo: number;
   video: number;
+}
+
+interface PhotoGridCandidateSummary {
+  accidentalCount: number;
+  abnormalCount: number;
+  duplicateCount: number;
+  highConfidenceCount: number;
+}
+
+interface PhotoGridResultBreakdownItem {
+  key: 'accidental' | 'abnormal' | 'duplicate' | 'highConfidence';
+  label: string;
+  count: number;
+}
+
+interface PhotoGridEntryCopy {
+  eyebrow: string;
+  title: string;
+  body: string | null;
+  action: string | null;
+  progress: {
+    current: number;
+    total: number;
+    value: string;
+  } | null;
+  note: string | null;
+  result: string | null;
+  resultBreakdown?: readonly PhotoGridResultBreakdownItem[];
 }
 
 // PhotoGrid entry interaction standard:
@@ -108,6 +146,64 @@ export function buildPhotoGridScopeBreakdown(
   ] as const;
 }
 
+function buildPhotoGridCandidateSummary(
+  candidates: readonly Pick<CleanupCandidate, 'primaryIssueType' | 'confidence'>[],
+): PhotoGridCandidateSummary {
+  return candidates.reduce<PhotoGridCandidateSummary>(
+    (summary, candidate) => {
+      if (candidate.primaryIssueType === 'accidental') {
+        summary.accidentalCount += 1;
+      } else if (candidate.primaryIssueType === 'abnormal') {
+        summary.abnormalCount += 1;
+      } else if (candidate.primaryIssueType === 'duplicate') {
+        summary.duplicateCount += 1;
+      }
+
+      if (candidate.confidence === 'high') {
+        summary.highConfidenceCount += 1;
+      }
+
+      return summary;
+    },
+    {
+      accidentalCount: 0,
+      abnormalCount: 0,
+      duplicateCount: 0,
+      highConfidenceCount: 0,
+    },
+  );
+}
+
+function buildPhotoGridResultBreakdown(
+  copy: PhotoGridCopy,
+  candidates: readonly Pick<CleanupCandidate, 'primaryIssueType' | 'confidence'>[],
+) {
+  const summary = buildPhotoGridCandidateSummary(candidates);
+
+  return [
+    {
+      key: 'accidental',
+      label: copy.summary.accidentalLabel,
+      count: summary.accidentalCount,
+    },
+    {
+      key: 'abnormal',
+      label: copy.summary.abnormalLabel,
+      count: summary.abnormalCount,
+    },
+    {
+      key: 'duplicate',
+      label: copy.summary.duplicateLabel,
+      count: summary.duplicateCount,
+    },
+    {
+      key: 'highConfidence',
+      label: copy.summary.highConfidenceLabel,
+      count: summary.highConfidenceCount,
+    },
+  ] as const;
+}
+
 export function buildPhotoGridEntryCopy(
   copy: PhotoGridCopy,
   options: {
@@ -119,8 +215,11 @@ export function buildPhotoGridEntryCopy(
     progressTotal?: number;
     currentFileName?: string | null;
     resultCount?: number;
+    hasCompletedFullScan?: boolean;
+    scanRangeLabel?: string | null;
+    liveCandidates?: readonly Pick<CleanupCandidate, 'primaryIssueType' | 'confidence'>[];
   },
-) {
+): PhotoGridEntryCopy {
   const scanScopeCount = options.scanScopeCount ?? PHOTO_GRID_ENTRY_INTERACTION_STANDARD.defaultScanScopeCount;
   const progressTotal =
     options.progressTotal && options.progressTotal > 0 ? options.progressTotal : scanScopeCount;
@@ -161,12 +260,39 @@ export function buildPhotoGridEntryCopy(
         total: progressTotal,
         value: copy.screens.photoGrid.scanProgressValue(progressCurrent, progressTotal),
       },
-      note: null,
+      note: options.scanRangeLabel ?? null,
       result: null,
     } as const;
   }
 
   if (options.hasCompletedScan) {
+    const resultBreakdown = options.liveCandidates
+      ? buildPhotoGridResultBreakdown(copy, options.liveCandidates)
+      : undefined;
+    const completedAction = options.hasCompletedFullScan ? null : copy.controls.rescan;
+
+    if (options.hasCompletedFullScan) {
+      return {
+        eyebrow: copy.screens.photoGrid.scanCompleteTitle,
+        title: copy.screens.photoGrid.scanAllCompleteTitle,
+        body: (options.resultCount ?? 0) === 0
+          ? copy.screens.photoGrid.scanAllCompleteBody
+          : copy.screens.photoGrid.scanResultFootnote,
+        action: null,
+        progress: {
+          current: progressTotal,
+          total: progressTotal,
+          value: copy.screens.photoGrid.scanProgressValue(progressTotal, progressTotal),
+        },
+        note: options.scanRangeLabel ?? null,
+        result:
+          (options.resultCount ?? 0) > 0
+            ? copy.screens.photoGrid.scanResultSummary(options.resultCount ?? 0)
+            : null,
+        ...(resultBreakdown ? { resultBreakdown } : {}),
+      } as const;
+    }
+
     if ((options.resultCount ?? 0) === 0) {
       return {
         eyebrow: copy.screens.photoGrid.scanCompleteTitle,
@@ -178,8 +304,9 @@ export function buildPhotoGridEntryCopy(
           total: progressTotal,
           value: copy.screens.photoGrid.scanProgressValue(progressTotal, progressTotal),
         },
-        note: null,
+        note: options.scanRangeLabel ?? null,
         result: null,
+        ...(resultBreakdown ? { resultBreakdown } : {}),
       } as const;
     }
 
@@ -187,14 +314,15 @@ export function buildPhotoGridEntryCopy(
       eyebrow: copy.screens.photoGrid.scanCompleteTitle,
       title: copy.screens.photoGrid.scanScopeSummary(scanScopeCount),
       body: copy.screens.photoGrid.scanResultFootnote,
-      action: copy.controls.rescan,
+      action: completedAction,
       progress: {
         current: progressTotal,
         total: progressTotal,
         value: copy.screens.photoGrid.scanProgressValue(progressTotal, progressTotal),
       },
-      note: null,
+      note: options.scanRangeLabel ?? null,
       result: copy.screens.photoGrid.scanResultSummary(options.resultCount ?? 0),
+      ...(resultBreakdown ? { resultBreakdown } : {}),
     } as const;
   }
 
@@ -204,7 +332,7 @@ export function buildPhotoGridEntryCopy(
     body: null,
     action: copy.screens.photoGrid.startScan,
     progress: null,
-    note: null,
+    note: options.scanRangeLabel ?? null,
     result: null,
   } as const;
 }

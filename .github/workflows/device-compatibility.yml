@@ -1,34 +1,22 @@
-# Device Compatibility CI Workflow
-# Task 41 - 机型适配自动化测试
+# Legacy Device Compatibility Exploratory Workflow
+# Task 41 - 机型适配探索性自动化测试
 #
-# This workflow runs automated screen adaptation tests across
-# 24 different device configurations to verify notch/punch hole
-# compatibility, orientation handling, and navigation adaptation.
+# This workflow remains as a manual/nightly exploratory matrix.
+# The primary Android device observability gate now lives in
+# `.github/workflows/android-agent-device-observability.yml`.
 #
 # Author: 赵虎
 
-name: Device Compatibility Tests
+name: Legacy Device Compatibility Exploratory
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'src/features/compatibility/**'
-      - 'src/services/device/**'
-      - 'src/ui/**'
-      - '.github/workflows/device-compatibility.yml'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'src/features/compatibility/**'
-      - 'src/services/device/**'
-      - 'src/ui/**'
+  workflow_dispatch:
   schedule:
     # Run daily at 2 AM UTC (10 AM Beijing)
     - cron: '0 2 * * *'
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '24.11.0'
   JAVA_VERSION: '17'
   ANDROID_API: '33'
   EMULATOR_TIMEOUT: '600'
@@ -386,7 +374,7 @@ jobs:
 
             # Install and launch app
             adb install android/app/build/outputs/apk/debug/app-debug.apk
-            adb shell am start -n com.appcleaner/.MainActivity
+            adb shell am start -n com.jt.mistapmediacleaner/.MainActivity
 
             # Wait for app to stabilize
             sleep 10
@@ -399,7 +387,7 @@ jobs:
             adb logcat -d | grep -i "SafeArea" || echo "No SafeArea logs found"
 
             # Cleanup
-            adb shell am force-stop com.appcleaner
+            adb shell am force-stop com.jt.mistapmediacleaner
 
       - name: Upload screenshot
         if: always()

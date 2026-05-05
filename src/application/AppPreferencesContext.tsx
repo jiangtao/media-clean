@@ -6,16 +6,24 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { useColorScheme } from 'react-native';
+import { AppState, useColorScheme } from 'react-native';
 
-import type { AppLanguage } from '../i18n/app-language';
-import { detectPreferredAppLanguage } from '../i18n/app-language';
+import type { AppLanguage, AppLanguagePreference } from '../i18n/app-language';
+import {
+  detectPreferredAppLanguage,
+  resolveAppLanguagePreference,
+} from '../i18n/app-language';
 import { getAppCopy } from '../i18n/app-copy';
-import { loadAppLanguage, saveAppLanguage } from '../services/storage/app-language-storage';
+import {
+  loadAppLanguagePreference,
+  saveAppLanguagePreference,
+} from '../services/storage/app-language-storage';
 import {
   loadThemePreference,
   saveThemePreference,
 } from '../services/storage/theme-preference-storage';
+import { OBSERVABILITY_EVENTS } from '../services/observability/observability';
+import { getAppObservability } from './observability';
 import {
   getAppTheme,
   resolveThemeScheme,
@@ -27,11 +35,12 @@ import {
 interface AppPreferencesContextValue {
   isReady: boolean;
   language: AppLanguage;
+  languagePreference: AppLanguagePreference;
   themePreference: AppThemePreference;
   resolvedThemeScheme: AppThemeScheme;
   theme: AppThemePalette;
   copy: ReturnType<typeof getAppCopy>;
-  setLanguage: (language: AppLanguage) => Promise<void>;
+  setLanguage: (language: AppLanguagePreference) => Promise<void>;
   setThemePreference: (preference: AppThemePreference) => Promise<void>;
 }
 
@@ -45,6 +54,8 @@ export function AppPreferencesProvider({ children }: AppPreferencesProviderProps
   const systemTheme = useColorScheme();
   const [isReady, setIsReady] = useState(false);
   const [language, setLanguageState] = useState<AppLanguage>(detectPreferredAppLanguage);
+  const [languagePreference, setLanguagePreferenceState] =
+    useState<AppLanguagePreference>('system');
   const [themePreference, setThemePreferenceState] = useState<AppThemePreference>('system');
 
   useEffect(() => {
@@ -52,8 +63,8 @@ export function AppPreferencesProvider({ children }: AppPreferencesProviderProps
 
     async function loadPreferences() {
       try {
-        const [savedLanguage, savedThemePreference] = await Promise.all([
-          loadAppLanguage(),
+        const [savedLanguagePreference, savedThemePreference] = await Promise.all([
+          loadAppLanguagePreference(),
           loadThemePreference(),
         ]);
 
@@ -61,9 +72,18 @@ export function AppPreferencesProvider({ children }: AppPreferencesProviderProps
           return;
         }
 
-        setLanguageState(savedLanguage);
+        setLanguagePreferenceState(savedLanguagePreference);
+        setLanguageState(resolveAppLanguagePreference(savedLanguagePreference));
         setThemePreferenceState(savedThemePreference);
       } catch (error) {
+        getAppObservability().trackError(
+          OBSERVABILITY_EVENTS.appPreferencesLoadFailed,
+          error,
+          {
+            source: 'AppPreferencesContext',
+            operation: 'loadPreferences',
+          },
+        );
         console.error('Failed to load app preferences:', error);
       } finally {
         if (isActive) {
@@ -79,12 +99,39 @@ export function AppPreferencesProvider({ children }: AppPreferencesProviderProps
     };
   }, []);
 
-  const setLanguage = useCallback(async (nextLanguage: AppLanguage) => {
-    setLanguageState(nextLanguage);
+  useEffect(() => {
+    if (languagePreference !== 'system') {
+      return;
+    }
+
+    const handleAppStateChange = (nextState: string) => {
+      if (nextState === 'active') {
+        setLanguageState(detectPreferredAppLanguage());
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [languagePreference]);
+
+  const setLanguage = useCallback(async (nextLanguagePreference: AppLanguagePreference) => {
+    setLanguagePreferenceState(nextLanguagePreference);
+    setLanguageState(resolveAppLanguagePreference(nextLanguagePreference));
 
     try {
-      await saveAppLanguage(nextLanguage);
+      await saveAppLanguagePreference(nextLanguagePreference);
     } catch (error) {
+      getAppObservability().trackError(
+        OBSERVABILITY_EVENTS.appPreferencesSaveFailed,
+        error,
+        {
+          source: 'AppPreferencesContext',
+          preference: 'language',
+        },
+      );
       console.error('Failed to save app language:', error);
     }
   }, []);
@@ -95,6 +142,14 @@ export function AppPreferencesProvider({ children }: AppPreferencesProviderProps
     try {
       await saveThemePreference(nextPreference);
     } catch (error) {
+      getAppObservability().trackError(
+        OBSERVABILITY_EVENTS.appPreferencesSaveFailed,
+        error,
+        {
+          source: 'AppPreferencesContext',
+          preference: 'theme',
+        },
+      );
       console.error('Failed to save theme preference:', error);
     }
   }, []);
@@ -110,6 +165,7 @@ export function AppPreferencesProvider({ children }: AppPreferencesProviderProps
     () => ({
       isReady,
       language,
+      languagePreference,
       themePreference,
       resolvedThemeScheme,
       theme,
@@ -121,6 +177,7 @@ export function AppPreferencesProvider({ children }: AppPreferencesProviderProps
       copy,
       isReady,
       language,
+      languagePreference,
       resolvedThemeScheme,
       setLanguage,
       setThemePreference,

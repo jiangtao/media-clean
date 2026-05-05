@@ -2,15 +2,14 @@ name: Android Release APK
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
-    tags:
-      - "android-v*"
+    inputs:
+      release_tag:
+        description: "正式 Android release tag，例如 android-v0.0.1"
+        required: true
+        type: string
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-release-${{ github.ref }}
@@ -32,11 +31,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24.11.0
           cache: npm
 
       - name: Setup Java
@@ -49,13 +50,88 @@ jobs:
         uses: android-actions/setup-android@v4
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Typecheck
         run: npm run typecheck -- --pretty false
 
+      - name: Verify release-page contract
+        run: node scripts/release/verify-android-release-page-contract.mjs
+
+      - name: Resolve release tag
+        id: release_tag
+        run: |
+          TAG="${{ github.event.inputs.release_tag }}"
+
+          if [[ ! "${TAG}" =~ ^android-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "非法 release tag: ${TAG}" >&2
+            exit 1
+          fi
+
+          VERSION="${TAG#android-v}"
+          echo "value=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create release tag
+        env:
+          RELEASE_TAG: ${{ steps.release_tag.outputs.value }}
+        run: |
+          git fetch --tags origin
+          if git rev-parse -q --verify "refs/tags/${RELEASE_TAG}" >/dev/null; then
+            echo "release tag 已存在: ${RELEASE_TAG}" >&2
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${RELEASE_TAG}" "${GITHUB_SHA}"
+          git push origin "refs/tags/${RELEASE_TAG}"
+
       - name: Build signed APK
         run: bash scripts/android/build-release-apk.sh --skip-install
+
+      - name: Prepare release assets
+        id: release_assets
+        env:
+          RELEASE_TAG: ${{ steps.release_tag.outputs.value }}
+          RELEASE_VERSION: ${{ steps.release_tag.outputs.version }}
+        run: |
+          VERSIONED_APK="artifacts/android-release/media-clean-android-v${RELEASE_VERSION}.apk"
+          LATEST_APK="artifacts/android-release/media-clean-android-latest.apk"
+          VERSIONED_SHA="artifacts/android-release/media-clean-android-v${RELEASE_VERSION}.sha256"
+          VERSIONED_METADATA="artifacts/android-release/media-clean-android-v${RELEASE_VERSION}.metadata.json"
+          VERSIONED_SIGNING="artifacts/android-release/media-clean-android-v${RELEASE_VERSION}.signing.txt"
+
+          cp "android/app/build/outputs/apk/release/app-release.apk" "${VERSIONED_APK}"
+          cp "android/app/build/outputs/apk/release/app-release.apk" "${LATEST_APK}"
+          cp "artifacts/android-release/app-release.sha256" "${VERSIONED_SHA}"
+          cp "artifacts/android-release/release-metadata.json" "${VERSIONED_METADATA}"
+          cp "artifacts/android-release/app-release.signing.txt" "${VERSIONED_SIGNING}"
+
+          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/media-clean-android-latest.apk"
+          {
+            echo "versioned_apk=${VERSIONED_APK}"
+            echo "latest_apk=${LATEST_APK}"
+            echo "versioned_sha=${VERSIONED_SHA}"
+            echo "versioned_metadata=${VERSIONED_METADATA}"
+            echo "versioned_signing=${VERSIONED_SIGNING}"
+            echo "download_url=${DOWNLOAD_URL}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Publish GitHub release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_tag.outputs.value }}
+          name: Media Clean Android ${{ steps.release_tag.outputs.version }}
+          generate_release_notes: true
+          make_latest: true
+          files: |
+            ${{ steps.release_assets.outputs.versioned_apk }}
+            ${{ steps.release_assets.outputs.latest_apk }}
+            ${{ steps.release_assets.outputs.versioned_sha }}
+            ${{ steps.release_assets.outputs.versioned_metadata }}
+            ${{ steps.release_assets.outputs.versioned_signing }}
+          overwrite_files: true
 
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v7
@@ -67,3 +143,22 @@ jobs:
             artifacts/android-release/app-release.signing.txt
             artifacts/android-release/app-release.sha256
             artifacts/android-release/release-metadata.json
+            artifacts/android-release/media-clean-android-v*.apk
+            artifacts/android-release/media-clean-android-latest.apk
+            artifacts/android-release/media-clean-android-v*.sha256
+            artifacts/android-release/media-clean-android-v*.metadata.json
+            artifacts/android-release/media-clean-android-v*.signing.txt
+
+      - name: Publish release summary
+        env:
+          RELEASE_TAG: ${{ steps.release_tag.outputs.value }}
+          RELEASE_VERSION: ${{ steps.release_tag.outputs.version }}
+          DOWNLOAD_URL: ${{ steps.release_assets.outputs.download_url }}
+        run: |
+          {
+            echo "## Android release 已发布"
+            echo
+            echo "- Tag: \`${RELEASE_TAG}\`"
+            echo "- Version: \`${RELEASE_VERSION}\`"
+            echo "- Canonical page download URL: ${DOWNLOAD_URL}"
+          } >> "${GITHUB_STEP_SUMMARY}"

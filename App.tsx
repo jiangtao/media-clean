@@ -7,6 +7,7 @@ import {
   useAppPreferences,
 } from './src/application/AppPreferencesContext';
 import { CleanupReminderBootstrap } from './src/application/CleanupReminderBootstrap';
+import { AppErrorBoundary } from './src/application/AppErrorBoundary';
 import { RootNavigator } from './src/navigation/RootNavigator';
 
 function AppShell() {
@@ -51,7 +52,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AppPreferencesProvider>
-        <AppShell />
+        <AppErrorBoundary>
+          <AppShell />
+        </AppErrorBoundary>
       </AppPreferencesProvider>
     </SafeAreaProvider>
   );

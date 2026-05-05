@@ -2,15 +2,15 @@
 
 [English Version](./android.en.md)
 
-本文档定义 Media Clean Android debug / release APK 的仓库内发包、CI/CD 流水线、签名验签与产物约定。目标不是“能打一个包”，而是让 debug 与 release 的 APK 产出、签名来源、验签结果和元数据都可复现、可审计。
+本文档定义 Media Clean Android debug / release APK 的仓库内发包、CI/CD 流水线、签名验签、对外发布入口与产物约定。目标不是“能打一个包”，而是让 debug 与 release 的 APK 产出、签名来源、验签结果、对外下载地址和元数据都可复现、可审计。
 
 ## 发布入口
 
-仓库内统一入口：
+正式 release 入口：
 
-```bash
-bash scripts/android/build-release-apk.sh --skip-install
-```
+- GitHub Actions：`.github/workflows/android-release.yml`
+- 触发方式：`workflow_dispatch`
+- 对外唯一 Android 下载入口：`https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk`
 
 Debug APK：
 
@@ -23,6 +23,12 @@ bash scripts/android/build-debug-apk.sh --skip-install
 ```bash
 bash scripts/android/build-release-apk.sh --temp-keystore --skip-install
 ```
+
+说明：
+
+1. 本地禁止生成正式签名的 release APK。
+2. 本地若要验证 release 链路，只允许使用临时 keystore smoke。
+3. 正式签名、正式 release 资产与 page 下载入口只通过 workflow 维护，避免本地散发多份来源不一致的 APK。
 
 ## 发布流程
 
@@ -38,7 +44,13 @@ bash scripts/android/build-release-apk.sh --temp-keystore --skip-install
 正式 release workflow:
 
 - `.github/workflows/android-release.yml`
-- 触发方式：`workflow_dispatch`、`main/master` push 或 `android-v*` tag
+- 触发方式：`workflow_dispatch`
+- 发布结果：
+  1. 创建 / 更新 GitHub Release
+  2. 上传版本化资产 `media-clean-android-v<version>.apk`
+  3. 上传 page 固定下载资产 `media-clean-android-latest.apk`
+  4. page 下载按钮固定指向 `releases/latest/download/media-clean-android-latest.apk`
+  5. workflow 内置 `verify:release:page-contract`，确保 release 资产名与 page 下载入口保持一致
 
 正式 debug workflow:
 
@@ -74,6 +86,8 @@ Release:
 2. 验签报告：`artifacts/android-release/app-release.signing.txt`
 3. SHA256：`artifacts/android-release/app-release.sha256`
 4. 元数据：`artifacts/android-release/release-metadata.json`
+5. GitHub Release 版本化资产：`artifacts/android-release/media-clean-android-v<version>.apk`
+6. GitHub Release page 固定资产：`artifacts/android-release/media-clean-android-latest.apk`
 
 Debug:
 
@@ -89,3 +103,4 @@ Debug:
 3. metadata 必须包含版本、`versionCode`、包名与 checksum
 4. debug workflow 必须稳定产出 `app-debug.apk` 与对应签名报告
 5. PR check 必须能在无正式证书前提下，同时跑通 release 与 debug 两条链路
+6. page 中所有 Android 下载入口必须指向 `releases/latest/download/media-clean-android-latest.apk`

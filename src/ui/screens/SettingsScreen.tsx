@@ -11,8 +11,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
-import { getAppTheme, type AppThemePreference, APP_THEME_PREFERENCES } from '../../theme/app-theme';
-import type { AppLanguage } from '../../i18n/app-language';
+import {
+  getAppTheme,
+  type AppThemePalette,
+  type AppThemePreference,
+  APP_THEME_PREFERENCES,
+} from '../../theme/app-theme';
+import type { AppLanguage, AppLanguagePreference } from '../../i18n/app-language';
 import {
   buildReminderSummary,
   createDefaultReminderSettings,
@@ -23,7 +28,7 @@ import {
   type ReminderSettings,
 } from '../../features/reminders/reminder-settings';
 import {
-  reconcileReminderRuntimeOnLaunch,
+  reconcileReminderRuntimeInForeground,
   reconcileReminderRuntimeSettings,
   syncReminderRuntimeSettings,
 } from '../../features/reminders/reminder-runtime';
@@ -33,14 +38,30 @@ import {
   VALID_SCAN_RANGES,
   type ScanRange,
 } from '../../services/storage/scan-range-storage';
-import { loadLastScanMeta } from '../../services/storage/app-storage';
+import {
+  clearPersistentScanCache,
+  loadLastScanMeta,
+  loadPersistentScanCacheSizeBytes,
+} from '../../services/storage/app-storage';
+import {
+  clearGeneratedAnalysisFileCache,
+  loadGeneratedAnalysisFileCacheSizeBytes,
+} from '../../services/media/analysis-temp-file-cache';
 import { useAppPreferences } from '../../application/AppPreferencesContext';
 import { buildSettingsScreenLayout } from './screen-layout';
+import { formatLocalizedSize } from '../../i18n/app-copy';
+
+type SettingsScreenLayout = {
+  headerTop: number;
+  contentBottom: number;
+  left: number;
+  right: number;
+};
 
 interface SettingsSectionProps {
   title: string;
   children: React.ReactNode;
-  theme: ReturnType<typeof getAppTheme>;
+  theme: AppThemePalette;
   leftInset: number;
   rightInset: number;
 }
@@ -61,7 +82,7 @@ function SettingsSection({ title, children, theme, leftInset, rightInset }: Sett
   );
 }
 
-function createSectionStyles(theme: ReturnType<typeof getAppTheme>, leftInset: number, rightInset: number) {
+function createSectionStyles(theme: AppThemePalette, leftInset: number, rightInset: number) {
   return StyleSheet.create({
     section: {
       marginBottom: 24,
@@ -94,7 +115,7 @@ interface SettingsRowProps {
   onPress?: () => void;
   showArrow?: boolean;
   children?: React.ReactNode;
-  theme: ReturnType<typeof getAppTheme>;
+  theme: AppThemePalette;
   isLast?: boolean;
 }
 
@@ -123,7 +144,7 @@ function SettingsRow({ label, value, onPress, showArrow = false, children, theme
   return content;
 }
 
-function createRowStyles(theme: ReturnType<typeof getAppTheme>, isLast: boolean) {
+function createRowStyles(theme: AppThemePalette, isLast: boolean) {
   return StyleSheet.create({
     row: {
       flexDirection: 'row',
@@ -160,6 +181,7 @@ export function SettingsScreen() {
   const layout = useMemo(() => buildSettingsScreenLayout(insets), [insets]);
   const {
     language,
+    languagePreference,
     themePreference,
     resolvedThemeScheme,
     theme,
@@ -167,12 +189,14 @@ export function SettingsScreen() {
     setLanguage,
     setThemePreference,
   } = useAppPreferences();
-  const [scanRange, setScanRange] = useState<ScanRange>(3);
+  const [scanRange, setScanRange] = useState<ScanRange>(12);
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(
     createDefaultReminderSettings(),
   );
   const [notificationPermissionGranted, setNotificationPermissionGranted] = useState(false);
   const [lastScanTime, setLastScanTime] = useState<number | null>(null);
+  const [persistentCacheSizeBytes, setPersistentCacheSizeBytes] = useState(0);
+  const [isClearingPersistentCache, setIsClearingPersistentCache] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const styles = useMemo(() => createStyles(theme, layout), [theme, layout]);
   const reminderChannelCopy = useMemo(
@@ -198,15 +222,26 @@ export function SettingsScreen() {
 
       async function loadSettings() {
         try {
-          const [savedScanRange, lastScanMeta, reminderRuntime] = await Promise.all([
+          const [
+            savedScanRange,
+            lastScanMeta,
+            reminderRuntime,
+            nextPersistentCacheSizeBytes,
+            nextGeneratedAnalysisFileCacheSizeBytes,
+          ] = await Promise.all([
             loadScanRange(),
             loadLastScanMeta(),
-            reconcileReminderRuntimeOnLaunch(language, reminderChannelCopy),
+            reconcileReminderRuntimeInForeground(language, reminderChannelCopy),
+            loadPersistentScanCacheSizeBytes(),
+            loadGeneratedAnalysisFileCacheSizeBytes(),
           ]);
 
           if (isActive) {
             setScanRange(savedScanRange);
             setLastScanTime(lastScanMeta?.scannedAt ?? null);
+            setPersistentCacheSizeBytes(
+              nextPersistentCacheSizeBytes + nextGeneratedAnalysisFileCacheSizeBytes,
+            );
             setReminderSettings(reminderRuntime.settings);
             setNotificationPermissionGranted(reminderRuntime.permissionGranted);
             setIsLoading(false);
@@ -227,11 +262,11 @@ export function SettingsScreen() {
     }, [language, reminderChannelCopy])
   );
 
-  const handleLanguageChange = useCallback(async (newLanguage: AppLanguage) => {
-    if (newLanguage === language) return;
+  const handleLanguageChange = useCallback(async (newLanguage: AppLanguagePreference) => {
+    if (newLanguage === languagePreference) return;
 
     await setLanguage(newLanguage);
-  }, [language, setLanguage]);
+  }, [languagePreference, setLanguage]);
 
   const handleThemeChange = useCallback(async (newTheme: AppThemePreference) => {
     if (newTheme === themePreference) return;
@@ -246,7 +281,11 @@ export function SettingsScreen() {
     try {
       await saveScanRange(newRange);
 
-      if (reminderSettings.enabled) {
+      if (
+        reminderSettings.enabled ||
+        reminderSettings.notificationId !== null ||
+        reminderSettings.nextTriggerAt !== null
+      ) {
         const reminderRuntime = await reconcileReminderRuntimeSettings(
           reminderSettings,
           language,
@@ -340,6 +379,26 @@ export function SettingsScreen() {
     }
   }, [language, reminderChannelCopy, reminderSettings]);
 
+  const handleClearPersistentScanCache = useCallback(async () => {
+    if (isClearingPersistentCache) {
+      return;
+    }
+
+    setIsClearingPersistentCache(true);
+    try {
+      await Promise.all([
+        clearPersistentScanCache(),
+        clearGeneratedAnalysisFileCache(),
+      ]);
+      setLastScanTime(null);
+      setPersistentCacheSizeBytes(0);
+    } catch (error) {
+      console.error('Failed to clear persistent scan cache:', error);
+    } finally {
+      setIsClearingPersistentCache(false);
+    }
+  }, [isClearingPersistentCache]);
+
   const getThemeLabel = (pref: AppThemePreference): string => {
     switch (pref) {
       case 'system':
@@ -379,6 +438,34 @@ export function SettingsScreen() {
       return `${currentLabel} (${systemLabel})`;
     }
     return currentLabel;
+  };
+
+  const languageOptions = useMemo(
+    () => [
+      {
+        value: 'system' as const,
+        label: language === 'zh-CN' ? `跟随系统（当前：${copy.languageOptions.find((option) => option.value === language)?.label ?? '简体中文'}）` : `System (${copy.languageOptions.find((option) => option.value === language)?.label ?? 'English'})`,
+      },
+      ...copy.languageOptions,
+    ],
+    [copy.languageOptions, language],
+  );
+
+  const getPersistentCacheActionLabel = (): string => {
+    if (isClearingPersistentCache) {
+      return language === 'zh-CN' ? '清除中...' : 'Clearing...';
+    }
+
+    return language === 'zh-CN' ? '清除' : 'Clear';
+  };
+
+  const getPersistentCacheRowLabel = (): string => {
+    if (persistentCacheSizeBytes > 0) {
+      const formattedSize = formatLocalizedSize(persistentCacheSizeBytes, language);
+      return language === 'zh-CN' ? `清除缓存 ${formattedSize}` : `Clear cache ${formattedSize}`;
+    }
+
+    return language === 'zh-CN' ? '清除缓存' : 'Clear cache';
   };
 
   const getReminderStatusLabel = (): string => {
@@ -459,6 +546,7 @@ export function SettingsScreen() {
                   styles.scanRangeOption,
                   scanRange === range && styles.scanRangeOptionActive,
                 ]}
+                testID={`scan-range-option-${range}`}
               >
                 <Text
                   style={[
@@ -499,6 +587,7 @@ export function SettingsScreen() {
                 true: theme.buttonPrimaryBackground,
               }}
               thumbColor={theme.buttonPrimaryText}
+              testID="reminder-settings-toggle"
             />
           </View>
           <Text style={styles.reminderHint}>
@@ -607,25 +696,26 @@ export function SettingsScreen() {
 
       <SettingsSection title={copy.languageLabel} theme={theme} leftInset={layout.left} rightInset={layout.right}>
         <View style={styles.languageSelector}>
-          {copy.languageOptions.map((option, index) => (
+          {languageOptions.map((option, index) => (
             <Pressable
               key={option.value}
               onPress={() => handleLanguageChange(option.value)}
               style={[
                 styles.languageOption,
-                language === option.value && styles.languageOptionActive,
-                index === copy.languageOptions.length - 1 && styles.languageOptionLast,
+                languagePreference === option.value && styles.languageOptionActive,
+                index === languageOptions.length - 1 && styles.languageOptionLast,
               ]}
+              testID={`language-option-${option.value}`}
             >
               <Text
                 style={[
                   styles.languageOptionText,
-                  language === option.value && styles.languageOptionTextActive,
+                  languagePreference === option.value && styles.languageOptionTextActive,
                 ]}
               >
                 {option.label}
               </Text>
-              {language === option.value ? (
+              {languagePreference === option.value ? (
                 <Ionicons name="checkmark-circle" size={18} color={theme.buttonPrimaryBackground} />
               ) : null}
             </Pressable>
@@ -644,6 +734,7 @@ export function SettingsScreen() {
                 themePreference === pref && styles.themeOptionActive,
                 index === APP_THEME_PREFERENCES.length - 1 && styles.themeOptionLast,
               ]}
+              testID={`theme-option-${pref}`}
             >
               <View style={styles.themeOptionLeft}>
                 <View
@@ -686,6 +777,32 @@ export function SettingsScreen() {
         </View>
       </SettingsSection>
 
+      <SettingsSection
+        title={language === 'zh-CN' ? '缓存数据' : 'Cached Data'}
+        theme={theme}
+        leftInset={layout.left}
+        rightInset={layout.right}
+      >
+        <Pressable
+          testID="clear-persistent-scan-cache-button"
+          onPress={() => void handleClearPersistentScanCache()}
+          disabled={isClearingPersistentCache}
+          style={({ pressed }) => [
+            styles.cacheActionRow,
+            (pressed || isClearingPersistentCache) && styles.cacheActionRowPressed,
+          ]}
+        >
+          <View style={styles.cacheActionTextGroup}>
+            <Text style={styles.cacheActionLabel}>
+              {getPersistentCacheRowLabel()}
+            </Text>
+          </View>
+          <Text style={styles.cacheActionValue}>
+            {getPersistentCacheActionLabel()}
+          </Text>
+        </Pressable>
+      </SettingsSection>
+
       <View style={styles.footer}>
         <Text style={styles.footerText}>
           {language === 'zh-CN'
@@ -699,8 +816,8 @@ export function SettingsScreen() {
 }
 
 function createStyles(
-  theme: ReturnType<typeof getAppTheme>,
-  layout: ReturnType<typeof buildSettingsScreenLayout>,
+  theme: AppThemePalette,
+  layout: SettingsScreenLayout,
 ) {
   return StyleSheet.create({
     container: {
@@ -938,6 +1055,30 @@ function createStyles(
     lastScanValue: {
       fontSize: 16,
       color: theme.pageTextPrimary,
+    },
+    cacheActionRow: {
+      minHeight: 64,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 16,
+    },
+    cacheActionRowPressed: {
+      backgroundColor: theme.cardMutedBackground,
+    },
+    cacheActionTextGroup: {
+      flex: 1,
+    },
+    cacheActionLabel: {
+      fontSize: 16,
+      color: theme.pageTextPrimary,
+    },
+    cacheActionValue: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.buttonPrimaryBackground,
     },
     footer: {
       paddingLeft: layout.left,

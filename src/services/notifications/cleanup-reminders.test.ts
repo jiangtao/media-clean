@@ -25,6 +25,7 @@ const mediaLibraryApi = vi.hoisted(() => ({
 
 const appStorageApi = vi.hoisted(() => ({
   loadLastScanMeta: vi.fn(),
+  loadLastValidScanBaseline: vi.fn(),
 }));
 
 const scanRangeStorageApi = vi.hoisted(() => ({
@@ -55,6 +56,7 @@ vi.mock('../storage/scan-range-storage', () => scanRangeStorageApi);
 
 import {
   buildCleanupReminderRequest,
+  evaluateCleanupReminderTriggerInBackground,
   formatReminderTimeLabel,
   reconcileCleanupReminderNotification,
   syncCleanupReminderNotification,
@@ -70,6 +72,7 @@ describe('cleanup reminders', () => {
     notificationsApi.getNextTriggerDateAsync.mockReset();
     mediaLibraryApi.getAssetsAsync.mockReset();
     appStorageApi.loadLastScanMeta.mockReset();
+    appStorageApi.loadLastValidScanBaseline.mockReset();
     scanRangeStorageApi.loadScanRange.mockReset();
     scanRangeStorageApi.buildScanRangeStartAt.mockReset();
 
@@ -88,6 +91,14 @@ describe('cleanup reminders', () => {
       scannedAt: 1_710_000_000_000,
       scannedCount: 180,
       candidateCount: 12,
+    });
+    appStorageApi.loadLastValidScanBaseline.mockResolvedValue({
+      scannedAt: 1_710_000_000_000,
+      scannedCount: 180,
+      candidateCount: 12,
+      scanRangeMonths: 3,
+      latestEligibleAssetAt: 1_710_000_000_000,
+      ledgerUpdatedAt: 1_710_000_000_000,
     });
     scanRangeStorageApi.loadScanRange.mockResolvedValue(3);
     scanRangeStorageApi.buildScanRangeStartAt.mockReturnValue(1_709_000_000_000);
@@ -169,6 +180,91 @@ describe('cleanup reminders', () => {
     );
 
     expect(request.content.title).toBe('Cleanup Reminder');
+  });
+
+  it('suppresses the evaluator when reminders are disabled', () => {
+    expect(
+      evaluateCleanupReminderTriggerInBackground({
+        enabled: false,
+        scanRangeMonths: 3,
+        latestEligibleAssetAt: 1_710_100_000_000,
+        lastScanAt: 1_710_000_000_000,
+        lastValidScanBaseline: {
+          scannedAt: 1_710_000_000_000,
+          scannedCount: 180,
+          candidateCount: 12,
+          scanRangeMonths: 3,
+          latestEligibleAssetAt: 1_710_000_000_000,
+          ledgerUpdatedAt: 1_710_000_000_000,
+        },
+        nowInput: 1_710_200_000_000,
+      }),
+    ).toMatchObject({
+      shouldSchedule: false,
+      reason: 'disabled',
+    });
+  });
+
+  it('suppresses the evaluator when no eligible media was added after the last valid scan baseline', () => {
+    expect(
+      evaluateCleanupReminderTriggerInBackground({
+        enabled: true,
+        scanRangeMonths: 3,
+        latestEligibleAssetAt: 1_710_000_000_000,
+        lastScanAt: 1_710_000_000_000,
+        lastValidScanBaseline: {
+          scannedAt: 1_710_000_000_000,
+          scannedCount: 180,
+          candidateCount: 12,
+          scanRangeMonths: 3,
+          latestEligibleAssetAt: 1_710_000_000_000,
+          ledgerUpdatedAt: 1_710_000_000_000,
+        },
+        nowInput: 1_710_200_000_000,
+      }),
+    ).toMatchObject({
+      shouldSchedule: false,
+      reason: 'no-new-media-since-last-scan',
+    });
+  });
+
+  it('treats recent eligible media as enough context before the first valid scan baseline exists', () => {
+    expect(
+      evaluateCleanupReminderTriggerInBackground({
+        enabled: true,
+        scanRangeMonths: 6,
+        latestEligibleAssetAt: 1_710_100_000_000,
+        lastScanAt: null,
+        lastValidScanBaseline: null,
+        nowInput: 1_710_200_000_000,
+      }),
+    ).toMatchObject({
+      shouldSchedule: true,
+      reason: 'recent-media-before-first-scan',
+    });
+  });
+
+  it('marks the evaluator as eligible when new media arrives after the last valid scan baseline', () => {
+    expect(
+      evaluateCleanupReminderTriggerInBackground({
+        enabled: true,
+        scanRangeMonths: 3,
+        latestEligibleAssetAt: 1_710_100_000_000,
+        lastScanAt: 1_710_000_000_000,
+        lastValidScanBaseline: {
+          scannedAt: 1_710_000_000_000,
+          scannedCount: 180,
+          candidateCount: 12,
+          scanRangeMonths: 3,
+          latestEligibleAssetAt: 1_710_000_000_000,
+          ledgerUpdatedAt: 1_710_000_000_000,
+        },
+        nowInput: 1_710_200_000_000,
+      }),
+    ).toMatchObject({
+      shouldSchedule: true,
+      reason: 'new-media-since-last-scan',
+    });
   });
 
   it('returns scheduled metadata and cancels only the previous reminder when resyncing', async () => {

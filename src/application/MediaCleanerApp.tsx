@@ -21,7 +21,11 @@ import {
   scanMediaLibrary,
   type ScanSummary,
 } from '../features/scan/scan-media-library';
-import { DEFAULT_SCAN_LIMIT } from '../features/scan/scan-config';
+import {
+  DEFAULT_SCAN_LIMIT,
+  DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT,
+  buildDefaultScanWindowStartAt,
+} from '../features/scan/scan-config';
 import { buildRecentScanReminderCopy } from '../features/reminders/reminder-copy';
 import {
   DEFAULT_REMINDER_SUMMARY,
@@ -41,9 +45,16 @@ import {
   getAppCopy,
   resolveReminderSummary,
 } from '../i18n/app-copy';
-import { loadLastScanMeta, loadRecycleBinIds, saveLastScanMeta, saveRecycleBinIds } from '../services/storage/app-storage';
+import {
+  loadLastScanMeta,
+  loadRecycleBinIds,
+  saveLastScanMeta,
+  saveLastValidScanBaseline,
+  saveRecycleBinIds,
+} from '../services/storage/app-storage';
 import type { LastScanMeta } from '../services/storage/app-storage';
 import {
+  captureLastValidScanBaseline,
   ensureCleanupReminderPermissions,
   reconcileCleanupReminderNotification,
   syncCleanupReminderNotification,
@@ -63,6 +74,11 @@ import {
   type AppThemePalette,
   type AppThemePreference,
 } from '../theme/app-theme';
+import {
+  ensureMediaLibraryDeletePermissionsAsync,
+  getMediaLibraryPermissionsAsync,
+  requestMediaLibraryPermissionsAsync,
+} from '../services/media-library-permissions';
 import { CandidateCard } from '../ui/CandidateCard';
 import { PreviewModal } from '../ui/PreviewModal';
 import {
@@ -268,7 +284,10 @@ export function MediaCleanerApp() {
       try {
         const ids = recycleBinIds ?? (await loadRecycleBinIds());
         recycleBinIdsRef.current = ids;
-        const result = await scanMediaLibrary(ids);
+        const createdAfter = buildDefaultScanWindowStartAt();
+        const result = await scanMediaLibrary(ids, {
+          createdAfter,
+        });
         const hydrateAction: CleanupAction = {
           type: 'hydrate',
           activeCandidates: result.state.activeCandidates,
@@ -293,7 +312,20 @@ export function MediaCleanerApp() {
         setLastScanMeta(meta);
         lastScanMetaRef.current = meta;
         recycleBinIdsRef.current = nextRecycleBinIds;
-        await Promise.all([saveRecycleBinIds(nextRecycleBinIds), saveLastScanMeta(meta)]);
+        const baseline = await captureLastValidScanBaseline({
+          scannedAt: meta.scannedAt,
+          scannedCount: meta.scannedCount,
+          candidateCount: meta.candidateCount,
+          ledgerUpdatedAt: meta.scannedAt,
+        }, {
+          scanRangeMonths: DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT,
+          createdAfter,
+        });
+        await Promise.all([
+          saveRecycleBinIds(nextRecycleBinIds),
+          saveLastScanMeta(meta),
+          saveLastValidScanBaseline(baseline),
+        ]);
 
         if (reminderSettingsRef.current.enabled && notificationPermissionGrantedRef.current) {
           await syncReminderState(
@@ -329,7 +361,7 @@ export function MediaCleanerApp() {
         loadThemePreference(),
         loadLastScanMeta(),
         loadRecycleBinIds(),
-        MediaLibrary.getPermissionsAsync(false, ['photo', 'video']),
+        getMediaLibraryPermissionsAsync(),
         loadReminderSettings(),
         Notifications.getPermissionsAsync(),
       ]);
@@ -375,7 +407,7 @@ export function MediaCleanerApp() {
   }, [bootstrap]);
 
   const requestPermission = useCallback(async () => {
-    const permission = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
+    const permission = await requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       setPermissionState('denied');
       return;
@@ -393,6 +425,11 @@ export function MediaCleanerApp() {
       }
 
       try {
+        const deletePermission = await ensureMediaLibraryDeletePermissionsAsync();
+        if (!deletePermission.granted) {
+          throw new Error(copy.alerts.deleteFailedBody);
+        }
+
         await MediaLibrary.deleteAssetsAsync(ids);
         await commitCleanupAction({ type: 'hard-delete', ids });
         setPreviewCandidate(null);

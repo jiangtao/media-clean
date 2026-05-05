@@ -8,6 +8,7 @@ const runtime = vi.hoisted(() => ({
     replace: vi.fn(),
     navigate: vi.fn(),
   },
+  loadHasEnteredWorkspace: vi.fn(),
   landingRenderCount: 0,
   mainRenderCount: 0,
 }));
@@ -59,9 +60,15 @@ vi.mock('../../ui/components/TabBar', () => ({
   TabBar: () => React.createElement('View', { testID: 'mock-tab-bar' }),
 }));
 
+vi.mock('../MainTabNavigator', () => ({
+  MainTabNavigator: () => {
+    runtime.mainRenderCount += 1;
+    return React.createElement('View', { testID: 'mock-main-tab-navigator' });
+  },
+}));
+
 vi.mock('../../ui/screens/PhotoGridScreen', () => ({
   PhotoGridScreen: () => {
-    runtime.mainRenderCount += 1;
     return React.createElement('View', { testID: 'mock-photo-grid-screen' });
   },
 }));
@@ -79,7 +86,7 @@ vi.mock('../../application/AppPreferencesContext', () => ({
     copy: {
       tabs: {
         photos: '照片',
-        recycle: '回收站',
+        recycle: '保留和清理',
         settings: '设置',
       },
     },
@@ -97,6 +104,10 @@ vi.mock('../../application/AppPreferencesContext', () => ({
   }),
 }));
 
+vi.mock('../../services/storage/workspace-entry-storage', () => ({
+  loadHasEnteredWorkspace: () => runtime.loadHasEnteredWorkspace(),
+}));
+
 import { RootNavigator } from '../RootNavigator';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -104,29 +115,64 @@ import { RootNavigator } from '../RootNavigator';
 function renderNavigator() {
   let renderer!: ReturnType<typeof TestRenderer.create>;
 
-  act(() => {
+  return act(async () => {
     renderer = TestRenderer.create(<RootNavigator />);
+    await Promise.resolve();
+    return renderer;
   });
-
-  return renderer;
 }
 
 describe('RootNavigator', () => {
+  const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
   beforeEach(() => {
     runtime.initialRouteName = undefined;
     runtime.navigation.replace.mockReset();
     runtime.navigation.navigate.mockReset();
+    runtime.loadHasEnteredWorkspace.mockReset();
     runtime.landingRenderCount = 0;
     runtime.mainRenderCount = 0;
+    consoleWarnSpy.mockClear();
   });
 
-  it('starts from the landing route instead of the main workspace', () => {
-    const renderer = renderNavigator();
+  it('starts from the landing route when the workspace entry flag is absent', async () => {
+    runtime.loadHasEnteredWorkspace.mockResolvedValueOnce(false);
+
+    const renderer = await renderNavigator();
 
     expect(runtime.initialRouteName).toBe('Landing');
     expect(renderer.root.findByProps({ testID: 'mock-landing-screen' })).toBeTruthy();
-    expect(renderer.root.findAllByProps({ testID: 'mock-photo-grid-screen' })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ testID: 'mock-main-tab-navigator' })).toHaveLength(0);
     expect(runtime.landingRenderCount).toBe(1);
     expect(runtime.mainRenderCount).toBe(0);
+  });
+
+  it('starts from the main workspace after the landing entry has been persisted', async () => {
+    runtime.loadHasEnteredWorkspace.mockResolvedValueOnce(true);
+
+    const renderer = await renderNavigator();
+
+    expect(runtime.initialRouteName).toBe('Main');
+    expect(renderer.root.findByProps({ testID: 'mock-main-tab-navigator' })).toBeTruthy();
+    expect(renderer.root.findAllByProps({ testID: 'mock-landing-screen' })).toHaveLength(0);
+    expect(runtime.landingRenderCount).toBe(0);
+    expect(runtime.mainRenderCount).toBe(1);
+  });
+
+  it('falls back to the main workspace when the workspace entry flag cannot be loaded', async () => {
+    const loadError = new Error('storage-busy');
+    runtime.loadHasEnteredWorkspace.mockRejectedValueOnce(loadError);
+
+    const renderer = await renderNavigator();
+
+    expect(runtime.initialRouteName).toBe('Main');
+    expect(renderer.root.findByProps({ testID: 'mock-main-tab-navigator' })).toBeTruthy();
+    expect(renderer.root.findAllByProps({ testID: 'mock-landing-screen' })).toHaveLength(0);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      'Failed to load workspace entry state, fallback to Main.',
+      loadError,
+    );
+    expect(runtime.landingRenderCount).toBe(0);
+    expect(runtime.mainRenderCount).toBe(1);
   });
 });

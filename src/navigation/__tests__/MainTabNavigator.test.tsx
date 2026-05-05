@@ -7,6 +7,8 @@ const runtime = vi.hoisted(() => ({
   recycleBinCount: 0,
   tabBarSpy: vi.fn(),
   navigate: vi.fn(),
+  screenSpy: vi.fn(),
+  navigatorSpy: vi.fn(),
 }));
 
 vi.mock('@react-navigation/bottom-tabs', () => ({
@@ -14,14 +16,17 @@ vi.mock('@react-navigation/bottom-tabs', () => ({
     Navigator: ({
       children,
       tabBar,
+      ...rest
     }: {
       children?: React.ReactNode;
+      initialRouteName?: string;
       tabBar: (props: {
         state: { index: number; routes: Array<{ key: string; name: string }> };
         navigation: { navigate: typeof runtime.navigate };
       }) => React.ReactNode;
-    }) =>
-      React.createElement(
+    }) => {
+      runtime.navigatorSpy(rest);
+      return React.createElement(
         React.Fragment,
         null,
         tabBar({
@@ -38,9 +43,12 @@ vi.mock('@react-navigation/bottom-tabs', () => ({
           },
         }),
         children,
-      ),
-    Screen: ({ name }: { name: string }) =>
-      React.createElement('View', { testID: `mock-screen-${name}` }),
+      );
+    },
+    Screen: (props: { name: string; component?: React.ComponentType; children?: React.ReactNode }) => {
+      runtime.screenSpy(props);
+      return React.createElement('View', { testID: `mock-screen-${props.name}` });
+    },
   }),
 }));
 
@@ -68,7 +76,7 @@ vi.mock('../../application/AppPreferencesContext', () => ({
     copy: {
       tabs: {
         photos: '照片',
-        recycle: '回收站',
+        recycle: '保留和清理',
         settings: '设置',
       },
     },
@@ -129,6 +137,8 @@ describe('MainTabNavigator recycle bin badge', () => {
     runtime.recycleBinCount = 0;
     runtime.tabBarSpy.mockReset();
     runtime.navigate.mockReset();
+    runtime.screenSpy.mockReset();
+    runtime.navigatorSpy.mockReset();
   });
 
   it('在回收站存在条目时，应把 badge 透传给 TabBar', () => {
@@ -159,5 +169,57 @@ describe('MainTabNavigator recycle bin badge', () => {
     });
 
     expect(getRecycleBinTab().badge).toBe(2);
+  });
+
+  it('当回收站数量变化后，Photos / RecycleBin screen 注册应保持稳定 component，不应退回 children render function', () => {
+    const renderer = renderNavigator();
+
+    const initialCalls = runtime.screenSpy.mock.calls.map(([props]) => props);
+    const initialPhotos = initialCalls.find((props) => props.name === 'Photos');
+    const initialRecycle = initialCalls.find((props) => props.name === 'RecycleBin');
+
+    expect(initialPhotos?.component).toBeTypeOf('function');
+    expect(initialRecycle?.component).toBeTypeOf('function');
+    expect(initialPhotos?.children).toBeUndefined();
+    expect(initialRecycle?.children).toBeUndefined();
+
+    runtime.recycleBinIds = ['deleted-1'];
+    runtime.recycleBinCount = 1;
+
+    act(() => {
+      renderer.update(<MainTabNavigator />);
+    });
+
+    const latestCalls = runtime.screenSpy.mock.calls.slice(-3).map(([props]) => props);
+    const nextPhotos = latestCalls.find((props) => props.name === 'Photos');
+    const nextRecycle = latestCalls.find((props) => props.name === 'RecycleBin');
+
+    expect(nextPhotos?.component).toBe(initialPhotos?.component);
+    expect(nextRecycle?.component).toBe(initialRecycle?.component);
+    expect(nextPhotos?.children).toBeUndefined();
+    expect(nextRecycle?.children).toBeUndefined();
+  });
+
+  it('用户切到 RecycleBin 后，即便 badge 重新计算，也应记住最后一次主动选择的 tab', () => {
+    const renderer = renderNavigator();
+    const initialNavigatorProps = runtime.navigatorSpy.mock.lastCall?.[0] as { initialRouteName?: string };
+
+    expect(initialNavigatorProps.initialRouteName).toBe('Photos');
+
+    const tabBarProps = runtime.tabBarSpy.mock.lastCall?.[0] as { onTabPress: (name: string) => void };
+
+    act(() => {
+      tabBarProps.onTabPress('RecycleBin');
+    });
+
+    runtime.recycleBinIds = ['deleted-1'];
+    runtime.recycleBinCount = 1;
+
+    act(() => {
+      renderer.update(<MainTabNavigator />);
+    });
+
+    const latestNavigatorProps = runtime.navigatorSpy.mock.lastCall?.[0] as { initialRouteName?: string };
+    expect(latestNavigatorProps.initialRouteName).toBe('RecycleBin');
   });
 });

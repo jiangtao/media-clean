@@ -1,0 +1,92 @@
+name: Page Vercel Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - ".github/workflows/page-vercel.yml"
+      - ".github/workflows/android-release.yml"
+      - "page/**"
+      - "scripts/release/verify-android-release-page-contract.mjs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: page-vercel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-page:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+      VERCEL_ORG_ID: team_KMAhi2p340W6VAP8OPUVhJh7
+      VERCEL_PROJECT_ID: prj_MP950Qnus5voEiUep7mT2GHeP8wq
+      PAGE_PRODUCTION_URL: https://mc-khaki.vercel.app
+      ANDROID_LATEST_APK_URL: https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.11.0
+
+      - name: Verify release-page contract
+        run: node scripts/release/verify-android-release-page-contract.mjs
+
+      - name: Build page
+        run: npm run page:build
+
+      - name: Deploy page to Vercel production
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "缺少 GitHub secret: VERCEL_TOKEN" >&2
+            exit 1
+          fi
+
+          cd page
+          npx vercel pull --yes --environment=production --token "${VERCEL_TOKEN}"
+          npx vercel build --prod --token "${VERCEL_TOKEN}"
+
+          DEPLOY_OUTPUT="$(npx vercel deploy --prebuilt --prod --yes --token "${VERCEL_TOKEN}")"
+          printf '%s\n' "${DEPLOY_OUTPUT}"
+
+          DEPLOYMENT_URL="$(printf '%s\n' "${DEPLOY_OUTPUT}" | grep -Eo 'https://[^[:space:]]+' | tail -n 1)"
+          if [ -z "${DEPLOYMENT_URL}" ]; then
+            echo "无法从部署输出中解析 deployment url" >&2
+            exit 1
+          fi
+
+          echo "deployment_url=${DEPLOYMENT_URL}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify production page content
+        run: |
+          curl -I -L "${PAGE_PRODUCTION_URL}"
+          PAGE_HTML="$(curl -sS "${PAGE_PRODUCTION_URL}")"
+          printf '%s' "${PAGE_HTML}" | grep -q '下载 Android'
+          printf '%s' "${PAGE_HTML}" | grep -q 'Android APK'
+          printf '%s' "${PAGE_HTML}" | grep -q "${ANDROID_LATEST_APK_URL}"
+
+      - name: Publish page deployment summary
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+        run: |
+          {
+            echo "## Page Vercel 已部署"
+            echo
+            echo "- Vercel deployment URL: ${DEPLOYMENT_URL}"
+            echo "- Production alias: ${PAGE_PRODUCTION_URL}"
+            echo "- Android download URL: ${ANDROID_LATEST_APK_URL}"
+          } >> "${GITHUB_STEP_SUMMARY}"

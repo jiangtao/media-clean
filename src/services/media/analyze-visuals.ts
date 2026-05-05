@@ -1,4 +1,5 @@
 import { Buffer } from 'buffer';
+import * as FileSystem from 'expo-file-system/legacy';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { getThumbnailAsync } from 'expo-video-thumbnails';
 import { toByteArray } from 'base64-js';
@@ -30,33 +31,52 @@ export interface VisualAnalysisResult {
   status: 'ok' | 'fallback';
 }
 
-async function loadJpegPixels(sourceUri: string) {
-  const reduced = await manipulateAsync(
-    sourceUri,
-    [{ resize: { width: 48 } }],
-    {
-      base64: true,
-      compress: 0.65,
-      format: SaveFormat.JPEG,
-    },
-  );
-
-  if (!reduced.base64) {
-    throw new Error('No base64 returned from image manipulator.');
+async function deleteGeneratedFile(uri: string, protectedUri?: string) {
+  if (!uri || uri === protectedUri || !uri.startsWith('file://')) {
+    return;
   }
 
-  const decoded = jpeg.decode(toByteArray(reduced.base64), { useTArray: true });
+  try {
+    await FileSystem.deleteAsync(uri, { idempotent: true });
+  } catch {
+    // Best-effort cleanup: analysis correctness must not depend on cache eviction.
+  }
+}
 
-  return {
-    rgba: decoded.data,
-    width: decoded.width,
-    height: decoded.height,
-    previewUri: reduced.uri,
-  };
+async function loadJpegPixels(sourceUri: string) {
+  let reducedUri: string | null = null;
+
+  try {
+    const reduced = await manipulateAsync(
+      sourceUri,
+      [{ resize: { width: 48 } }],
+      {
+        base64: true,
+        compress: 0.65,
+        format: SaveFormat.JPEG,
+      },
+    );
+    reducedUri = reduced.uri;
+
+    if (!reduced.base64) {
+      throw new Error('No base64 returned from image manipulator.');
+    }
+
+    const decoded = jpeg.decode(toByteArray(reduced.base64), { useTArray: true });
+
+    return {
+      rgba: decoded.data,
+      width: decoded.width,
+      height: decoded.height,
+    };
+  } finally {
+    if (reducedUri) {
+      await deleteGeneratedFile(reducedUri, sourceUri);
+    }
+  }
 }
 
 interface ReducedFrameAnalysis {
-  previewUri: string;
   metrics: VisualMetrics;
   fingerprint: string | null;
   differenceHash: string | null;
@@ -66,7 +86,6 @@ async function analyzeReducedFrame(sourceUri: string): Promise<ReducedFrameAnaly
   const reduced = await loadJpegPixels(sourceUri);
 
   return {
-    previewUri: reduced.previewUri,
     metrics: calculateVisualMetricsFromRgba(reduced.rgba, reduced.width, reduced.height),
     fingerprint: calculateAverageHashFromRgba(reduced.rgba, reduced.width, reduced.height),
     differenceHash: calculateDifferenceHashFromRgba(reduced.rgba, reduced.width, reduced.height),
@@ -108,11 +127,18 @@ export function buildVideoSampleTimes(durationSeconds: number) {
 async function analyzeVideoFrames(assetUri: string, durationSeconds: number) {
   const results = await Promise.all(
     buildVideoSampleTimes(durationSeconds).map(async (time) => {
+      let thumbnailUri: string | null = null;
+
       try {
         const thumbnail = await getThumbnailAsync(assetUri, { quality: 0.4, time });
+        thumbnailUri = thumbnail.uri;
         return await analyzeReducedFrame(thumbnail.uri);
       } catch {
         return null;
+      } finally {
+        if (thumbnailUri) {
+          await deleteGeneratedFile(thumbnailUri, assetUri);
+        }
       }
     }),
   );
@@ -133,7 +159,7 @@ export async function analyzeVisualsForAsset(
       }
 
       return {
-        previewUri: frames[0].previewUri,
+        previewUri: assetUri,
         metrics: frames[0].metrics,
         fingerprint: frames[0].fingerprint,
         differenceHash: frames[0].differenceHash,
@@ -147,7 +173,7 @@ export async function analyzeVisualsForAsset(
     const reduced = await analyzeReducedFrame(assetUri);
 
     return {
-      previewUri: reduced.previewUri,
+      previewUri: assetUri,
       metrics: reduced.metrics,
       fingerprint: reduced.fingerprint,
       differenceHash: reduced.differenceHash,

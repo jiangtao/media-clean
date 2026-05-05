@@ -16,6 +16,8 @@ interface PhotoGridProps {
   onItemPress: (candidate: CleanupCandidate) => void;
   theme: AppThemePalette;
   mediaType?: 'all' | 'photo' | 'video';
+  gridTestID?: string;
+  itemTestID?: string;
   contentPadding?: {
     top?: number;
     bottom?: number;
@@ -62,6 +64,8 @@ export function PhotoGrid({
   onItemPress,
   theme,
   mediaType = 'all',
+  gridTestID,
+  itemTestID = 'photo-grid-item',
   contentPadding,
 }: PhotoGridProps) {
   const styles = useMemo(() => createStyles(theme, contentPadding), [contentPadding, theme]);
@@ -87,10 +91,11 @@ export function PhotoGrid({
         selectionMode={isSelectionMode}
         onPress={() => onItemPress(item)}
         onSelect={() => onSelect(item.id)}
+        itemTestID={itemTestID}
         theme={theme}
       />
     );
-  }, [duplicateCountByGroup, isSelectionMode, onItemPress, onSelect, selectedIdSet, theme]);
+  }, [duplicateCountByGroup, isSelectionMode, itemTestID, onItemPress, onSelect, selectedIdSet, theme]);
 
   const keyExtractor = useCallback((item: CleanupCandidate) => item.id, []);
   const getItemLayout = useCallback(
@@ -122,6 +127,7 @@ export function PhotoGrid({
       updateCellsBatchingPeriod={16}
       windowSize={7}
       removeClippedSubviews
+      testID={gridTestID}
     />
   );
 }
@@ -133,6 +139,7 @@ interface PhotoGridItemProps {
   selectionMode: boolean;
   onPress: () => void;
   onSelect: () => void;
+  itemTestID: string;
   theme: AppThemePalette;
 }
 
@@ -143,6 +150,7 @@ function PhotoGridItem({
   selectionMode,
   onPress,
   onSelect,
+  itemTestID,
   theme,
 }: PhotoGridItemProps) {
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -173,7 +181,7 @@ function PhotoGridItem({
       style={styles.item}
       pressedStyle={styles.itemPressed}
       preset="tile"
-      testID="photo-grid-item"
+      testID={itemTestID}
     >
       <Image
         source={buildSizedImageSource(resolveThumbnailUri(candidate), ITEM_SIZE, ITEM_SIZE)}

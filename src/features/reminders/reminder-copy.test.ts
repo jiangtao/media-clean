@@ -33,7 +33,7 @@ describe('reminder copy', () => {
     ).toEqual({
       title: '今晚检查最近拍摄的识别结果',
       summary: '最近一次扫描发现 18 个待处理识别结果，建议在 20:15 再检查一次。',
-      detail: '本次扫描共检查 312 项媒体，其中 6 项高置信度、12 项中置信度，回收站里还有 4 项待处理。',
+      detail: '本次扫描共检查 312 项媒体，其中 6 项高置信度、12 项中置信度，保留和清理页里还有 4 项待处理。',
     });
   });
 
@@ -55,7 +55,7 @@ describe('reminder copy', () => {
       title: 'Cleanup Reminder',
       summary: 'The last scan found 3 recognition results to review. Check again at 20:30.',
       detail:
-        'This scan checked 120 media items: 2 high-confidence, 1 medium-confidence, and 0 still waiting in the recycle bin.',
+        'This scan checked 120 media items: 2 high-confidence, 1 medium-confidence, and 0 still waiting in keep & clean.',
     });
   });
 });

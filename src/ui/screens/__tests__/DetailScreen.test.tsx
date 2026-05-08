@@ -188,6 +188,17 @@ function findTextNode(
     );
 }
 
+function collectActionSwitchLabels(
+  renderer: ReturnType<typeof TestRenderer.create>,
+  testID = 'detail-action-switch',
+) {
+  return renderer.root
+    .findByProps({ testID })
+    .findAllByType('Text')
+    .map((node: { props: { children?: React.ReactNode } }) => flattenText(node.props.children))
+    .filter((label: string) => ['保留', '清理', '删除'].includes(label));
+}
+
 function renderDetailScreen(
   candidate: CleanupCandidate | null = duplicateCandidate,
   mode: 'suggestions' | 'recycle' = 'suggestions',
@@ -249,7 +260,7 @@ describe('DetailScreen', () => {
       renderer.root.findByProps({ testID: 'duplicate-nav-next' }).props.style,
     );
     const duplicateTagText = findTextNode(renderer, '重复');
-    const primaryActionText = findTextNode(renderer, '清除');
+    const primaryActionText = findTextNode(renderer, '清理');
     const primaryActionStyle = flattenStyle(
       renderer.root.findByProps({ testID: 'detail-primary-action' }).props.style,
     );
@@ -269,7 +280,7 @@ describe('DetailScreen', () => {
     expect(renderer.root.findByProps({ testID: 'detail-keep-action' })).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'detail-action-switch' })).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'detail-pagination' })).toBeTruthy();
-    expect(texts).toContain('清除');
+    expect(texts).toContain('清理');
     expect(texts).toContain('保留');
     expect(closeButtonStyle.width).toBe(34);
     expect(closeButtonStyle.height).toBe(34);
@@ -305,6 +316,24 @@ describe('DetailScreen', () => {
     });
 
     expect(onKeep).toHaveBeenCalledWith(['duplicate-item-2']);
+  });
+
+  it('keeps the suggestions detail actions ordered as keep on the left and cleanup on the right', () => {
+    const { renderer, onKeep, onPrimaryAction } = renderDetailScreen();
+    const keepAction = renderer.root.findByProps({ testID: 'detail-keep-action' });
+    const cleanupAction = renderer.root.findByProps({ testID: 'detail-primary-action' });
+
+    expect(collectActionSwitchLabels(renderer)).toEqual(['保留', '清理']);
+
+    act(() => {
+      keepAction.props.onPress();
+    });
+    act(() => {
+      cleanupAction.props.onPress();
+    });
+
+    expect(onKeep).toHaveBeenCalledWith(['duplicate-item']);
+    expect(onPrimaryAction).toHaveBeenCalledWith(['duplicate-item']);
   });
 
   it('keeps next and prev navigation in sync when opening on the second related item', () => {
@@ -398,13 +427,13 @@ describe('DetailScreen', () => {
     expect(stageImage.props.priority).toBe('high');
   });
 
-  it('shows restore and delete actions in recycle mode', () => {
+  it('shows keep and delete actions in recycle mode', () => {
     const { renderer } = renderDetailScreen(abnormalCandidate, 'recycle');
 
     expect(renderer.root.findByProps({ testID: 'detail-primary-action' })).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'detail-hard-delete' })).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'detail-action-switch' })).toBeTruthy();
-    expect(collectTexts(renderer)).toContain('恢复');
+    expect(collectTexts(renderer)).toContain('保留');
     expect(collectTexts(renderer)).toContain('删除');
   });
 

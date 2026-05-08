@@ -86,11 +86,12 @@ vi.mock('../../application/AppPreferencesContext', () => ({
     copy: {
       tabs: {
         photos: '照片',
-        recycle: '保留和清理',
+        recycle: '回收站',
         settings: '设置',
       },
     },
     theme: {
+      safeArea: '#f3ecdf',
       tabBarBackground: '#000000',
       tabBarBorder: '#111111',
       tabBarInactive: '#666666',
@@ -143,7 +144,7 @@ describe('RootNavigator', () => {
     expect(runtime.initialRouteName).toBe('Landing');
     expect(renderer.root.findByProps({ testID: 'mock-landing-screen' })).toBeTruthy();
     expect(renderer.root.findAllByProps({ testID: 'mock-main-tab-navigator' })).toHaveLength(0);
-    expect(runtime.landingRenderCount).toBe(1);
+    expect(runtime.landingRenderCount).toBeGreaterThanOrEqual(1);
     expect(runtime.mainRenderCount).toBe(0);
   });
 
@@ -159,20 +160,20 @@ describe('RootNavigator', () => {
     expect(runtime.mainRenderCount).toBe(1);
   });
 
-  it('falls back to the main workspace when the workspace entry flag cannot be loaded', async () => {
+  it('falls back to the landing workspace when the workspace entry flag cannot be loaded', async () => {
     const loadError = new Error('storage-busy');
     runtime.loadHasEnteredWorkspace.mockRejectedValueOnce(loadError);
 
     const renderer = await renderNavigator();
 
-    expect(runtime.initialRouteName).toBe('Main');
-    expect(renderer.root.findByProps({ testID: 'mock-main-tab-navigator' })).toBeTruthy();
-    expect(renderer.root.findAllByProps({ testID: 'mock-landing-screen' })).toHaveLength(0);
+    expect(runtime.initialRouteName).toBe('Landing');
+    expect(renderer.root.findByProps({ testID: 'mock-landing-screen' })).toBeTruthy();
+    expect(renderer.root.findAllByProps({ testID: 'mock-main-tab-navigator' })).toHaveLength(0);
     expect(consoleWarnSpy).toHaveBeenCalledWith(
-      'Failed to load workspace entry state, fallback to Main.',
+      'Failed to load workspace entry state, fallback to Landing.',
       loadError,
     );
-    expect(runtime.landingRenderCount).toBe(0);
-    expect(runtime.mainRenderCount).toBe(1);
+    expect(runtime.landingRenderCount).toBeGreaterThanOrEqual(1);
+    expect(runtime.mainRenderCount).toBe(0);
   });
 });

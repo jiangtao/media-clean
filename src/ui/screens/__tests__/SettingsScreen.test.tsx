@@ -53,6 +53,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
+  useWindowDimensions: () => ({ width: 375, height: 812, scale: 3, fontScale: 1 }),
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
     hairlineWidth: 1,
@@ -73,10 +74,33 @@ const mockClearGeneratedAnalysisFileCache = vi.mocked(
   analysisTempFileCacheApi.clearGeneratedAnalysisFileCache,
 );
 const mockLoadScanRange = vi.mocked(scanRangeStorage.loadScanRange);
+const mockSaveScanRange = vi.mocked(scanRangeStorage.saveScanRange);
 const mockReconcileReminderRuntimeInForeground = vi.mocked(
   reminderRuntime.reconcileReminderRuntimeInForeground,
 );
+const mockReconcileReminderRuntimeSettings = vi.mocked(
+  reminderRuntime.reconcileReminderRuntimeSettings,
+);
+const mockSyncReminderRuntimeSettings = vi.mocked(reminderRuntime.syncReminderRuntimeSettings);
+const mockSetLanguage = vi.fn();
+const mockSetThemePreference = vi.fn();
 const ReactTestRenderer = TestRenderer;
+
+const baselineReminderSettings = {
+  enabled: true,
+  frequency: 'weekly' as const,
+  weekday: 1,
+  hour: 20,
+  minute: 30,
+  notificationId: 'existing-reminder-id',
+  nextTriggerAt: 1_710_000_000_000,
+  summary: '定期检查最近拍摄的照片和视频，优先清理重复、模糊与相似内容。',
+};
+
+const baselineReminderRuntime = {
+  settings: baselineReminderSettings,
+  permissionGranted: true,
+};
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -119,9 +143,18 @@ function collectRenderedTexts(renderer: ReturnType<typeof ReactTestRenderer.crea
     .filter(Boolean);
 }
 
+function expectRenderedTextContaining(
+  renderer: ReturnType<typeof ReactTestRenderer.create>,
+  expected: string,
+) {
+  expect(collectRenderedTexts(renderer).some((text: string) => text.includes(expected))).toBe(true);
+}
+
 describe('SettingsScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSetLanguage.mockResolvedValue(undefined);
+    mockSetThemePreference.mockResolvedValue(undefined);
 
     mockUseAppPreferences.mockReturnValue({
       isReady: true,
@@ -131,10 +164,11 @@ describe('SettingsScreen', () => {
       resolvedThemeScheme: 'light',
       theme: getAppTheme('light'),
       copy: getAppCopy('zh-CN'),
-      setLanguage: vi.fn().mockResolvedValue(undefined),
-      setThemePreference: vi.fn().mockResolvedValue(undefined),
+      setLanguage: mockSetLanguage,
+      setThemePreference: mockSetThemePreference,
     });
     mockLoadScanRange.mockResolvedValue(3);
+    mockSaveScanRange.mockResolvedValue(undefined);
     mockClearPersistentScanCache.mockResolvedValue(undefined);
     mockClearGeneratedAnalysisFileCache.mockResolvedValue(undefined);
     mockLoadPersistentScanCacheSizeBytes.mockResolvedValue(5 * 1024 * 1024);
@@ -147,19 +181,9 @@ describe('SettingsScreen', () => {
       mediumConfidenceCount: 4,
       recycleBinCount: 1,
     });
-    mockReconcileReminderRuntimeInForeground.mockResolvedValue({
-      settings: {
-        enabled: true,
-        frequency: 'weekly',
-        weekday: 1,
-        hour: 20,
-        minute: 30,
-        notificationId: 'existing-reminder-id',
-        nextTriggerAt: 1_710_000_000_000,
-        summary: '定期检查最近拍摄的照片和视频，优先清理误触、异常与重复内容。',
-      },
-      permissionGranted: true,
-    });
+    mockReconcileReminderRuntimeInForeground.mockResolvedValue(baselineReminderRuntime);
+    mockReconcileReminderRuntimeSettings.mockResolvedValue(baselineReminderRuntime);
+    mockSyncReminderRuntimeSettings.mockResolvedValue(baselineReminderRuntime);
   });
 
   it('loads persisted scan state and reminder runtime on focus', async () => {
@@ -170,7 +194,7 @@ describe('SettingsScreen', () => {
     expect(mockLoadLastScanMeta).toHaveBeenCalled();
     expect(mockReconcileReminderRuntimeInForeground).toHaveBeenCalledWith('zh-CN', {
       name: '定期清理提醒',
-      description: '提醒你重新扫描最近媒体并清理误触、异常与重复内容。',
+      description: '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
     });
     expect(renderedTexts).toContain('最近 3 个月');
     expect(renderedTexts).toContain('每周一 20:30 提醒你检查识别结果');
@@ -182,7 +206,7 @@ describe('SettingsScreen', () => {
 
     const renderer = await renderScreen();
 
-    expect(collectRenderedTexts(renderer)).toContain('尚未扫描');
+    expectRenderedTextContaining(renderer, '尚未扫描');
   });
 
   it('clears persisted scan cache from settings and resets the last-scan status', async () => {
@@ -214,15 +238,16 @@ describe('SettingsScreen', () => {
 
     expect(mockClearPersistentScanCache).toHaveBeenCalledTimes(1);
     expect(mockClearGeneratedAnalysisFileCache).toHaveBeenCalledTimes(1);
-    expect(collectRenderedTexts(renderer)).toContain('尚未扫描');
-    expect(collectRenderedTexts(renderer)).toContain('清除缓存');
+    expectRenderedTextContaining(renderer, '尚未扫描');
+    expect(collectRenderedTexts(renderer)).toContain('缓存数据');
     expect(collectRenderedTexts(renderer)).toContain('清除');
   });
 
   it('shows the estimated persistent cache size inline for the clear-cache action', async () => {
     const renderer = await renderScreen();
 
-    expect(collectRenderedTexts(renderer)).toContain('清除缓存 5.0 MB');
+    expect(collectRenderedTexts(renderer)).toContain('缓存数据');
+    expect(collectRenderedTexts(renderer)).toContain('5.0 MB');
     expect(collectRenderedTexts(renderer)).toContain('清除');
   });
 
@@ -232,13 +257,96 @@ describe('SettingsScreen', () => {
 
     const renderer = await renderScreen();
 
-    expect(collectRenderedTexts(renderer)).toContain('清除缓存 7.0 MB');
+    expect(collectRenderedTexts(renderer)).toContain('7.0 MB');
   });
 
-  it('shows a follow-system language option using the current resolved language', async () => {
+  it('shows design-aligned language and theme chips while keeping system choices visible', async () => {
     const renderer = await renderScreen();
 
-    expect(collectRenderedTexts(renderer)).toContain('跟随系统（当前：简体中文）');
+    expect(collectRenderedTexts(renderer)).toContain('语言与主题');
+    expect(collectRenderedTexts(renderer)).toContain('系统');
+    expect(collectRenderedTexts(renderer)).toContain('简体中文');
+    expect(collectRenderedTexts(renderer)).toContain('English');
+    expect(collectRenderedTexts(renderer)).toContain('浅色');
+    expect(collectRenderedTexts(renderer)).toContain('深色');
+  });
+
+  it('persists scan range changes and reconciles reminder runtime when reminders are active', async () => {
+    const renderer = await renderScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'scan-range-option-6' }).props.onPress();
+      await flushPromises();
+    });
+
+    expect(mockSaveScanRange).toHaveBeenCalledWith(6);
+    expect(mockReconcileReminderRuntimeSettings).toHaveBeenCalledWith(
+      baselineReminderSettings,
+      'zh-CN',
+      {
+        name: '定期清理提醒',
+        description: '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
+      },
+    );
+  });
+
+  it('keeps reminder enablement, cadence, and time controls wired to runtime sync', async () => {
+    const renderer = await renderScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'reminder-settings-toggle' }).props.onPress();
+      await flushPromises();
+    });
+
+    expect(mockSyncReminderRuntimeSettings).toHaveBeenCalledWith(
+      baselineReminderSettings,
+      { enabled: false },
+      'zh-CN',
+      {
+        name: '定期清理提醒',
+        description: '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
+      },
+      { requestPermissionOnEnable: false },
+    );
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'reminder-frequency-daily' }).props.onPress();
+      await flushPromises();
+    });
+
+    expect(mockSyncReminderRuntimeSettings).toHaveBeenCalledWith(
+      baselineReminderSettings,
+      { frequency: 'daily' },
+      'zh-CN',
+      expect.any(Object),
+    );
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'reminder-time-0830' }).props.onPress();
+      await flushPromises();
+    });
+
+    expect(mockSyncReminderRuntimeSettings).toHaveBeenCalledWith(
+      baselineReminderSettings,
+      { hour: 8, minute: 30 },
+      'zh-CN',
+      expect.any(Object),
+    );
+  });
+
+  it('persists language and theme chip changes through preferences context', async () => {
+    const renderer = await renderScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'language-option-system' }).props.onPress();
+      renderer.root.findByProps({ testID: 'language-option-en-US' }).props.onPress();
+      renderer.root.findByProps({ testID: 'theme-option-dark' }).props.onPress();
+      await flushPromises();
+    });
+
+    expect(mockSetLanguage).toHaveBeenCalledWith('system');
+    expect(mockSetLanguage).toHaveBeenCalledWith('en-US');
+    expect(mockSetThemePreference).toHaveBeenCalledWith('dark');
   });
 });
 
@@ -256,10 +364,51 @@ describe('SettingsScreen support logic', () => {
         right: 26,
       }),
     ).toEqual({
-      headerTop: 42,
-      contentBottom: 124,
-      left: 46,
-      right: 42,
+      headerTop: 44,
+      contentBottom: 116,
+      left: 58,
+      right: 54,
+      contentWidth: 0,
+      cardPadding: 12,
+      cardGap: 14,
+      chipMinWidth: 32,
+      chipMinHeight: 24,
+      isSELike: true,
+    });
+  });
+
+  it('uses a compact SE typography and chip layout contract for 375pt windows', () => {
+    expect(
+      buildSettingsScreenLayout(
+        { top: 0, bottom: 0, left: 0, right: 0 },
+        { width: 375, height: 812, scale: 3, fontScale: 1 },
+      ),
+    ).toMatchObject({
+      headerTop: 18,
+      contentBottom: 92,
+      left: 28,
+      right: 28,
+      contentWidth: 319,
+      cardPadding: 12,
+      cardGap: 14,
+      chipMinWidth: 32,
+      chipMinHeight: 24,
+      isSELike: true,
+    });
+  });
+
+  it('keeps settings cards centered instead of stretching on wide RN windows', () => {
+    expect(
+      buildSettingsScreenLayout(
+        { top: 0, bottom: 0, left: 0, right: 0 },
+        { width: 800, height: 1100, scale: 2, fontScale: 1 },
+      ),
+    ).toMatchObject({
+      left: 80,
+      right: 80,
+      contentWidth: 640,
+      isSELike: false,
+      cardPadding: 30,
     });
   });
 

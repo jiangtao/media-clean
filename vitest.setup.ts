@@ -87,11 +87,14 @@ vi.mock('react-native', () => ({
       start: () => animation.start?.(),
       stop: () => animation.stop?.(),
     }),
+    createAnimatedComponent: <T,>(component: T) => component,
   },
   Easing: {
     linear: (value: number) => value,
     ease: (value: number) => value,
     inOut: <T,>(value: T) => value,
+    out: <T,>(value: T) => value,
+    cubic: (value: number) => value,
   },
   Platform: {
     OS: 'ios',
@@ -124,6 +127,24 @@ vi.mock('@expo/vector-icons', () => ({
     testID?: string;
   }) => React.createElement('Text', { testID, style: { color, fontSize: size } }, name),
 }));
+
+vi.mock('react-native-svg', () => {
+  const createSvgComponent =
+    (type: string) =>
+    ({ children, ...props }: { children?: React.ReactNode }) =>
+      React.createElement(type, props, children);
+
+  return {
+    __esModule: true,
+    default: createSvgComponent('Svg'),
+    Svg: createSvgComponent('Svg'),
+    Path: createSvgComponent('Path'),
+    Rect: createSvgComponent('Rect'),
+    Circle: createSvgComponent('Circle'),
+    G: createSvgComponent('G'),
+    Text: createSvgComponent('SvgText'),
+  };
+});
 
 // Mock react-native-safe-area-context
 vi.mock('react-native-safe-area-context', () => ({

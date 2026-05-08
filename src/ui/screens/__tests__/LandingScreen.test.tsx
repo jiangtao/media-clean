@@ -2,9 +2,13 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { getAppCopy } from '../../../i18n/app-copy';
+
 const runtime = vi.hoisted(() => ({
   replace: vi.fn(),
   saveHasEnteredWorkspace: vi.fn(),
+  getMediaLibraryPermissionsAsync: vi.fn(),
+  requestMediaLibraryPermissionsAsync: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
@@ -12,8 +16,10 @@ vi.mock('react-native', () => ({
   Text: 'Text',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  useWindowDimensions: () => ({ width: 375, height: 812, scale: 3, fontScale: 1 }),
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
+    hairlineWidth: 1,
   },
 }));
 
@@ -32,6 +38,8 @@ vi.mock('../../../application/AppPreferencesContext', () => ({
     theme: {
       scheme: 'light',
       safeArea: '#f3ecdf',
+      orbTop: '#d8e7df',
+      orbBottom: '#f2d4c6',
       cardBackground: '#fffaf1',
       cardBorder: '#e7dcc7',
       pageTextPrimary: '#18212f',
@@ -51,12 +59,18 @@ vi.mock('../../../application/AppPreferencesContext', () => ({
       shadowColor: '#0f172a',
       statusBarStyle: 'dark',
     },
-    copy: {},
+    copy: getAppCopy('zh-CN'),
   }),
 }));
 
 vi.mock('../../../services/storage/workspace-entry-storage', () => ({
   saveHasEnteredWorkspace: (...args: unknown[]) => runtime.saveHasEnteredWorkspace(...args),
+}));
+
+vi.mock('../../../services/media-library-permissions', () => ({
+  getMediaLibraryPermissionsAsync: (...args: unknown[]) => runtime.getMediaLibraryPermissionsAsync(...args),
+  requestMediaLibraryPermissionsAsync: (...args: unknown[]) =>
+    runtime.requestMediaLibraryPermissionsAsync(...args),
 }));
 
 import { LandingScreen } from '../LandingScreen';
@@ -86,17 +100,45 @@ function collectTexts(renderer: ReturnType<typeof TestRenderer.create>) {
     .filter(Boolean);
 }
 
+function flattenStyle(style: unknown): Record<string, unknown> {
+  if (Array.isArray(style)) {
+    return style.reduce<Record<string, unknown>>(
+      (mergedStyle, stylePart) => ({
+        ...mergedStyle,
+        ...flattenStyle(stylePart),
+      }),
+      {},
+    );
+  }
+
+  if (style && typeof style === 'object') {
+    return style as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+async function flushPromises() {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 describe('LandingScreen', () => {
   beforeEach(() => {
     runtime.replace.mockReset();
     runtime.saveHasEnteredWorkspace.mockReset();
     runtime.saveHasEnteredWorkspace.mockResolvedValue(undefined);
+    runtime.getMediaLibraryPermissionsAsync.mockReset();
+    runtime.getMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true });
+    runtime.requestMediaLibraryPermissionsAsync.mockReset();
+    runtime.requestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true });
   });
 
-  it('renders the five-step product flow and trust points', () => {
+  it('renders the compact scan entry experience instead of a productized multi-step landing page', async () => {
     let renderer!: ReturnType<typeof TestRenderer.create>;
 
-    act(() => {
+    await act(async () => {
       renderer = TestRenderer.create(
         <LandingScreen
           navigation={{
@@ -104,37 +146,42 @@ describe('LandingScreen', () => {
           }}
         />,
       );
+      await flushPromises();
     });
 
     const texts = collectTexts(renderer);
-    const stepCards = renderer.root.findAllByProps({ testID: 'landing-step' });
-    const trustCards = renderer.root.findAllByProps({ testID: 'landing-trust-point' });
 
-    expect(texts).toContain('本地相册助手');
-    expect(texts).toContain('五步完成清理');
-    expect(texts).toContain('扫描、识别、筛选、清理、报告，一条清晰的本地处理流程。');
-    expect(texts).toContain('扫描');
-    expect(texts).toContain('识别');
-    expect(texts).toContain('筛选');
-    expect(texts).toContain('清理');
-    expect(texts).toContain('报告');
-    expect(texts).toContain('本地优先');
-    expect(texts).toContain('安全清理');
-    expect(texts).toContain('后台处理');
-    expect(texts).toContain('继续进入 Main');
+    expect(texts).toContain('授权已完成');
+    expect(texts).toContain('可开始扫描相册');
+    expect(texts).toContain('准备开始扫描');
+    expect(texts).toContain('扫描并分析重复、模糊与相似内容');
+    expect(texts).toContain('开始扫描');
+    expect(texts).toContain('即将扫描照片与视频');
+    expect(texts).toContain('仅在本地分析，不上传任何数据');
+    expect(texts).toContain('支持照片与视频');
+    expect(texts).not.toContain('主流程');
+    expect(texts).not.toContain('识别');
+    expect(texts).not.toContain('筛选');
+    expect(texts).not.toContain('报告');
+    expect(texts).not.toContain('五步完成清理');
+    expect(texts).not.toContain('五步流程');
     expect(renderer.root.findByProps({ testID: 'landing-screen' })).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'landing-scroll-view' })).toBeTruthy();
-    expect(renderer.root.findByProps({ testID: 'landing-step-list' })).toBeTruthy();
-    expect(renderer.root.findByProps({ testID: 'landing-trust-list' })).toBeTruthy();
-    expect(stepCards).toHaveLength(5);
-    expect(trustCards).toHaveLength(3);
+    const statusCardStyle = flattenStyle(
+      renderer.root.findByProps({ testID: 'landing-status-card' }).props.style,
+    );
+    expect(statusCardStyle.backgroundColor).toBe('transparent');
+    expect(statusCardStyle.borderWidth).toBe(0);
+    expect(statusCardStyle.shadowOpacity).toBe(0);
+    expect(statusCardStyle.elevation).toBe(0);
+    expect(renderer.root.findAllByProps({ testID: 'landing-feature-row' })).toHaveLength(2);
     expect(renderer.root.findByProps({ testID: 'landing-primary-action' })).toBeTruthy();
   });
 
   it('persists workspace entry and replaces the landing page when the CTA is pressed', async () => {
     let renderer!: ReturnType<typeof TestRenderer.create>;
 
-    act(() => {
+    await act(async () => {
       renderer = TestRenderer.create(
         <LandingScreen
           navigation={{
@@ -142,6 +189,7 @@ describe('LandingScreen', () => {
           }}
         />,
       );
+      await flushPromises();
     });
 
     await act(async () => {
@@ -149,6 +197,44 @@ describe('LandingScreen', () => {
     });
 
     expect(runtime.saveHasEnteredWorkspace).toHaveBeenCalledWith(true);
-    expect(runtime.replace).toHaveBeenCalledWith('Main');
+    expect(runtime.requestMediaLibraryPermissionsAsync).not.toHaveBeenCalled();
+    expect(runtime.replace).toHaveBeenCalledWith('Main', {
+      screen: 'Photos',
+      params: { autoStartScan: true },
+    });
+  });
+
+  it('uses accurate pending-permission copy and starts the scan flow after one CTA tap', async () => {
+    runtime.getMediaLibraryPermissionsAsync.mockResolvedValue({ granted: false });
+    let renderer!: ReturnType<typeof TestRenderer.create>;
+
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <LandingScreen
+          navigation={{
+            replace: runtime.replace,
+          }}
+        />,
+      );
+      await flushPromises();
+    });
+
+    const texts = collectTexts(renderer);
+
+    expect(texts).toContain('需要媒体权限');
+    expect(texts).toContain('进入工作区后授权即可开始扫描');
+    expect(texts).toContain('进入工作区后授权，即可开始扫描并分析重复、模糊与相似内容');
+    expect(texts).toContain('进入工作区并授权');
+
+    await act(async () => {
+      await renderer.root.findByProps({ testID: 'landing-primary-action' }).props.onPress();
+    });
+
+    expect(runtime.requestMediaLibraryPermissionsAsync).toHaveBeenCalledTimes(1);
+    expect(runtime.saveHasEnteredWorkspace).toHaveBeenCalledWith(true);
+    expect(runtime.replace).toHaveBeenCalledWith('Main', {
+      screen: 'Photos',
+      params: { autoStartScan: true },
+    });
   });
 });

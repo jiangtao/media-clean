@@ -34,7 +34,7 @@ ENABLE_REACT_DEVTOOLS=0
 usage() {
   cat <<'EOF'
 用法:
-  bash scripts/android/run-agent-device-observability.sh [capture|smoke|acceptance|scan-probe|scan-complete|continue-scan|all-complete|permission-denied|scan-cleanup|recycle|recycle-delete|doctor|react|help] [选项]
+  bash scripts/android/run-agent-device-observability.sh [capture|smoke|acceptance|scan-probe|scan-complete|continue-scan|all-complete|permission-denied|scan-cleanup|settings-signoff|filtering-selection|recycle|recycle-selection|recycle-delete|doctor|react|help] [选项]
 
 说明:
   为 Media Clean 提供基于 agent-device 的 Android 设备观测验证入口。
@@ -49,7 +49,10 @@ usage() {
   all-complete 执行“继续扫描回填 -> full batch 结果清空 -> 全部媒体已扫描完成”验收
   permission-denied 执行首启授权拒绝后的回流与再引导验收
   scan-cleanup 执行 seeded scan -> detail viewer -> primary cleanup -> recycle 回流验收
+  settings-signoff 执行 Settings 06 设计签收采集，不切换主题/语言
+  filtering-selection 执行 seeded scan -> issue workspace -> selection mode 设计签收采集
   recycle   执行 Recycle Bin hydration -> detail viewer -> restore 回流验收
+  recycle-selection 执行 Recycle Bin hydration -> selection mode 设计签收采集
   recycle-delete 执行 Recycle Bin hydration -> detail viewer -> hard delete 回流验收
   doctor    输出设备、应用与环境前置检查信息
   react     仅检查 react-devtools 连接与组件树
@@ -293,6 +296,29 @@ safe_vertical_scroll_down_via_adb() {
   center_x="$((width / 2))"
   start_y="$((height * 78 / 100))"
   end_y="$((height * 34 / 100))"
+
+  adb -s "${SERIAL}" shell input swipe "${center_x}" "${start_y}" "${center_x}" "${end_y}" 280 >/dev/null 2>&1 || return 1
+  sleep 1
+}
+
+safe_vertical_scroll_up_via_adb() {
+  local display_size=""
+  local width=""
+  local height=""
+  local center_x=""
+  local start_y=""
+  local end_y=""
+
+  display_size="$(device_display_size)"
+  if [[ -z "${display_size}" || "${display_size}" != *x* ]]; then
+    return 1
+  fi
+
+  width="${display_size%x*}"
+  height="${display_size#*x}"
+  center_x="$((width / 2))"
+  start_y="$((height * 34 / 100))"
+  end_y="$((height * 78 / 100))"
 
   adb -s "${SERIAL}" shell input swipe "${center_x}" "${start_y}" "${center_x}" "${end_y}" 280 >/dev/null 2>&1 || return 1
   sleep 1
@@ -581,6 +607,67 @@ snapshot_has_identifier() {
   ' "${snapshot_path}" "${identifier}"
 }
 
+snapshot_has_result_summary_surface() {
+  local snapshot_path="$1"
+
+  node - "${snapshot_path}" <<'NODE'
+const fs = require('node:fs');
+
+const snapshotPath = process.argv[2];
+const payload = JSON.parse(fs.readFileSync(snapshotPath, 'utf8') || '{}');
+const nodes = Array.isArray(payload?.data?.nodes) ? payload.data.nodes : [];
+
+const found = nodes.some((node) => {
+  const identifier = typeof node?.identifier === 'string' ? node.identifier : '';
+  return identifier === 'photo-grid-scan-summary'
+    || /^photo-grid-result-breakdown-/.test(identifier);
+});
+
+process.stdout.write(found ? 'true' : 'false');
+NODE
+}
+
+snapshot_has_visible_identifier_rect() {
+  local snapshot_path="$1"
+  local identifier="$2"
+
+  node - "${snapshot_path}" "${identifier}" <<'NODE'
+const fs = require('node:fs');
+
+const snapshotPath = process.argv[2];
+const identifier = process.argv[3];
+const payload = JSON.parse(fs.readFileSync(snapshotPath, 'utf8') || '{}');
+const nodes = Array.isArray(payload?.data?.nodes) ? payload.data.nodes : [];
+const match = nodes.find((node) => node?.identifier === identifier);
+const rect = match?.rect;
+const isVisible = Boolean(
+  rect
+  && Number(rect.width ?? 0) >= 12
+  && Number(rect.height ?? 0) >= 12
+  && Number(rect.x ?? 0) >= 0
+  && Number(rect.y ?? 0) >= 0,
+);
+
+process.stdout.write(isVisible ? 'true' : 'false');
+NODE
+}
+
+live_snapshot_has_visible_identifier_rect() {
+  local identifier="$1"
+  local snapshot_path=""
+  local matched="false"
+
+  snapshot_path="$(mktemp "${RUN_DIR}/live-snapshot.XXXXXX.json")"
+  if ! agent_device_session snapshot -i -c --json > "${snapshot_path}" 2>/dev/null; then
+    rm -f "${snapshot_path}"
+    return 1
+  fi
+
+  matched="$(snapshot_has_visible_identifier_rect "${snapshot_path}" "${identifier}")"
+  rm -f "${snapshot_path}"
+  [[ "${matched}" == "true" ]]
+}
+
 step_artifact_has_identifier() {
   local step_name="$1"
   local identifier="$2"
@@ -596,6 +683,78 @@ step_artifact_has_identifier() {
   fi
 
   return 1
+}
+
+assert_step_artifact_has_identifier() {
+  local step_name="$1"
+  local identifier="$2"
+
+  if step_artifact_has_identifier "${step_name}" "${identifier}"; then
+    return 0
+  fi
+
+  echo "${step_name} 未观察到 ${identifier}。" >&2
+  return 1
+}
+
+snapshot_has_text_matching() {
+  local snapshot_path="$1"
+  local pattern="$2"
+
+  node - "${snapshot_path}" "${pattern}" <<'NODE'
+const fs = require('node:fs');
+
+const snapshotPath = process.argv[2];
+const pattern = process.argv[3];
+const regex = new RegExp(pattern, 'i');
+const payload = JSON.parse(fs.readFileSync(snapshotPath, 'utf8') || '{}');
+const nodes = Array.isArray(payload?.data?.nodes) ? payload.data.nodes : [];
+
+const found = nodes.some((node) => {
+  const texts = [node?.value, node?.label]
+    .filter((value) => typeof value === 'string')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return texts.some((value) => regex.test(value));
+});
+
+process.stdout.write(found ? 'true' : 'false');
+NODE
+}
+
+step_artifact_has_text_matching() {
+  local step_name="$1"
+  local pattern="$2"
+  local interactive_snapshot_path="${RUN_DIR}/steps/${step_name}/snapshot-interactive.json"
+  local snapshot_path="${RUN_DIR}/steps/${step_name}/snapshot.json"
+
+  if [[ -f "${interactive_snapshot_path}" ]] \
+    && [[ "$(snapshot_has_text_matching "${interactive_snapshot_path}" "${pattern}")" == "true" ]]; then
+    return 0
+  fi
+
+  if [[ -f "${snapshot_path}" ]] \
+    && [[ "$(snapshot_has_text_matching "${snapshot_path}" "${pattern}")" == "true" ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
+live_snapshot_has_text_matching() {
+  local pattern="$1"
+  local snapshot_path=""
+  local matched="false"
+
+  snapshot_path="$(mktemp "${RUN_DIR}/live-snapshot.XXXXXX.json")"
+  if ! agent_device_session snapshot -i -c --json > "${snapshot_path}" 2>/dev/null; then
+    rm -f "${snapshot_path}"
+    return 1
+  fi
+
+  matched="$(snapshot_has_text_matching "${snapshot_path}" "${pattern}")"
+  rm -f "${snapshot_path}"
+  [[ "${matched}" == "true" ]]
 }
 
 press_identifier_via_interactive_ref() {
@@ -688,6 +847,46 @@ press_photo_grid_start_button_best_effort() {
 
   echo "多次尝试后仍无法触发 photo-grid-start-scan-button。" >&2
   return 1
+}
+
+close_detail_viewer_if_present() {
+  if ! agent_device_session wait 'id="detail-close-button"' 1200 >/dev/null 2>&1; then
+    return 1
+  fi
+
+  press_identifier_with_fallbacks "detail-close-button" >/dev/null 2>&1 \
+    || agent_device_session press 'id="detail-close-button"' >/dev/null 2>&1 \
+    || true
+  agent_device_session wait 700 >/dev/null 2>&1 || true
+  return 0
+}
+
+press_photos_tab_best_effort() {
+  local step_name="${1:-}"
+  local did_press=1
+
+  agent_device_session wait 'id="tab-button-Photos"' 2000 >/dev/null 2>&1 || true
+
+  if agent_device_session press 'id="tab-button-Photos"' >/dev/null 2>&1; then
+    did_press=0
+  fi
+
+  agent_device_session wait 250 >/dev/null 2>&1 || true
+
+  if [[ -n "${step_name}" ]] \
+    && tap_identifier_from_step_artifact "${step_name}" "tab-button-Photos" >/dev/null 2>&1; then
+    did_press=0
+  fi
+
+  if tap_identifier_from_live_snapshot "tab-button-Photos" >/dev/null 2>&1; then
+    did_press=0
+  fi
+
+  if press_identifier_from_live_snapshot "tab-button-Photos" >/dev/null 2>&1; then
+    did_press=0
+  fi
+
+  return "${did_press}"
 }
 
 interactive_center_for_identifier() {
@@ -914,7 +1113,7 @@ EOF
 seed_recycle_bin_fixture() {
   local seed_log_path="${RUN_DIR}/recycle-seed.log"
 
-  bash "${REPO_ROOT}/scripts/android/seed-emulator-recycle-bin.sh" --serial "${SERIAL}" > "${seed_log_path}" 2>&1
+  bash "${REPO_ROOT}/scripts/android/seed-emulator-recycle-bin.sh" --serial "${SERIAL}" "$@" > "${seed_log_path}" 2>&1
 }
 
 REACT_DEVTOOLS_CONNECTED=0
@@ -946,13 +1145,76 @@ cleanup_capture() {
   agent_device_session close >/dev/null 2>&1 || true
 }
 
+current_android_user_id() {
+  adb -s "${SERIAL}" shell am get-current-user 2>/dev/null | tr -d '\r' | awk 'NF { print $1; exit }'
+}
+
+is_app_installed_for_user() {
+  local user_id="$1"
+  adb -s "${SERIAL}" shell pm list packages --user "${user_id}" "${APP_ID}" 2>/dev/null | grep -q "package:${APP_ID}"
+}
+
+is_app_installed() {
+  local user_id=""
+  user_id="$(current_android_user_id)"
+
+  if [[ -z "${user_id}" ]]; then
+    return 1
+  fi
+
+  is_app_installed_for_user "${user_id}"
+}
+
+ensure_app_installed_for_current_user() {
+  local user_id=""
+  user_id="$(current_android_user_id)"
+
+  if [[ -z "${user_id}" ]]; then
+    echo "无法识别当前 Android 用户，无法确认 ${APP_ID} 是否可见。" >&2
+    return 1
+  fi
+
+  if is_app_installed_for_user "${user_id}"; then
+    return 0
+  fi
+
+  if adb -s "${SERIAL}" shell pm install-existing --user "${user_id}" "${APP_ID}" >/dev/null 2>&1; then
+    if is_app_installed_for_user "${user_id}"; then
+      echo "已将 ${APP_ID} 补装到当前 Android 用户 ${user_id}。" >&2
+      return 0
+    fi
+  fi
+
+  echo "APK 安装完成后，当前 Android 用户 ${user_id} 仍不可见: ${APP_ID}" >&2
+  return 1
+}
+
+install_debug_apk() {
+  if [[ ! -f "${APK_PATH}" ]]; then
+    echo "未找到 debug APK: ${APK_PATH}" >&2
+    echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
+    exit 1
+  fi
+
+  agent_device_target install "${APP_ID}" "${APK_PATH}"
+  ensure_app_installed_for_current_user
+}
+
 reset_app_state() {
-  adb -s "${SERIAL}" shell pm clear "${APP_ID}" >/dev/null
-  adb -s "${SERIAL}" shell pm revoke "${APP_ID}" android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 || true
-  adb -s "${SERIAL}" shell pm revoke "${APP_ID}" android.permission.READ_MEDIA_IMAGES >/dev/null 2>&1 || true
-  adb -s "${SERIAL}" shell pm revoke "${APP_ID}" android.permission.READ_MEDIA_VIDEO >/dev/null 2>&1 || true
-  adb -s "${SERIAL}" shell pm revoke "${APP_ID}" android.permission.READ_EXTERNAL_STORAGE >/dev/null 2>&1 || true
-  adb -s "${SERIAL}" shell pm revoke "${APP_ID}" android.permission.WRITE_EXTERNAL_STORAGE >/dev/null 2>&1 || true
+  local user_id=""
+
+  user_id="$(current_android_user_id)"
+  if ! is_app_installed; then
+    return 0
+  fi
+
+  adb -s "${SERIAL}" shell am force-stop --user "${user_id}" "${APP_ID}" >/dev/null 2>&1 || true
+  adb -s "${SERIAL}" shell pm clear --user "${user_id}" "${APP_ID}" >/dev/null
+  adb -s "${SERIAL}" shell pm revoke --user "${user_id}" "${APP_ID}" android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 || true
+  adb -s "${SERIAL}" shell pm revoke --user "${user_id}" "${APP_ID}" android.permission.READ_MEDIA_IMAGES >/dev/null 2>&1 || true
+  adb -s "${SERIAL}" shell pm revoke --user "${user_id}" "${APP_ID}" android.permission.READ_MEDIA_VIDEO >/dev/null 2>&1 || true
+  adb -s "${SERIAL}" shell pm revoke --user "${user_id}" "${APP_ID}" android.permission.READ_EXTERNAL_STORAGE >/dev/null 2>&1 || true
+  adb -s "${SERIAL}" shell pm revoke --user "${user_id}" "${APP_ID}" android.permission.WRITE_EXTERNAL_STORAGE >/dev/null 2>&1 || true
 }
 
 press_allowing_external_prompt() {
@@ -1063,7 +1325,8 @@ wait_for_media_permission_dialog() {
     return 0
   fi
 
-  if agent_device_session wait 'id="android:id/button1"' 3000 >/dev/null 2>&1; then
+  if [[ "$(current_foreground_package_via_adb)" =~ ^(com\.google\.android\.permissioncontroller|com\.lbe\.security\.miui)$ ]] \
+    && agent_device_session wait 'id="android:id/button1"' 3000 >/dev/null 2>&1; then
     return 0
   fi
 
@@ -1087,7 +1350,8 @@ wait_for_notification_permission_dialog() {
     return 0
   fi
 
-  if agent_device_session wait 'id="android:id/button1"' 3000 >/dev/null 2>&1; then
+  if [[ "$(current_foreground_package_via_adb)" =~ ^(com\.google\.android\.permissioncontroller|com\.lbe\.security\.miui)$ ]] \
+    && agent_device_session wait 'id="android:id/button1"' 3000 >/dev/null 2>&1; then
     return 0
   fi
 
@@ -1371,6 +1635,33 @@ handle_external_media_delete_confirmation_if_present() {
   return 1
 }
 
+handle_in_app_delete_confirmation_if_present() {
+  local attempt=0
+  local foreground_package=""
+
+  for attempt in {1..5}; do
+    foreground_package="$(current_foreground_package_via_adb)"
+    if [[ "${foreground_package}" != "${APP_ID}" ]]; then
+      return 1
+    fi
+
+    if ! agent_device_session wait 'id="android:id/button1"' 1500 >/dev/null 2>&1; then
+      return 1
+    fi
+
+    capture_step_artifacts "05-recycle-delete-app-confirmation"
+    if press_identifier_with_fallbacks "android:id/button1" >/dev/null 2>&1; then
+      return 0
+    fi
+    if agent_device_session press 'id="android:id/button1"' >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  return 1
+}
+
 grant_media_permissions_best_effort() {
   agent_device_session settings permission grant photos >/dev/null 2>&1 || true
   adb -s "${SERIAL}" shell pm grant "${APP_ID}" android.permission.READ_MEDIA_IMAGES >/dev/null 2>&1 || true
@@ -1390,7 +1681,7 @@ open_settings_screen() {
   agent_device_session wait 'id="tab-button-Settings"' 5000 >/dev/null
 
   for attempt in {1..3}; do
-    agent_device_session press 'id="tab-button-Settings"' >/dev/null 2>&1 || true
+    press_identifier_with_fallbacks "tab-button-Settings" >/dev/null 2>&1 || true
     ensure_app_foreground
 
     if agent_device_session wait 'id="settings-scroll-view"' 2500 >/dev/null 2>&1; then
@@ -1402,6 +1693,17 @@ open_settings_screen() {
 
   echo "多次尝试后仍未进入 Settings。" >&2
   return 1
+}
+
+scroll_settings_to_top() {
+  local attempt=0
+
+  for attempt in {1..4}; do
+    ensure_app_foreground
+    safe_vertical_scroll_up_via_adb >/dev/null 2>&1 || agent_device_session scroll up >/dev/null 2>&1 || true
+  done
+
+  agent_device_session wait 'id="settings-header"' 3000 >/dev/null 2>&1 || true
 }
 
 relaunch_app_to_photo_grid_after_permission_grant() {
@@ -1417,18 +1719,20 @@ ensure_settings_option_visible() {
   local option_id="$1"
   local attempt=0
 
-  for attempt in {1..4}; do
+  for attempt in {1..6}; do
     ensure_app_foreground
     if ! agent_device_session wait 'id="settings-scroll-view"' 2500 >/dev/null 2>&1; then
       open_settings_screen
     fi
 
-    if agent_device_session wait "id=\"${option_id}\"" 1500 >/dev/null 2>&1; then
+    if agent_device_session wait "id=\"${option_id}\"" 1500 >/dev/null 2>&1 \
+      && live_snapshot_has_visible_identifier_rect "${option_id}"; then
       return 0
     fi
 
-    agent_device_session scroll down >/dev/null 2>&1 || true
-    if agent_device_session wait "id=\"${option_id}\"" 2000 >/dev/null 2>&1; then
+    safe_vertical_scroll_down_via_adb >/dev/null 2>&1 || agent_device_session scroll down >/dev/null 2>&1 || true
+    if agent_device_session wait "id=\"${option_id}\"" 2000 >/dev/null 2>&1 \
+      && live_snapshot_has_visible_identifier_rect "${option_id}"; then
       return 0
     fi
 
@@ -1451,11 +1755,17 @@ open_recycle_bin_screen() {
 
   agent_device_session wait 'id="tab-button-RecycleBin"' 5000 >/dev/null 2>&1 || true
 
-  for attempt in {1..3}; do
-    agent_device_session press 'id="tab-button-RecycleBin"' >/dev/null 2>&1 || true
+  for attempt in {1..5}; do
+    press_identifier_with_fallbacks "tab-button-RecycleBin" >/dev/null 2>&1 \
+      || agent_device_session press 'label="tab-button-RecycleBin"' >/dev/null 2>&1 \
+      || true
     ensure_app_foreground
 
-    if agent_device_session wait 'id="recycle-bin-header-title"' 2500 >/dev/null 2>&1; then
+    if agent_device_session wait 'id="recycle-bin-header-title"' 2500 >/dev/null 2>&1 \
+      || agent_device_session wait 'id="recycle-bin-item"' 1200 >/dev/null 2>&1 \
+      || agent_device_session wait 'id="recycle-bin-grid"' 1200 >/dev/null 2>&1 \
+      || agent_device_session wait 'id="recycle-bin-loading-label"' 1200 >/dev/null 2>&1 \
+      || agent_device_session wait 'id="recycle-bin-empty-title"' 1200 >/dev/null 2>&1; then
       return 0
     fi
 
@@ -1477,7 +1787,7 @@ wait_for_recycle_bin_population_after_cleanup() {
     fi
 
     if agent_device_session wait 'id="recycle-bin-empty-title"' 1000 >/dev/null 2>&1; then
-      agent_device_session press 'id="tab-button-Photos"' >/dev/null 2>&1 || true
+      press_photos_tab_best_effort || true
       ensure_app_foreground
     fi
 
@@ -1489,9 +1799,10 @@ wait_for_recycle_bin_population_after_cleanup() {
 
 select_language_option() {
   local option_id="$1"
-  local expected_text="$2"
-  local expected_marker="${3:-$2}"
+  local expected_text_pattern="$2"
+  local expected_marker_pattern="${3:-$2}"
   local attempt=0
+  local step_name=""
 
   for attempt in {1..3}; do
     ensure_app_foreground
@@ -1500,23 +1811,100 @@ select_language_option() {
       open_settings_screen
     fi
 
-    press_identifier_with_fallbacks "${option_id}" >/dev/null 2>&1 || true
+    ensure_settings_option_visible "${option_id}"
+    step_name="$(printf 'language-switch-attempt-%02d' "${attempt}")"
+    capture_step_artifacts "${step_name}"
+
+    trigger_detail_action_from_step_artifact "${step_name}" "${option_id}" >/dev/null 2>&1 || true
+    press_identifier_with_fallbacks "${option_id}" "${step_name}" >/dev/null 2>&1 || true
     agent_device_session wait 1200 >/dev/null 2>&1 || true
 
-    if agent_device_session wait "text=\"${expected_text}\"" 2500 >/dev/null 2>&1; then
+    if live_snapshot_has_text_matching "${expected_text_pattern}"; then
       return 0
     fi
 
-    if agent_device_session wait "text=\"${expected_marker}\"" 2500 >/dev/null 2>&1; then
+    if live_snapshot_has_text_matching "${expected_marker_pattern}"; then
       return 0
     fi
 
+    open_app_with_session "relaunch" >/dev/null 2>&1 || true
+    wait_for_session_ready >/dev/null 2>&1 || true
+    ensure_app_foreground
     reattach_session_best_effort || true
     open_settings_screen || true
     agent_device_session wait 700 >/dev/null 2>&1 || true
   done
 
-  echo "多次尝试后仍未切换到语言: ${expected_text}" >&2
+  echo "多次尝试后仍未切换到语言，未观察到预期文本模式: ${expected_text_pattern} / ${expected_marker_pattern}" >&2
+  return 1
+}
+
+open_issue_workspace_from_result_summary() {
+  local step_name="$1"
+  local identifier=""
+  local interactive_snapshot_path="${RUN_DIR}/steps/${step_name}/snapshot-interactive.json"
+  local snapshot_path="${RUN_DIR}/steps/${step_name}/snapshot.json"
+  local source_snapshot_path=""
+  local identifiers_raw=""
+  local -a identifiers=()
+
+  if [[ -f "${interactive_snapshot_path}" ]]; then
+    source_snapshot_path="${interactive_snapshot_path}"
+  elif [[ -f "${snapshot_path}" ]]; then
+    source_snapshot_path="${snapshot_path}"
+  fi
+
+  if [[ -n "${source_snapshot_path}" ]]; then
+    identifiers_raw="$(node - "${source_snapshot_path}" <<'NODE'
+const fs = require('node:fs');
+
+const snapshotPath = process.argv[2];
+const payload = JSON.parse(fs.readFileSync(snapshotPath, 'utf8') || '{}');
+const nodes = Array.isArray(payload?.data?.nodes) ? payload.data.nodes : [];
+
+const identifiers = nodes
+  .filter((node) => typeof node?.identifier === 'string' && /^photo-grid-result-breakdown-/.test(node.identifier))
+  .map((node) => ({ identifier: node.identifier, y: Number(node?.rect?.y ?? 0) }))
+  .sort((left, right) => left.y - right.y)
+  .map((entry) => entry.identifier);
+
+process.stdout.write(identifiers.join('\n'));
+NODE
+)"
+  fi
+
+  if [[ -n "${identifiers_raw}" ]]; then
+    while IFS= read -r identifier; do
+      [[ -n "${identifier}" ]] && identifiers+=("${identifier}")
+    done <<< "${identifiers_raw}"
+  fi
+
+  if [[ "${#identifiers[@]}" -eq 0 ]]; then
+    identifiers=(
+      "photo-grid-result-breakdown-duplicate"
+      "photo-grid-result-breakdown-blurry"
+      "photo-grid-result-breakdown-similar"
+    )
+  fi
+
+  for identifier in "${identifiers[@]}"; do
+    if ! step_artifact_has_identifier "${step_name}" "${identifier}"; then
+      continue
+    fi
+
+    if trigger_detail_action_from_step_artifact "${step_name}" "${identifier}" \
+      && agent_device_session wait 'id="scan-result-grid-item"' 2500 >/dev/null 2>&1; then
+      return 0
+    fi
+
+    if press_identifier_with_fallbacks "${identifier}" "${step_name}" >/dev/null 2>&1; then
+      agent_device_session wait 1000 >/dev/null 2>&1 || true
+      if agent_device_session wait 'id="scan-result-grid-item"' 2500 >/dev/null 2>&1; then
+        return 0
+      fi
+    fi
+  done
+
   return 1
 }
 
@@ -1622,10 +2010,19 @@ const snapshotPath = process.argv[2];
 const payload = JSON.parse(fs.readFileSync(snapshotPath, 'utf8') || '{}');
 const nodes = Array.isArray(payload?.data?.nodes) ? payload.data.nodes : [];
 const byId = new Map();
+const textValues = [];
 
 for (const node of nodes) {
   if (node && typeof node.identifier === 'string' && node.identifier.length > 0) {
     byId.set(node.identifier, node);
+  }
+
+  const rawText = node?.value || node?.label || null;
+  if (typeof rawText === 'string') {
+    const normalizedText = rawText.trim();
+    if (normalizedText.length > 0) {
+      textValues.push(normalizedText);
+    }
   }
 }
 
@@ -1637,26 +2034,53 @@ const readDisplayValue = (identifier) => {
   return node.value || node.label || null;
 };
 
-const startButtonLabel = readDisplayValue('photo-grid-start-scan-button');
-const rangeLabel = nodes
-  .map((node) => node?.value || node?.label || null)
-  .find((value) => typeof value === 'string' && /^(本批范围：|Batch range: )/.test(value))
-  ?? null;
+const findTextValue = (pattern) =>
+  textValues.find((value) => pattern.test(value)) ?? null;
+
+const startButtonLabel =
+  readDisplayValue('photo-grid-start-scan-button')
+  || findTextValue(
+    /^(开始扫描|继续扫描|重新扫描|Start scan|Continue scan|Rescan)$/i,
+  );
+const runningStatusText = findTextValue(/^(扫描中|扫描中\.\.\.|Scanning)$/i);
+const runningProgressText = findTextValue(/^\d+\s*\/\s*\d+$/);
+const rangeLabel = findTextValue(/^(当前扫描批次：|已扫描范围：|结果范围：|本批范围：|Current batch: |Scanned range: |Result range: |Batch range: )/);
+const segmentedCountAll =
+  readDisplayValue('segmented-count-all') || findTextValue(/^(全部|All)\s+\d+/);
+const segmentedCountPhoto =
+  readDisplayValue('segmented-count-photo') || findTextValue(/^(照片|Photos)\s+\d+/);
+const segmentedCountVideo =
+  readDisplayValue('segmented-count-video') || findTextValue(/^(视频|Videos)\s+\d+/);
 
 let outcome = 'pending';
-if (byId.has('photo-grid-scan-all-complete-title')) {
+if (
+  byId.has('photo-grid-scan-all-complete-title')
+  || findTextValue(/^(全部媒体已扫描完成|Entire library scanned)$/)
+) {
   outcome = 'all-complete';
-} else if (byId.has('photo-grid-scan-exhausted-title')) {
+} else if (
+  byId.has('photo-grid-scan-exhausted-title')
+  || findTextValue(/^(当前这一批已处理完成|Current batch processed)$/)
+) {
   outcome = 'exhausted';
-} else if (byId.has('cancel-scan-button')) {
+} else if (
+  typeof startButtonLabel === 'string' &&
+  /继续扫描|Continue scan/i.test(startButtonLabel)
+) {
+  outcome = 'exhausted';
+} else if (byId.has('cancel-scan-button') || runningStatusText || runningProgressText) {
   outcome = 'running';
-} else if (byId.has('scan-result-grid-item')) {
+} else if (
+  byId.has('scan-result-grid-item')
+  || byId.has('photo-grid-scan-summary')
+  || findTextValue(/^(扫描完成，发现异常结果|Scan complete, flagged results found)$/)
+) {
   outcome = 'result-ready';
 } else if (
   typeof startButtonLabel === 'string' &&
-  /继续扫描|Scan again/.test(startButtonLabel)
+  /重新扫描|Rescan|Scan again/i.test(startButtonLabel)
 ) {
-  outcome = 'exhausted';
+  outcome = 'result-ready';
 }
 
 process.stdout.write(JSON.stringify({
@@ -1666,11 +2090,12 @@ process.stdout.write(JSON.stringify({
   hasResultItem: byId.has('scan-result-grid-item'),
   hasPermissionButton: byId.has('photo-grid-request-permission-button'),
   hasCancelButton: byId.has('cancel-scan-button'),
+  hasRunningText: Boolean(runningStatusText || runningProgressText),
   rangeLabel,
   counts: {
-    all: readDisplayValue('segmented-count-all'),
-    photo: readDisplayValue('segmented-count-photo'),
-    video: readDisplayValue('segmented-count-video'),
+    all: segmentedCountAll,
+    photo: segmentedCountPhoto,
+    video: segmentedCountVideo,
   },
 }, null, 2));
 NODE
@@ -1886,6 +2311,7 @@ wait_for_seeded_result_item() {
   local snapshot_path=""
   local summary_json=""
   local has_result_item=""
+  local has_result_summary=""
 
   for attempt in $(seq 1 "${max_attempts}"); do
     ensure_app_foreground
@@ -1901,9 +2327,10 @@ wait_for_seeded_result_item() {
 
     summary_json="$(scan_probe_summary_json "${snapshot_path}")"
     has_result_item="$(scan_probe_has_result_item_value "${summary_json}")"
+    has_result_summary="$(snapshot_has_result_summary_surface "${snapshot_path}")"
     printf '%s\n' "${summary_json}" > "${snapshot_path%.json}.summary.json"
 
-    if [[ "${has_result_item}" == "true" ]]; then
+    if [[ "${has_result_item}" == "true" || "${has_result_summary}" == "true" ]]; then
       printf '%s\n' "${summary_json}" > "${RUN_DIR}/scan-probe-state.json"
       cp "${snapshot_path}" "${RUN_DIR}/scan-probe-latest.json"
       return 0
@@ -2117,13 +2544,7 @@ async_keys = async_storage_summary['keys']
 
 has_completed_batch = (
     latest_batch.get('phase') == 'completed'
-    and max(
-        int(latest_batch.get('progressTotal') or 0),
-        int(latest_batch.get('enumeratedCount') or 0),
-        int(latest_batch.get('dirtyCount') or 0),
-        int(latest_batch.get('analyzedCount') or 0),
-        int(latest_batch.get('candidateCount') or 0),
-    ) > 0
+    and latest_batch.get('completedAt') is not None
 )
 has_result_cache = (
     counts['candidateViewMeta'] > 0
@@ -2346,7 +2767,7 @@ open_photo_grid_screen_for_scan() {
   agent_device_session wait 'id="tab-button-Photos"' 5000 >/dev/null 2>&1 || true
 
   for attempt in {1..4}; do
-    agent_device_session press 'id="tab-button-Photos"' >/dev/null 2>&1 || true
+    press_photos_tab_best_effort || true
     ensure_app_foreground
     reattach_session_best_effort || true
     state="$(wait_for_photo_grid_probe_state 2500 || true)"
@@ -2375,6 +2796,7 @@ wait_for_scan_probe_outcome() {
   local outcome=""
   local summary_json=""
   local cancel_step=""
+  local terminal_step_snapshot_path=""
 
   cancel_step="$(printf '%02d-scan-cancelled' "$((10#${step_base} + 1))")"
 
@@ -2388,16 +2810,31 @@ wait_for_scan_probe_outcome() {
     case "${outcome}" in
       all-complete)
         capture_step_artifacts "${step_base}-scan-all-complete"
+        terminal_step_snapshot_path="${RUN_DIR}/steps/${step_base}-scan-all-complete/snapshot.json"
+        if [[ -f "${terminal_step_snapshot_path}" ]]; then
+          summary_json="$(scan_probe_summary_json "${terminal_step_snapshot_path}")"
+          printf '%s\n' "${summary_json}" > "${latest_summary_path}"
+        fi
         write_scan_probe_summary_artifact "${step_base}-scan-all-complete" "${summary_json}"
         return 0
         ;;
       exhausted)
         capture_step_artifacts "${step_base}-scan-exhausted"
+        terminal_step_snapshot_path="${RUN_DIR}/steps/${step_base}-scan-exhausted/snapshot.json"
+        if [[ -f "${terminal_step_snapshot_path}" ]]; then
+          summary_json="$(scan_probe_summary_json "${terminal_step_snapshot_path}")"
+          printf '%s\n' "${summary_json}" > "${latest_summary_path}"
+        fi
         write_scan_probe_summary_artifact "${step_base}-scan-exhausted" "${summary_json}"
         return 0
         ;;
       result-ready)
         capture_step_artifacts "${step_base}-scan-result-ready"
+        terminal_step_snapshot_path="${RUN_DIR}/steps/${step_base}-scan-result-ready/snapshot.json"
+        if [[ -f "${terminal_step_snapshot_path}" ]]; then
+          summary_json="$(scan_probe_summary_json "${terminal_step_snapshot_path}")"
+          printf '%s\n' "${summary_json}" > "${latest_summary_path}"
+        fi
         write_scan_probe_summary_artifact "${step_base}-scan-result-ready" "${summary_json}"
         return 0
         ;;
@@ -2407,13 +2844,19 @@ wait_for_scan_probe_outcome() {
           write_scan_probe_summary_artifact "${step_base}-scan-running" "${summary_json}"
 
           if [[ "${cancel_running}" -eq 1 ]]; then
-            agent_device_session press 'id="cancel-scan-button"' >/dev/null 2>&1 || true
-            agent_device_session wait 'id="photo-grid-start-scan-button"' 10000 >/dev/null 2>&1 || true
-            agent_device_session snapshot -i -c --json > "${latest_snapshot_path}"
-            summary_json="$(scan_probe_summary_json "${latest_snapshot_path}")"
-            printf '%s\n' "${summary_json}" > "${latest_summary_path}"
-            capture_step_artifacts "${cancel_step}"
-            write_scan_probe_summary_artifact "${cancel_step}" "${summary_json}"
+            if agent_device_session press 'id="cancel-scan-button"' >/dev/null 2>&1; then
+              agent_device_session wait 'id="photo-grid-start-scan-button"' 10000 >/dev/null 2>&1 || true
+              agent_device_session snapshot -i -c --json > "${latest_snapshot_path}"
+              summary_json="$(scan_probe_summary_json "${latest_snapshot_path}")"
+              printf '%s\n' "${summary_json}" > "${latest_summary_path}"
+              capture_step_artifacts "${cancel_step}"
+              terminal_step_snapshot_path="${RUN_DIR}/steps/${cancel_step}/snapshot.json"
+              if [[ -f "${terminal_step_snapshot_path}" ]]; then
+                summary_json="$(scan_probe_summary_json "${terminal_step_snapshot_path}")"
+                printf '%s\n' "${summary_json}" > "${latest_summary_path}"
+              fi
+              write_scan_probe_summary_artifact "${cancel_step}" "${summary_json}"
+            fi
           fi
 
           return 0
@@ -2476,7 +2919,7 @@ run_capture() {
       echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
       exit 1
     fi
-    agent_device_target install "${APP_ID}" "${APK_PATH}"
+    install_debug_apk
   fi
 
   configure_adb_reverse
@@ -2527,7 +2970,7 @@ run_smoke() {
       echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
       exit 1
     fi
-    agent_device_target install "${APP_ID}" "${APK_PATH}"
+    install_debug_apk
   fi
 
   configure_adb_reverse
@@ -2574,13 +3017,13 @@ run_smoke() {
   ensure_app_foreground
   reattach_session_best_effort || true
   open_settings_screen
-  select_language_option "language-option-zh-CN" "设置" "跟随系统（当前：简体中文）"
+  select_language_option "language-option-zh-CN" "设置|语言" "简体中文\\s*,\\s*|语言\\s*[·.]\\s*简体中文|跟随系统（当前：简体中文）"
   capture_step_artifacts "07-language-zh"
 
   ensure_app_foreground
   reattach_session_best_effort || true
   open_settings_screen
-  select_language_option "language-option-en-US" "Settings" "System (English)"
+  select_language_option "language-option-en-US" "Language|Appearance|Storage|Notifications" "English\\s*,\\s*|System \\(English\\)"
   capture_step_artifacts "08-language-en"
 
   collect_runtime_artifacts
@@ -2588,6 +3031,101 @@ run_smoke() {
 
   cat <<EOF
 agent-device smoke 证据已生成:
+  目录: ${RUN_DIR}
+  最终 Snapshot: ${RUN_DIR}/snapshot.json
+  最终 Screenshot: ${RUN_DIR}/current-screen.png
+  分步证据目录: ${RUN_DIR}/steps
+EOF
+}
+
+run_settings_signoff_probe() {
+  require_command adb
+  require_command npx
+  require_command node
+  detect_android_serial
+  reset_agent_device_state_if_idle
+  close_conflicting_android_sessions
+  mkdir -p "${ARTIFACT_ROOT}"
+  prepare_run_dir
+
+  trap cleanup_capture EXIT
+
+  agent_device close --platform android --session "${SESSION}" >/dev/null 2>&1 || true
+  agent_device devices --platform android --json > "${RUN_DIR}/devices.json"
+  agent_device_target apps --json > "${RUN_DIR}/apps.json"
+
+  if [[ "${INSTALL_APK}" -eq 1 ]]; then
+    if [[ ! -f "${APK_PATH}" ]]; then
+      echo "未找到 debug APK: ${APK_PATH}" >&2
+      echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
+      exit 1
+    fi
+    install_debug_apk
+  fi
+
+  configure_adb_reverse
+  agent_device metro prepare \
+    --public-base-url "${METRO_PUBLIC_BASE_URL}" \
+    --project-root "${REPO_ROOT}" \
+    --port "${METRO_PORT}" \
+    --kind expo \
+    --runtime-file "${RUN_DIR}/metro-runtime.json"
+
+  open_app_with_session
+  ensure_app_foreground
+  prepare_active_session
+
+  start_react_devtools_if_requested
+
+  maybe_advance_past_landing_if_present "01-landing-ready" "02-landing-cta" || true
+
+  agent_device_session wait 'id="tab-button-Settings"' 10000
+  capture_step_artifacts "03-main-tabs"
+  open_settings_screen
+  scroll_settings_to_top
+  agent_device_session wait 'id="settings-scroll-view"' 5000
+  capture_step_artifacts "04-settings-entry"
+  assert_step_artifact_has_identifier "04-settings-entry" "settings-scroll-view"
+  assert_step_artifact_has_identifier "04-settings-entry" "settings-header"
+
+  capture_step_artifacts "05-settings-scan-range"
+  assert_step_artifact_has_identifier "05-settings-scan-range" "settings-scan-range-card"
+  assert_step_artifact_has_identifier "05-settings-scan-range" "scan-range-option-1"
+  assert_step_artifact_has_identifier "05-settings-scan-range" "scan-range-option-3"
+  assert_step_artifact_has_identifier "05-settings-scan-range" "scan-range-option-6"
+  assert_step_artifact_has_identifier "05-settings-scan-range" "scan-range-option-12"
+  assert_step_artifact_has_identifier "05-settings-scan-range" "scan-range-option-all-disabled"
+
+  ensure_settings_option_visible "reminder-settings-toggle"
+  capture_step_artifacts "06-settings-reminder"
+  assert_step_artifact_has_identifier "06-settings-reminder" "settings-reminder-card"
+  assert_step_artifact_has_identifier "06-settings-reminder" "reminder-settings-toggle"
+  assert_step_artifact_has_identifier "06-settings-reminder" "reminder-frequency-daily"
+  assert_step_artifact_has_identifier "06-settings-reminder" "reminder-frequency-weekly"
+  assert_step_artifact_has_identifier "06-settings-reminder" "reminder-time-0830"
+  assert_step_artifact_has_identifier "06-settings-reminder" "reminder-time-2030"
+
+  ensure_settings_option_visible "theme-option-dark"
+  capture_step_artifacts "07-settings-language-theme"
+  assert_step_artifact_has_identifier "07-settings-language-theme" "settings-language-theme-card"
+  assert_step_artifact_has_identifier "07-settings-language-theme" "language-option-system"
+  assert_step_artifact_has_identifier "07-settings-language-theme" "language-option-zh-CN"
+  assert_step_artifact_has_identifier "07-settings-language-theme" "language-option-en-US"
+  assert_step_artifact_has_identifier "07-settings-language-theme" "theme-option-system"
+  assert_step_artifact_has_identifier "07-settings-language-theme" "theme-option-light"
+  assert_step_artifact_has_identifier "07-settings-language-theme" "theme-option-dark"
+
+  ensure_settings_option_visible "clear-persistent-scan-cache-button"
+  capture_step_artifacts "08-settings-cache"
+  assert_step_artifact_has_identifier "08-settings-cache" "settings-cache-card"
+  assert_step_artifact_has_identifier "08-settings-cache" "clear-persistent-scan-cache-button"
+  assert_step_artifact_has_identifier "08-settings-cache" "settings-local-only-note"
+
+  collect_runtime_artifacts
+  finish_react_devtools_if_connected
+
+  cat <<EOF
+agent-device settings signoff 证据已生成:
   目录: ${RUN_DIR}
   最终 Snapshot: ${RUN_DIR}/snapshot.json
   最终 Screenshot: ${RUN_DIR}/current-screen.png
@@ -2618,7 +3156,7 @@ run_acceptance() {
       echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
       exit 1
     fi
-    agent_device_target install "${APP_ID}" "${APK_PATH}"
+    install_debug_apk
   fi
 
   configure_adb_reverse
@@ -2730,7 +3268,7 @@ run_scan_probe() {
       echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
       exit 1
     fi
-    agent_device_target install "${APP_ID}" "${APK_PATH}"
+    install_debug_apk
   fi
 
   configure_adb_reverse
@@ -2769,10 +3307,25 @@ run_scan_probe() {
     agent_device_session wait 'id="photo-grid-start-scan-button"' 10000
     agent_device_session press 'id="photo-grid-start-scan-button"'
     capture_step_artifacts "06-scan-started"
-    wait_for_scan_probe_outcome 1 1 "07" 60
+    local scan_started_snapshot_path="${RUN_DIR}/steps/06-scan-started/snapshot.json"
+    local scan_started_summary_json=""
+    local scan_started_outcome=""
     local post_scan_summary_json=""
     local post_scan_outcome=""
     local post_scan_persistence_summary_path=""
+
+    if [[ -f "${scan_started_snapshot_path}" ]]; then
+      scan_started_summary_json="$(scan_probe_summary_json "${scan_started_snapshot_path}")"
+      scan_started_outcome="$(scan_probe_outcome_value "${scan_started_summary_json}")"
+    fi
+
+    if [[ "${scan_started_outcome}" == "running" ]]; then
+      write_scan_probe_summary_artifact "06-scan-started" "${scan_started_summary_json}"
+      write_scan_probe_summary_root "${scan_started_summary_json}"
+    else
+      wait_for_scan_probe_outcome 1 1 "07" 60
+    fi
+
     post_scan_summary_json="$(cat "${RUN_DIR}/scan-probe-state.json")"
     post_scan_outcome="$(scan_probe_outcome_value "${post_scan_summary_json}")"
     post_scan_persistence_summary_path="$(capture_and_assert_scan_persistence "post-scan" "${post_scan_outcome}" "scan-probe")"
@@ -2845,7 +3398,7 @@ run_scan_complete_probe() {
       echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
       exit 1
     fi
-    agent_device_target install "${APP_ID}" "${APK_PATH}"
+    install_debug_apk
   fi
 
   configure_adb_reverse
@@ -2956,7 +3509,7 @@ run_permission_denied_probe() {
       echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
       exit 1
     fi
-    agent_device_target install "${APP_ID}" "${APK_PATH}"
+    install_debug_apk
   fi
 
   configure_adb_reverse
@@ -3048,7 +3601,7 @@ run_scan_cleanup_probe() {
       echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
       exit 1
     fi
-    agent_device_target install "${APP_ID}" "${APK_PATH}"
+    install_debug_apk
   fi
 
   configure_adb_reverse
@@ -3105,38 +3658,60 @@ run_scan_cleanup_probe() {
       agent_device_session wait 'id="photo-grid-start-scan-button"' 10000
       agent_device_session press 'id="photo-grid-start-scan-button"'
       wait_for_scan_probe_outcome 0 0 "06" 90
-      agent_device_session wait 'id="scan-result-grid-item"' 10000
+      if ! wait_for_seeded_result_item "06-seeded-result-poll" 10; then
+        echo "真实 seeded media scan 已完成，但未稳定观察到结果摘要或 issue workspace。" >&2
+        exit 1
+      fi
       capture_step_artifacts "06-seeded-result-ready"
     fi
-  elif ! agent_device_session wait 'id="scan-result-grid-item"' 3000 >/dev/null 2>&1; then
-    echo "scan-cleanup 前既无 start-scan 按钮，也未观察到 scan-result-grid-item。" >&2
+  elif ! wait_for_seeded_result_item "05-existing-result-poll" 6 >/dev/null 2>&1; then
+    echo "scan-cleanup 前既无 start-scan 按钮，也未观察到结果摘要或 scan-result-grid-item。" >&2
     exit 1
   fi
 
   local scan_cleanup_summary_json=""
   local scan_cleanup_outcome=""
+  local scan_cleanup_persistence_outcome=""
   local scan_cleanup_persistence_summary_path=""
+  local scan_cleanup_snapshot_path="${RUN_DIR}/scan-cleanup-pre-detail.json"
+  local has_scan_cleanup_result_summary="false"
   scan_cleanup_summary_json="$(cat "${RUN_DIR}/scan-probe-state.json" 2>/dev/null || true)"
+  agent_device_session snapshot -i -c --json > "${scan_cleanup_snapshot_path}"
   if [[ -z "${scan_cleanup_summary_json}" ]]; then
-    local scan_cleanup_snapshot_path="${RUN_DIR}/scan-cleanup-pre-detail.json"
-    agent_device_session snapshot -i -c --json > "${scan_cleanup_snapshot_path}"
     scan_cleanup_summary_json="$(scan_probe_summary_json "${scan_cleanup_snapshot_path}")"
   fi
   scan_cleanup_outcome="$(scan_probe_outcome_value "${scan_cleanup_summary_json}")"
-  scan_cleanup_persistence_summary_path="$(capture_and_assert_scan_persistence "post-scan-before-cleanup" "${scan_cleanup_outcome}" "scan-cleanup")"
+  has_scan_cleanup_result_summary="$(snapshot_has_result_summary_surface "${scan_cleanup_snapshot_path}")"
+  scan_cleanup_persistence_outcome="${scan_cleanup_outcome}"
+  if [[ "${scan_cleanup_persistence_outcome}" == "exhausted" && "${has_scan_cleanup_result_summary}" == "true" ]]; then
+    scan_cleanup_persistence_outcome="result-ready"
+  fi
+  scan_cleanup_persistence_summary_path="$(capture_and_assert_scan_persistence "post-scan-before-cleanup" "${scan_cleanup_persistence_outcome}" "scan-cleanup")"
 
+  local result_step_name="07-scan-result-item-visible"
   if ! agent_device_session wait 'id="scan-result-grid-item"' 2000 >/dev/null 2>&1; then
     if agent_device_session wait 'id="tab-button-Photos"' 2000 >/dev/null 2>&1; then
-      agent_device_session press 'id="tab-button-Photos"' || true
+      press_photos_tab_best_effort || true
       ensure_app_foreground
       reattach_session_best_effort || true
-      agent_device_session wait 'id="scan-result-grid-item"' 10000
+      wait_for_seeded_result_item "07-photos-result-poll" 10 || true
     fi
   fi
 
-  capture_step_artifacts "07-scan-result-item-visible"
-  if ! tap_identifier_from_step_artifact "07-scan-result-item-visible" "scan-result-grid-item"; then
-    if ! press_identifier_from_step_artifact "07-scan-result-item-visible" "scan-result-grid-item"; then
+  capture_step_artifacts "${result_step_name}"
+  if ! step_artifact_has_identifier "${result_step_name}" "scan-result-grid-item"; then
+    if ! open_issue_workspace_from_result_summary "${result_step_name}"; then
+      echo "scan-cleanup 结果页未直接暴露 scan-result-grid-item，且无法通过 breakdown 卡片进入 issue workspace。" >&2
+      exit 1
+    fi
+
+    result_step_name="07b-scan-issue-workspace"
+    agent_device_session wait 'id="scan-result-grid-item"' 5000
+    capture_step_artifacts "${result_step_name}"
+  fi
+
+  if ! tap_identifier_from_step_artifact "${result_step_name}" "scan-result-grid-item"; then
+    if ! press_identifier_from_step_artifact "${result_step_name}" "scan-result-grid-item"; then
       agent_device_session press 'id="scan-result-grid-item"'
     fi
   fi
@@ -3171,6 +3746,131 @@ agent-device scan cleanup probe 证据已生成:
 EOF
 }
 
+run_filtering_selection_probe() {
+  require_command adb
+  require_command npx
+  require_command node
+  require_command python3
+  detect_android_serial
+  reset_agent_device_state_if_idle
+  close_conflicting_android_sessions
+  mkdir -p "${ARTIFACT_ROOT}"
+  prepare_run_dir
+
+  trap cleanup_capture EXIT
+
+  agent_device close --platform android --session "${SESSION}" >/dev/null 2>&1 || true
+  reset_app_state
+  agent_device devices --platform android --json > "${RUN_DIR}/devices.json"
+  agent_device_target apps --json > "${RUN_DIR}/apps.json"
+
+  if [[ "${INSTALL_APK}" -eq 1 ]]; then
+    if [[ ! -f "${APK_PATH}" ]]; then
+      echo "未找到 debug APK: ${APK_PATH}" >&2
+      echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
+      exit 1
+    fi
+    install_debug_apk
+  fi
+
+  configure_adb_reverse
+  agent_device metro prepare \
+    --public-base-url "${METRO_PUBLIC_BASE_URL}" \
+    --project-root "${REPO_ROOT}" \
+    --port "${METRO_PORT}" \
+    --kind expo \
+    --runtime-file "${RUN_DIR}/metro-runtime.json"
+
+  open_app_with_session
+  ensure_app_foreground
+  prepare_active_session
+
+  start_react_devtools_if_requested
+
+  maybe_advance_past_landing_if_present "01-landing-ready" "02-landing-cta" || true
+  ensure_media_permission_ready_for_scan "03-main-before-media-permission" "04-media-permission-dialog"
+  open_photo_grid_screen_for_scan
+  ensure_app_foreground
+  reattach_session_best_effort || true
+  agent_device_session wait 'id="tab-button-Settings"' 10000 || true
+
+  capture_step_artifacts "05-main-after-media-allow"
+
+  if agent_device_session wait 'id="photo-grid-start-scan-button"' 3000 >/dev/null 2>&1; then
+    local deterministic_seed_ready=0
+    if bash "${REPO_ROOT}/scripts/android/seed-emulator-scan-result.sh" --serial "${SERIAL}"; then
+      agent_device close --platform android --session "${SESSION}" >/dev/null 2>&1 || true
+      open_app_with_session "relaunch"
+      ensure_app_foreground
+      prepare_active_session
+      if wait_for_seeded_result_item "05-seeded-result-poll" 10; then
+        deterministic_seed_ready=1
+        capture_step_artifacts "06-seeded-result-ready"
+      else
+        echo "deterministic scan result 已写入，但重启后未稳定进入 result-ready 界面。" >&2
+      fi
+    else
+      echo "deterministic scan result fixture 未就绪。" >&2
+    fi
+
+    if [[ "${deterministic_seed_ready}" -ne 1 ]]; then
+      echo "filtering-selection 需要 deterministic scan result fixture 才能稳定采集选择态。" >&2
+      exit 1
+    fi
+  elif ! wait_for_seeded_result_item "05-existing-result-poll" 6 >/dev/null 2>&1; then
+    echo "filtering-selection 前既无 start-scan 按钮，也未观察到结果摘要或 scan-result-grid-item。" >&2
+    exit 1
+  fi
+
+  local result_step_name="07-scan-result-item-visible"
+  if ! agent_device_session wait 'id="scan-result-grid-item"' 2000 >/dev/null 2>&1; then
+    if agent_device_session wait 'id="tab-button-Photos"' 2000 >/dev/null 2>&1; then
+      press_photos_tab_best_effort || true
+      ensure_app_foreground
+      reattach_session_best_effort || true
+      wait_for_seeded_result_item "07-photos-result-poll" 10 || true
+    fi
+  fi
+
+  capture_step_artifacts "${result_step_name}"
+  if ! step_artifact_has_identifier "${result_step_name}" "scan-result-grid-item"; then
+    if ! open_issue_workspace_from_result_summary "${result_step_name}"; then
+      echo "filtering-selection 结果页未直接暴露 scan-result-grid-item，且无法通过 breakdown 卡片进入 issue workspace。" >&2
+      exit 1
+    fi
+
+    result_step_name="07b-scan-issue-workspace"
+    agent_device_session wait 'id="scan-result-grid-item"' 5000
+    capture_step_artifacts "${result_step_name}"
+  fi
+
+  if ! long_press_identifier_from_step_artifact "${result_step_name}" "scan-result-grid-item"; then
+    echo "未能对 scan-result-grid-item 执行 long press，无法进入 filtering selection mode。" >&2
+    exit 1
+  fi
+
+  agent_device_session wait 'id="photo-selection-toggle-button"' 5000
+  agent_device_session wait 'id="cleanup-selected-button"' 5000
+  capture_step_artifacts "08-filtering-selection-mode"
+
+  if ! step_artifact_has_identifier "08-filtering-selection-mode" "keep-selected-button" \
+    || ! step_artifact_has_identifier "08-filtering-selection-mode" "cleanup-selected-button"; then
+    echo "filtering selection mode 未观察到底部保留/清理动作区。" >&2
+    exit 1
+  fi
+
+  collect_runtime_artifacts
+  finish_react_devtools_if_connected
+
+  cat <<EOF
+agent-device filtering selection 证据已生成:
+  目录: ${RUN_DIR}
+  最终 Snapshot: ${RUN_DIR}/snapshot.json
+  最终 Screenshot: ${RUN_DIR}/current-screen.png
+  分步证据目录: ${RUN_DIR}/steps
+EOF
+}
+
 run_continue_scan_probe() {
   require_command adb
   require_command npx
@@ -3195,7 +3895,7 @@ run_continue_scan_probe() {
       echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
       exit 1
     fi
-    agent_device_target install "${APP_ID}" "${APK_PATH}"
+    install_debug_apk
   fi
 
   bash "${SCRIPT_DIR}/seed-emulator-media.sh" \
@@ -3326,7 +4026,7 @@ run_all_complete_probe() {
       echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
       exit 1
     fi
-    agent_device_target install "${APP_ID}" "${APK_PATH}"
+    install_debug_apk
   fi
 
   bash "${SCRIPT_DIR}/seed-emulator-media.sh" \
@@ -3389,16 +4089,34 @@ run_all_complete_probe() {
     exit 1
   fi
 
-  agent_device_session wait 'id="scan-result-grid-item"' 5000
-  capture_step_artifacts "10-result-ready-before-clear"
+  local all_complete_result_step="10-result-ready-before-clear"
+  if ! agent_device_session wait 'id="scan-result-grid-item"' 2000 >/dev/null 2>&1; then
+    if agent_device_session wait 'id="tab-button-Photos"' 2000 >/dev/null 2>&1; then
+      press_photos_tab_best_effort || true
+      ensure_app_foreground
+      reattach_session_best_effort || true
+    fi
+  fi
+
+  capture_step_artifacts "${all_complete_result_step}"
+  if ! step_artifact_has_identifier "${all_complete_result_step}" "scan-result-grid-item"; then
+    if ! open_issue_workspace_from_result_summary "${all_complete_result_step}"; then
+      echo "all-complete 结果页未直接暴露 scan-result-grid-item，且无法通过 breakdown 卡片进入 issue workspace。" >&2
+      exit 1
+    fi
+    all_complete_result_step="10b-result-issue-workspace-before-clear"
+    agent_device_session wait 'id="scan-result-grid-item"' 5000
+    capture_step_artifacts "${all_complete_result_step}"
+  fi
+
   local expected_selection_count="0"
-  expected_selection_count="$(count_identifier_occurrences_from_step_artifact "10-result-ready-before-clear" "scan-result-grid-item")"
+  expected_selection_count="$(count_identifier_occurrences_from_step_artifact "${all_complete_result_step}" "scan-result-grid-item")"
   if [[ ! "${expected_selection_count}" =~ ^[0-9]+$ || "${expected_selection_count}" -le 0 ]]; then
     echo "未能从扫描结果页识别到可选结果项，无法进入 all-complete 终态验证。" >&2
     exit 1
   fi
 
-  if ! long_press_identifier_from_step_artifact "10-result-ready-before-clear" "scan-result-grid-item"; then
+  if ! long_press_identifier_from_step_artifact "${all_complete_result_step}" "scan-result-grid-item"; then
     echo "未能对 scan-result-grid-item 执行 long press，无法进入 selection mode。" >&2
     exit 1
   fi
@@ -3490,7 +4208,7 @@ run_recycle_probe() {
       echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
       exit 1
     fi
-    agent_device_target install "${APP_ID}" "${APK_PATH}"
+    install_debug_apk
   fi
 
   configure_adb_reverse
@@ -3557,6 +4275,117 @@ agent-device recycle probe 证据已生成:
 EOF
 }
 
+run_recycle_selection_probe() {
+  require_command adb
+  require_command npx
+  require_command node
+  detect_android_serial
+  reset_agent_device_state_if_idle
+  close_conflicting_android_sessions
+  mkdir -p "${ARTIFACT_ROOT}"
+  prepare_run_dir
+
+  trap cleanup_capture EXIT
+
+  agent_device close --platform android --session "${SESSION}" >/dev/null 2>&1 || true
+  agent_device devices --platform android --json > "${RUN_DIR}/devices.json"
+  agent_device_target apps --json > "${RUN_DIR}/apps.json"
+
+  if [[ "${INSTALL_APK}" -eq 1 ]]; then
+    if [[ ! -f "${APK_PATH}" ]]; then
+      echo "未找到 debug APK: ${APK_PATH}" >&2
+      echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
+      exit 1
+    fi
+    install_debug_apk
+  fi
+
+  configure_adb_reverse
+  agent_device metro prepare \
+    --public-base-url "${METRO_PUBLIC_BASE_URL}" \
+    --project-root "${REPO_ROOT}" \
+    --port "${METRO_PORT}" \
+    --kind expo \
+    --runtime-file "${RUN_DIR}/metro-runtime.json"
+
+  bash "${SCRIPT_DIR}/seed-emulator-media.sh" \
+    --serial "${SERIAL}" \
+    --clean >/dev/null
+  seed_recycle_bin_fixture --count 9
+  open_app_with_session
+  ensure_app_foreground
+  prepare_active_session
+  grant_media_permissions_best_effort
+
+  start_react_devtools_if_requested
+
+  maybe_advance_past_landing_if_present "01-landing-ready" "02-landing-cta" || true
+
+  capture_step_artifacts "02-main-tabs"
+  open_recycle_bin_screen
+  agent_device_session wait 1500 >/dev/null 2>&1 || true
+  if close_detail_viewer_if_present; then
+    open_recycle_bin_screen
+    agent_device_session wait 1000 >/dev/null 2>&1 || true
+  fi
+  capture_step_artifacts "03-recycle-bin"
+
+  if ! agent_device_session wait 'id="recycle-bin-item"' 5000 >/dev/null 2>&1 \
+    && ! step_artifact_has_identifier "03-recycle-bin" "recycle-bin-item"; then
+    echo "recycle-selection 未观察到 recycle-bin-item。" >&2
+    exit 1
+  fi
+
+  capture_step_artifacts "04-recycle-item-visible"
+  if step_artifact_has_identifier "04-recycle-item-visible" "detail-close-button"; then
+    close_detail_viewer_if_present || true
+    open_recycle_bin_screen
+    agent_device_session wait 1000 >/dev/null 2>&1 || true
+    capture_step_artifacts "04-recycle-item-visible"
+  fi
+
+  local already_in_selection_mode=0
+  if step_artifact_has_identifier "04-recycle-item-visible" "recycle-selection-toggle-button" \
+    && step_artifact_has_identifier "04-recycle-item-visible" "recycle-delete-selected-button"; then
+    echo "recycle-selection: 回收站已默认处于设计稿选择态，跳过旧版 long press 入口。"
+    already_in_selection_mode=1
+  else
+    if ! long_press_identifier_from_step_artifact "04-recycle-item-visible" "recycle-bin-item"; then
+      echo "未能对 recycle-bin-item 执行 long press，无法进入 recycle selection mode。" >&2
+      exit 1
+    fi
+  fi
+
+  if [[ "${already_in_selection_mode}" -eq 0 ]]; then
+    agent_device_session wait 'id="recycle-selection-toggle-button"' 5000
+    agent_device_session wait 'id="recycle-delete-selected-button"' 5000
+  fi
+  capture_step_artifacts "05-recycle-selection-mode"
+
+  if ! step_artifact_has_identifier "05-recycle-selection-mode" "recycle-restore-selected-button" \
+    && ! step_artifact_has_identifier "04-recycle-item-visible" "recycle-restore-selected-button"; then
+    echo "recycle selection mode 未观察到底部保留动作区。" >&2
+    exit 1
+  fi
+
+  if ! step_artifact_has_identifier "05-recycle-selection-mode" "recycle-delete-selected-button" \
+    && ! step_artifact_has_identifier "04-recycle-item-visible" "recycle-delete-selected-button"; then
+    echo "recycle selection mode 未观察到底部保留/清理动作区。" >&2
+    exit 1
+  fi
+
+  collect_runtime_artifacts
+  finish_react_devtools_if_connected
+
+  cat <<EOF
+agent-device recycle selection 证据已生成:
+  目录: ${RUN_DIR}
+  最终 Snapshot: ${RUN_DIR}/snapshot.json
+  最终 Screenshot: ${RUN_DIR}/current-screen.png
+  分步证据目录: ${RUN_DIR}/steps
+EOF
+}
+
 run_recycle_delete_probe() {
   require_command adb
   require_command npx
@@ -3579,7 +4408,7 @@ run_recycle_delete_probe() {
       echo "请先执行 npm run build:android:debug，或通过 --apk-path 指定现有 APK。" >&2
       exit 1
     fi
-    agent_device_target install "${APP_ID}" "${APK_PATH}"
+    install_debug_apk
   fi
 
   configure_adb_reverse
@@ -3625,10 +4454,13 @@ run_recycle_delete_probe() {
       exit 1
     fi
 
+    if handle_in_app_delete_confirmation_if_present; then
+      agent_device_session wait 700 >/dev/null 2>&1 || true
+    fi
+
     if wait_for_media_permission_dialog; then
       capture_step_artifacts "05-recycle-delete-media-permission"
       press_system_allow
-      ensure_app_foreground
     fi
 
     if handle_external_media_delete_confirmation_if_present; then
@@ -3641,11 +4473,13 @@ run_recycle_delete_probe() {
       press_system_allow
     fi
     ensure_app_foreground
+    open_recycle_bin_screen
     agent_device_session wait 1000 >/dev/null 2>&1 || true
     capture_step_artifacts "06-recycle-delete-return"
     if step_artifact_has_identifier "06-recycle-delete-return" "recycle-bin-empty-title"; then
       mv "${RUN_DIR}/steps/06-recycle-delete-return" "${RUN_DIR}/steps/06-recycle-deleted-empty"
-    elif step_artifact_has_identifier "06-recycle-delete-return" "recycle-bin-header-title"; then
+    elif step_artifact_has_identifier "06-recycle-delete-return" "recycle-bin-header-title" \
+      && ! step_artifact_has_identifier "06-recycle-delete-return" "recycle-bin-item"; then
       mv "${RUN_DIR}/steps/06-recycle-delete-return" "${RUN_DIR}/steps/06-recycle-deleted"
     else
       echo "hard delete 后未回到 recycle bin 页。" >&2
@@ -3787,8 +4621,17 @@ case "${COMMAND}" in
   scan-cleanup)
     run_and_exit run_scan_cleanup_probe
     ;;
+  settings-signoff)
+    run_and_exit run_settings_signoff_probe
+    ;;
+  filtering-selection)
+    run_and_exit run_filtering_selection_probe
+    ;;
   recycle)
     run_and_exit run_recycle_probe
+    ;;
+  recycle-selection)
+    run_and_exit run_recycle_selection_probe
     ;;
   recycle-delete)
     run_and_exit run_recycle_delete_probe

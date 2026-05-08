@@ -102,14 +102,14 @@ function resolveDetailActionSelection(
         candidate.asset.fileSize >= candidate.duplicateGroup.representativeFileSize &&
         candidate.asset.creationTime >= candidate.duplicateGroup.representativeCreationTime);
 
-    return isRepresentativeCandidate ? 'secondary' : 'primary';
+    return isRepresentativeCandidate ? 'primary' : 'secondary';
   }
 
   if (candidate.score >= 80 && candidate.confidence === 'high') {
-    return 'primary';
+    return 'secondary';
   }
 
-  return 'secondary';
+  return 'primary';
 }
 
 export function DetailScreen({
@@ -166,12 +166,19 @@ export function DetailScreen({
     viewerCandidates.findIndex((entry) => entry.id === activeDetailCandidate.id),
   );
   const actionTargetIds = [activeCandidateIdRef.current ?? activeDetailCandidate.id];
-  const primaryLabel =
-    mode === 'recycle' ? copy.preview.restoreCompactAction : copy.preview.clearCompactAction;
   const showKeepAction = mode === 'suggestions' && Boolean(onKeep);
-  const secondaryLabel = showKeepAction
-    ? copy.preview.keepCompactAction
-    : copy.preview.deleteForeverCompactAction;
+  const primaryLabel =
+    mode === 'recycle'
+      ? copy.preview.keepCompactAction
+      : showKeepAction
+        ? copy.preview.keepCompactAction
+        : copy.preview.clearCompactAction;
+  const secondaryLabel =
+    mode === 'recycle'
+      ? copy.preview.deleteForeverCompactAction
+      : showKeepAction
+        ? copy.preview.clearCompactAction
+        : copy.preview.deleteForeverCompactAction;
   const viewerTags = selectDetailViewerTags(
     activeDetailCandidate,
     getDetailViewerTags(activeDetailCandidate, language),
@@ -194,12 +201,17 @@ export function DetailScreen({
   };
 
   const handlePrimaryActionPress = () => {
+    if (showKeepAction) {
+      runActionSafely(() => onKeep?.(actionTargetIds));
+      return;
+    }
+
     runActionSafely(() => onPrimaryAction(actionTargetIds));
   };
 
   const handleSecondaryActionPress = () => {
     if (showKeepAction) {
-      runActionSafely(() => onKeep?.(actionTargetIds));
+      runActionSafely(() => onPrimaryAction(actionTargetIds));
       return;
     }
 
@@ -303,15 +315,15 @@ export function DetailScreen({
                 secondaryLabel={secondaryLabel}
                 onPrimaryPress={handlePrimaryActionPress}
                 onSecondaryPress={handleSecondaryActionPress}
-                primaryIcon={mode === 'recycle' ? 'arrow-undo-outline' : 'trash-outline'}
-                secondaryIcon={showKeepAction ? 'checkmark-circle-outline' : 'trash-outline'}
-                primaryTone={mode === 'recycle' ? 'keep' : 'danger'}
-                secondaryTone={showKeepAction ? 'keep' : 'danger'}
+                primaryIcon={mode === 'recycle' || showKeepAction ? 'checkmark-circle-outline' : 'trash-bin-outline'}
+                secondaryIcon="trash-bin-outline"
+                primaryTone={mode === 'recycle' || showKeepAction ? 'keep' : 'danger'}
+                secondaryTone="danger"
                 selectedAction={selectedAction}
                 density="compact"
                 testID="detail-action-switch"
-                primaryTestID="detail-primary-action"
-                secondaryTestID={showKeepAction ? 'detail-keep-action' : 'detail-hard-delete'}
+                primaryTestID={showKeepAction ? 'detail-keep-action' : 'detail-primary-action'}
+                secondaryTestID={showKeepAction ? 'detail-primary-action' : 'detail-hard-delete'}
               />
             </View>
           </View>

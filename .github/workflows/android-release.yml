@@ -27,6 +27,10 @@ jobs:
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      VERCEL_ORG_ID: team_KMAhi2p340W6VAP8OPUVhJh7
+      VERCEL_PROJECT_ID: prj_MP950Qnus5voEiUep7mT2GHeP8wq
+      PAGE_PRODUCTION_URL: https://mc.jerret.me
+      ANDROID_LATEST_APK_URL: https://mc.jerret.me/download/android-latest.apk
 
     steps:
       - name: Checkout
@@ -108,14 +112,14 @@ jobs:
           cp "artifacts/android-release/release-metadata.json" "${VERSIONED_METADATA}"
           cp "artifacts/android-release/app-release.signing.txt" "${VERSIONED_SIGNING}"
 
-          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/media-clean-android-latest.apk"
+          GITHUB_BACKUP_DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/media-clean-android-latest.apk"
           {
             echo "versioned_apk=${VERSIONED_APK}"
             echo "latest_apk=${LATEST_APK}"
             echo "versioned_sha=${VERSIONED_SHA}"
             echo "versioned_metadata=${VERSIONED_METADATA}"
             echo "versioned_signing=${VERSIONED_SIGNING}"
-            echo "download_url=${DOWNLOAD_URL}"
+            echo "github_backup_download_url=${GITHUB_BACKUP_DOWNLOAD_URL}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Publish GitHub release assets
@@ -149,16 +153,56 @@ jobs:
             artifacts/android-release/media-clean-android-v*.metadata.json
             artifacts/android-release/media-clean-android-v*.signing.txt
 
+      - name: Prepare page Android download asset
+        run: node scripts/release/prepare-page-android-download.mjs --apk android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Deploy page download to Vercel production
+        id: deploy_page
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "缺少 GitHub secret: VERCEL_TOKEN" >&2
+            exit 1
+          fi
+
+          cd page
+          npx vercel pull --yes --environment=production --token "${VERCEL_TOKEN}"
+          npx vercel build --prod --token "${VERCEL_TOKEN}"
+
+          DEPLOY_OUTPUT="$(npx vercel deploy --prebuilt --prod --yes --token "${VERCEL_TOKEN}")"
+          printf '%s\n' "${DEPLOY_OUTPUT}"
+
+          DEPLOYMENT_URL="$(printf '%s\n' "${DEPLOY_OUTPUT}" | grep -Eo 'https://[^[:space:]]+' | tail -n 1)"
+          if [ -z "${DEPLOYMENT_URL}" ]; then
+            echo "无法从部署输出中解析 deployment url" >&2
+            exit 1
+          fi
+
+          echo "deployment_url=${DEPLOYMENT_URL}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify production page download
+        run: |
+          curl -fsSIL "${PAGE_PRODUCTION_URL}"
+          PAGE_HTML="$(curl -sS "${PAGE_PRODUCTION_URL}")"
+          printf '%s' "${PAGE_HTML}" | grep -q '下载 Android'
+          printf '%s' "${PAGE_HTML}" | grep -q 'Android APK'
+          printf '%s' "${PAGE_HTML}" | grep -q "${ANDROID_LATEST_APK_URL}"
+          curl -fsSIL "${ANDROID_LATEST_APK_URL}"
+
       - name: Publish release summary
         env:
           RELEASE_TAG: ${{ steps.release_tag.outputs.value }}
           RELEASE_VERSION: ${{ steps.release_tag.outputs.version }}
-          DOWNLOAD_URL: ${{ steps.release_assets.outputs.download_url }}
+          GITHUB_BACKUP_DOWNLOAD_URL: ${{ steps.release_assets.outputs.github_backup_download_url }}
+          PAGE_DEPLOYMENT_URL: ${{ steps.deploy_page.outputs.deployment_url }}
         run: |
           {
             echo "## Android release 已发布"
             echo
             echo "- Tag: \`${RELEASE_TAG}\`"
             echo "- Version: \`${RELEASE_VERSION}\`"
-            echo "- Canonical page download URL: ${DOWNLOAD_URL}"
+            echo "- Canonical page download URL: ${ANDROID_LATEST_APK_URL}"
+            echo "- Page deployment URL: ${PAGE_DEPLOYMENT_URL}"
+            echo "- GitHub backup asset URL: ${GITHUB_BACKUP_DOWNLOAD_URL}"
           } >> "${GITHUB_STEP_SUMMARY}"

@@ -3,6 +3,23 @@
   "trailingSlash": false,
   "headers": [
     {
+      "source": "/download/android-latest.apk",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, s-maxage=300, must-revalidate"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"android-latest.apk\""
+        },
+        {
+          "key": "Content-Type",
+          "value": "application/vnd.android.package-archive"
+        }
+      ]
+    },
+    {
       "source": "/promo-video-60fps.mp4",
       "headers": [
         {

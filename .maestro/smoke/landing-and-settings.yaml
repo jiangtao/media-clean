@@ -24,7 +24,17 @@ name: Landing and settings smoke
     timeout: 20000
 - tapOn:
     id: language-option-en-US
+- scrollUntilVisible:
+    element:
+      text: "Scan Range"
+    direction: UP
+    timeout: 20000
 - assertVisible: "Scan Range"
+- scrollUntilVisible:
+    element:
+      text: "Appearance"
+    direction: DOWN
+    timeout: 20000
 - assertVisible: "Appearance"
 - scrollUntilVisible:
     element:
@@ -33,7 +43,7 @@ name: Landing and settings smoke
     timeout: 20000
 - tapOn:
     id: theme-option-dark
-- assertVisible: "Current theme:"
+- assertVisible: "Dark"
 - tapOn:
     id: theme-option-light
 - scrollUntilVisible:
@@ -43,5 +53,15 @@ name: Landing and settings smoke
     timeout: 20000
 - tapOn:
     id: language-option-zh-CN
+- scrollUntilVisible:
+    element:
+      text: "扫描范围"
+    direction: UP
+    timeout: 20000
 - assertVisible: "扫描范围"
+- scrollUntilVisible:
+    element:
+      text: "显示主题"
+    direction: DOWN
+    timeout: 20000
 - assertVisible: "显示主题"

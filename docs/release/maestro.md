@@ -62,7 +62,9 @@ INSTALL_FAILED_USER_RESTRICTED: Install canceled by user
 ```
 
 3. 这类错误说明交互验收链路被设备策略拦住，不等于 `Media Clean` 产品本身启动失败。
-4. 处理方式是先在开发者选项里允许 USB 安装 / 调试安装，再重新执行 `npm run test:maestro:smoke`。
+4. 额外确认：本地 `maestro 2.3.0` 即便带 `--no-reinstall-driver`，仍会尝试安装 `maestro-server.apk`，其包名为 `dev.mobile.maestro.test`；因此“设备上已有 `dev.mobile.maestro` driver”并不能绕过这一步。
+5. 在当前 Xiaomi / MIUI 真机上，若 `dev.mobile.maestro.test` 未预装，就没有仓库内可脚本化的本地绕过方案；处理方式仍是先在开发者选项里允许 USB 安装 / 调试安装，再重新执行 `npm run test:maestro:smoke`。
+6. 若当前设备策略无法放开，仓库内现成 fallback 是 emulator / CI lane，而不是继续在这台真机上重试。
 
 ## CI 自动化
 
@@ -79,6 +81,7 @@ INSTALL_FAILED_USER_RESTRICTED: Install canceled by user
 
 1. 本地 Xiaomi / MIUI 真机若拦截 Maestro driver，CI 仍可独立提供次级交互 smoke 信号。
 2. 交互 smoke 仍可进入 PR / 主干自动化，但主设备观测应优先看 `agent-device` artifact。
+3. 当真机同时拦截 `dev.mobile.maestro` / `dev.mobile.maestro.test` 安装时，CI emulator 是仓库内唯一稳定可复用的 Maestro 执行路径。
 
 ## 下一步推荐补充
 

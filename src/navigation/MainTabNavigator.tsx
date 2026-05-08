@@ -10,10 +10,16 @@ import { useAppPreferences } from '../application/AppPreferencesContext';
 import { loadRecycleBinIds } from '../services/storage/app-storage';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
+let lastSelectedMainTab: keyof MainTabParamList = 'Photos';
+
+export function __resetMainTabNavigatorSessionState() {
+  lastSelectedMainTab = 'Photos';
+}
 
 type MainTabScreenContextValue = {
   recycleBinIds: string[];
   onRecycleBinIdsChange: (ids: string[]) => void;
+  rememberSelectedTab: (tab: keyof MainTabParamList) => void;
 };
 
 const MainTabScreenContext = createContext<MainTabScreenContextValue | null>(null);
@@ -26,33 +32,50 @@ function useMainTabScreenContext() {
   return context;
 }
 
-function PhotosTabScreen() {
+function PhotosTabScreen({ route }: { route?: { params?: MainTabParamList['Photos'] } }) {
   const { recycleBinIds, onRecycleBinIdsChange } = useMainTabScreenContext();
   return (
     <PhotoGridScreen
       recycleBinIds={recycleBinIds}
       onRecycleBinIdsChange={onRecycleBinIdsChange}
+      autoStartScan={route?.params?.autoStartScan === true}
     />
   );
 }
 
-function RecycleBinTabScreen() {
-  const { recycleBinIds, onRecycleBinIdsChange } = useMainTabScreenContext();
+function RecycleBinTabScreen({ navigation }: { navigation: any }) {
+  const { recycleBinIds, onRecycleBinIdsChange, rememberSelectedTab } = useMainTabScreenContext();
   return (
     <RecycleBinScreen
       recycleBinIds={recycleBinIds}
       onRecycleBinIdsChange={onRecycleBinIdsChange}
+      onBackToPhotos={() => {
+        rememberSelectedTab('Photos');
+        navigation.navigate('Photos');
+      }}
     />
   );
 }
 
-export function MainTabNavigator() {
+export function MainTabNavigator({
+  route,
+}: {
+  route?: {
+    params?: {
+      screen?: keyof MainTabParamList;
+      params?: MainTabParamList[keyof MainTabParamList];
+    };
+  };
+}) {
   const appPreferences = useAppPreferences() as ReturnType<typeof useAppPreferences> & {
     recycleBinIds?: string[];
   };
   const { copy, theme } = appPreferences;
   const [recycleBinIds, setRecycleBinIds] = useState<string[]>(() => appPreferences.recycleBinIds ?? []);
-  const [lastSelectedTab, setLastSelectedTab] = useState<keyof MainTabParamList>('Photos');
+  const initialNestedScreen = route?.params?.screen;
+  const [lastSelectedTab, setLastSelectedTab] = useState<keyof MainTabParamList>(
+    () => initialNestedScreen ?? lastSelectedMainTab,
+  );
   const recycleBinCount = recycleBinIds.length;
 
   const refreshRecycleBinIds = useCallback(async () => {
@@ -74,26 +97,28 @@ export function MainTabNavigator() {
     }
   }, [appPreferences.recycleBinIds]);
 
+  const rememberSelectedTab = useCallback((tab: keyof MainTabParamList) => {
+    lastSelectedMainTab = tab;
+    setLastSelectedTab(tab);
+  }, []);
+
   const tabs = useMemo(() => [
     {
       name: 'Photos',
       label: copy.tabs.photos,
-      icon: 'images-outline',
-      activeIcon: 'images',
+      icon: 'nav-photo' as const,
       badge: undefined,
     },
     {
       name: 'RecycleBin',
       label: copy.tabs.recycle,
-      icon: 'trash-outline',
-      activeIcon: 'trash',
+      icon: 'nav-trash' as const,
       badge: recycleBinCount || undefined,
     },
     {
       name: 'Settings',
       label: copy.tabs.settings,
-      icon: 'settings-outline',
-      activeIcon: 'settings',
+      icon: 'nav-setting' as const,
       badge: undefined,
     },
   ], [copy, recycleBinCount]);
@@ -102,8 +127,9 @@ export function MainTabNavigator() {
     () => ({
       recycleBinIds,
       onRecycleBinIdsChange: setRecycleBinIds,
+      rememberSelectedTab,
     }),
-    [recycleBinIds],
+    [recycleBinIds, rememberSelectedTab],
   );
 
   return (
@@ -120,7 +146,7 @@ export function MainTabNavigator() {
             activeTab={state.routes[state.index].name}
             onTabPress={(name) => {
               void refreshRecycleBinIds();
-              setLastSelectedTab(name as keyof MainTabParamList);
+              rememberSelectedTab(name as keyof MainTabParamList);
               const route = state.routes.find(r => r.name === name);
               if (route) {
                 navigation.navigate(route.name);

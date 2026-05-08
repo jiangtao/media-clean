@@ -41,7 +41,7 @@ export function buildRecentScanReminderCopy(
     return {
       title: reminderTitle,
       summary: candidateSentence,
-      detail: `本次扫描共检查 ${latestScan.scannedCount} 项媒体，其中 ${latestScan.highConfidenceCount} 项高置信度、${latestScan.mediumConfidenceCount} 项中置信度，保留和清理页里还有 ${latestScan.recycleBinCount} 项待处理。`,
+      detail: `本次扫描共检查 ${latestScan.scannedCount} 项媒体，其中 ${latestScan.highConfidenceCount} 项建议清理、${latestScan.mediumConfidenceCount} 项建议复核，保留和清理页里还有 ${latestScan.recycleBinCount} 项待处理。`,
     };
   }
 

@@ -323,7 +323,7 @@ function getCopy(locale: 'zh-CN' | 'en-US') {
       complete: 'Scan Complete',
       cancel: 'Cancel',
       pendingCount: '0/0',
-      completedResults: (count: number) => `Found ${count} abnormal items`,
+      completedResults: (count: number) => `Found ${count} items to review`,
     };
   }
 
@@ -333,7 +333,7 @@ function getCopy(locale: 'zh-CN' | 'en-US') {
     complete: '扫描完成',
     cancel: '取消',
     pendingCount: '0/0',
-    completedResults: (count: number) => `发现 ${count} 个异常媒体`,
+    completedResults: (count: number) => `发现 ${count} 个待处理媒体`,
   };
 }
 

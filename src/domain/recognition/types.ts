@@ -45,6 +45,11 @@ export interface DuplicateGroup {
   representativeCreationTime: number;
 }
 
+export interface CleanupCandidateScanBatchRange {
+  startAt: number | null;
+  endAt: number | null;
+}
+
 export interface CleanupCandidate {
   id: string;
   asset: MediaAssetSnapshot;
@@ -55,4 +60,5 @@ export interface CleanupCandidate {
   issueTypes: CleanupIssueType[];
   reasons: string[];
   duplicateGroup?: DuplicateGroup;
+  scanBatchRange?: CleanupCandidateScanBatchRange;
 }

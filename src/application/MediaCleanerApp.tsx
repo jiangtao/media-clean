@@ -798,9 +798,9 @@ export function MediaCleanerApp() {
             <Text style={styles.summaryCaption}>{copy.summary.candidatesCaption}</Text>
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>{copy.summary.highConfidenceLabel}</Text>
+            <Text style={styles.summaryLabel}>{copy.summary.suggestedCleanupLabel}</Text>
             <Text style={styles.summaryValue}>{effectiveSummary.highConfidenceCount}</Text>
-            <Text style={styles.summaryCaption}>{copy.summary.highConfidenceCaption}</Text>
+            <Text style={styles.summaryCaption}>{copy.summary.suggestedCleanupCaption}</Text>
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>{copy.summary.recycleLabel}</Text>

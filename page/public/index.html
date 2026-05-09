@@ -6194,7 +6194,7 @@
                   class="flex items-center gap-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-full transition-colors">
                   <span>EN</span>
                 </a>
-                <a data-android-download-link download="media-clean-android-latest.apk"
+                <a data-android-download-link download="android-latest.apk"
                   class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full hover:shadow-lg transition-shadow inline-flex items-center justify-center"><span>下载 Android</span></a>
               </div>
             </div>
@@ -6232,7 +6232,7 @@
                     </div>
                   </button>
                   -->
-                  <a data-android-download-link download="media-clean-android-latest.apk"
+                  <a data-android-download-link download="android-latest.apk"
                     class="bg-black text-white px-8 py-4 rounded-2xl flex items-center gap-3 hover:bg-gray-800 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -6564,7 +6564,7 @@
                   </div>
                 </button>
                 -->
-                <a data-android-download-link download="media-clean-android-latest.apk" class="bg-white text-purple-600 px-8 py-4 rounded-2xl flex items-center gap-3 hover:bg-gray-100 transition-colors justify-center">
+                <a data-android-download-link download="android-latest.apk" class="bg-white text-purple-600 px-8 py-4 rounded-2xl flex items-center gap-3 hover:bg-gray-100 transition-colors justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                     class="lucide lucide-download size-5">
@@ -6617,7 +6617,7 @@
                   <ul class="space-y-2 text-gray-400">
                     <li><a href="https://github.com/jiangtao/media-clean/blob/main/README.en.md"
                         class="hover:text-white transition-colors"><span>功能特性</span></a></li>
-                    <li><a data-android-download-link download="media-clean-android-latest.apk"
+                    <li><a data-android-download-link download="android-latest.apk"
                         class="hover:text-white transition-colors"><span>下载 Android</span></a></li>
                   </ul>
                 </div>
@@ -6653,12 +6653,12 @@
   </div>
 
   <script>
-    const ANDROID_RELEASE_LATEST_URL = 'https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk';
+    const ANDROID_RELEASE_LATEST_URL = 'https://mc.jerret.me/download/android-latest.apk';
 
     function wireAndroidDownloadLinks() {
       document.querySelectorAll('[data-android-download-link]').forEach((link) => {
         link.setAttribute('href', ANDROID_RELEASE_LATEST_URL);
-        link.setAttribute('download', 'media-clean-android-latest.apk');
+        link.setAttribute('download', 'android-latest.apk');
         link.setAttribute('aria-label', '下载最新正式版 Android APK');
       });
     }

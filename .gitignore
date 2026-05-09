@@ -8,6 +8,7 @@ node_modules/
 .expo/
 /dist/
 /page/dist/
+/page/public/download/*.apk
 web-build/
 expo-env.d.ts
 

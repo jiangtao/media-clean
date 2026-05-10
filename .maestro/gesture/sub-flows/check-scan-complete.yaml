@@ -1,0 +1,19 @@
+appId: com.jt.mistapmediacleaner
+name: Check Scan Complete
+---
+# 检查扫描是否完成 (用于 repeat)
+
+- runFlow:
+    when:
+      visible: "photo-grid-start-scan-button"
+    commands:
+      - stopFlow
+
+- runFlow:
+    when:
+      visible:
+        id: "scan-result-grid-item"
+    commands:
+      - stopFlow
+
+- wait: 1000

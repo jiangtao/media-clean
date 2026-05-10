@@ -1,0 +1,14 @@
+appId: com.jt.mistapmediacleaner
+name: Start Scan and Wait
+---
+# 启动扫描并等待完成
+
+- tapOn:
+    id: "photo-grid-start-scan-button"
+
+# 等待扫描完成 (最多 60 秒)
+- wait: 3000
+
+- repeat:
+    times: 20
+    file: check-scan-complete.yaml

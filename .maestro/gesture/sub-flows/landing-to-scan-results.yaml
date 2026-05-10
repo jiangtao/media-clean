@@ -1,0 +1,32 @@
+appId: com.jt.mistapmediacleaner
+name: Navigate Landing to Scan Results
+---
+# 从 Landing 页导航到扫描结果页
+
+- assertVisible:
+    id: "landing-primary-action"
+    timeout: 5000
+
+- tapOn:
+    id: "landing-primary-action"
+
+# 等待 Tab 出现
+- wait: 1000
+
+- assertVisible:
+    id: "tab-button-Photos"
+    timeout: 10000
+
+- tapOn:
+    id: "tab-button-Photos"
+
+# 等待网格加载 (可能直接有结果，也可能需要扫描)
+- runFlow:
+    when:
+      visible: "photo-grid-start-scan-button"
+    file: start-scan-and-wait.yaml
+
+# 等待结果加载
+- assertVisible:
+    id: "scan-result-grid-item"
+    timeout: 15000

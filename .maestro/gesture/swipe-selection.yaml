@@ -1,0 +1,53 @@
+appId: com.jt.mistapmediacleaner
+name: Swipe Selection E2E
+---
+# 滑动批量选中测试
+# 前置条件: 需要已扫描结果 (可通过 seed 或先运行扫描)
+
+# 导航到扫描结果页
+- launchApp
+- runFlow:
+    when:
+      visible: "Landing"
+    file: sub-flows/landing-to-scan-results.yaml
+
+# 等待网格加载
+- assertVisible:
+    id: "scan-result-grid-item"
+    timeout: 5000
+
+# 长按第一个网格项进入选择模式
+- longPressOn:
+    id: "photo-grid-item"
+    duration: 600
+
+# 验证选择指示器出现
+- assertVisible:
+    id: "selection-indicator-empty"
+    timeout: 1000
+
+# 截图: 选择模式状态
+- takeScreenshot: swipe-selection-01-selection-mode
+
+# 向右滑动到第二个项 (模拟批量选中)
+- swipe:
+    direction: RIGHT
+    from:
+      id: "photo-grid-item"
+    duration: 400
+
+# 等待滑动完成
+- wait: 500
+
+# 截图: 滑动后
+- takeScreenshot: swipe-selection-02-after-swipe
+
+# 验证至少有一个选中标记
+- assertVisible:
+    id: "selection-checkmark"
+    timeout: 1000
+
+# 验证选中指示器样式变化
+- assertVisible:
+    id: "selection-checkmark-icon"
+    timeout: 1000

@@ -113,6 +113,49 @@ vi.mock('expo-image', () => ({
   Image: 'Image',
 }));
 
+// Mock react-native-gesture-handler
+vi.mock('react-native-gesture-handler', () => ({
+  Gesture: {
+    Pan: () => ({
+      enabled: () => ({
+        onBegin: () => ({
+          onUpdate: () => ({
+            onEnd: () => ({
+              onFinalize: () => ({}),
+            }),
+          }),
+        }),
+      }),
+    }),
+    Pinch: () => ({
+      onUpdate: () => ({
+        onEnd: () => ({}),
+      }),
+    }),
+    Tap: () => ({
+      numberOfTaps: () => ({
+        enabled: () => ({
+          onEnd: () => ({}),
+        }),
+      }),
+    }),
+    Simultaneous: (...gestures: any[]) => ({
+      gestures,
+    }),
+  },
+  GestureDetector: ({ children }: { children: any }) => children,
+  GestureHandlerRootView: ({ children }: { children: any }) => children,
+}));
+
+// Mock react-native-reanimated
+vi.mock('react-native-reanimated', () => ({
+  useSharedValue: (initial: number) => ({ value: initial }),
+  useAnimatedStyle: () => ({}),
+  createAnimatedComponent: (component: any) => component,
+  withSpring: (toValue: number) => toValue,
+  runOnJS: (fn: any) => fn,
+}));
+
 // Mock @expo/vector-icons
 vi.mock('@expo/vector-icons', () => ({
   Ionicons: ({

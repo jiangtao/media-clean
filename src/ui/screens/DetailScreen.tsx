@@ -13,6 +13,7 @@ import { DuplicateCarousel } from '../components/DuplicateCarousel';
 import { buildSizedImageSource } from '../components/image-source';
 import { TouchSurface } from '../components/TouchSurface';
 import { VideoPlayer } from '../components/VideoPlayer';
+import { ZoomableImage } from '../components/ZoomableImage';
 
 interface DetailScreenProps {
   candidate: CleanupCandidate | null;
@@ -267,20 +268,13 @@ export function DetailScreen({
           </View>
         ) : (
           <View style={styles.singleStage} testID="detail-photo-preview">
-            <Image
-              source={buildSizedImageSource(
-                activeDetailCandidate.asset.uri,
-                stageSize.width,
-                stageSize.height,
-              )}
-              style={styles.singleStageImage}
-              contentFit="contain"
-              cachePolicy="memory-disk"
-              priority="high"
-              allowDownscaling
-              transition={0}
-              recyclingKey={activeDetailCandidate.asset.uri}
-              testID="detail-photo-stage-image"
+            <ZoomableImage
+              uri={activeDetailCandidate.asset.uri}
+              width={stageSize.width}
+              height={stageSize.height}
+              maxScale={3}
+              minScale={1}
+              doubleTapReset
             />
           </View>
         )}

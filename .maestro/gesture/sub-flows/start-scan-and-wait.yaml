@@ -6,9 +6,8 @@ name: Start Scan and Wait
 - tapOn:
     id: "photo-grid-start-scan-button"
 
-# 等待扫描完成 (最多 60 秒)
-- wait: 3000
-
-- repeat:
-    times: 20
-    file: check-scan-complete.yaml
+# 等待扫描完成 - 等待进度条消失或网格出现
+- extendedWaitUntil:
+    visible:
+      id: "scan-result-grid-item"
+    timeout: 60000

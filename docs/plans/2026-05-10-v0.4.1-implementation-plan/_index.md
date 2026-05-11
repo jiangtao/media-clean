@@ -97,6 +97,12 @@ tasks:
     slug: "babel-config-reanimated"
     type: "config"
     depends-on: ["001"]
+  - id: "012"
+    subject: "Optimize swipe selection gestures"
+    slug: "swipe-selection-optimization"
+    type: "impl"
+    depends-on: ["008"]
+    status: "todo"
 ```
 
 ## Task File References
@@ -112,36 +118,39 @@ tasks:
 - [Task 009: Integrate ZoomableImage into DetailScreen test](./task-009-detailscreen-zoom-test.md)
 - [Task 010: Integrate ZoomableImage into DetailScreen](./task-010-detailscreen-zoom-impl.md)
 - [Task 011: Add Babel config for Reanimated](./task-011-babel-config-reanimated.md)
+- **[TODO] Task 012: 滑动选手势优化**](./task-012-swipe-selection-optimization.md)
 
 ## BDD Coverage
 
 ### 滑动批量选中 (Swipe Selection)
 
-| Scenario | Task Coverage |
-|----------|---------------|
-| 长按进入选中模式 | Task 008 (PhotoGrid 集成) |
-| 水平滑动批量选中 | Task 004 (Hook), Task 008 (Grid) |
-| 斜向滑动批量选中 | Task 004 (Hook), Task 008 (Grid) |
-| 反向滑动取消选中 | Task 004 (Hook) |
-| 非选中模式下滑动不触发 | Task 004 (Hook), Task 008 (Grid) |
-| 选中为空时自动退出 | Task 008 (Grid) |
-| 滑动选中与点击选中共存 | Task 008 (Grid) |
-| 快速滑动不丢帧 | Task 008 (性能测试) |
+| Scenario | Task Coverage | Status |
+|----------|---------------|--------|
+| 长按进入选中模式 | Task 008 (PhotoGrid 集成) | ✅ |
+| 轻触选择单个项 | Task 004 (Hook), Task 008 (Grid) | 🟡 需优化 |
+| 滑动选中多个项 | Task 004 (Hook), Task 008 (Grid) | ✅ |
+| 矩形区域选中 | Task 004 (Hook) | ✅ |
+| 滑动后正常滚动 | Task 008 (Grid) | 🟡 待优化 |
+| 反向滑动取消选中 | Task 004 (Hook) | ✅ |
+| 全不选保持选中模式 | Task 008 (Grid) | ✅ |
+| 点击 X 退出选中模式 | Task 008 (Grid) | ✅ |
+| 非选中模式下滑动不触发 | Task 004 (Hook), Task 008 (Grid) | ✅ |
+| 快速滑动不丢帧 | Task 008 (性能测试) | ✅ |
 
 ### 图片双指缩放 (Pinch Zoom)
 
-| Scenario | Task Coverage |
-|----------|---------------|
-| 双指展开放大图片 | Task 006 (ZoomableImage) |
-| 双指收缩缩小图片 | Task 006 (ZoomableImage) |
-| 缩放小于1时回弹 | Task 006 (ZoomableImage) |
-| 缩放时平移图片 | Task 006 (ZoomableImage) |
-| 图片边缘限制平移 | Task 006 (ZoomableImage) |
-| 视频不支持缩放 | Task 010 (DetailScreen 条件渲染) |
-| 双击重置缩放 | Task 006 (可选) |
-| 缩放状态下切换图片 | Task 010 (DetailScreen 状态重置) |
-| 最大缩放限制 | Task 006 (ZoomableImage) |
-| 缩放动画流畅 | Task 006 (性能) |
+| Scenario | Task Coverage | Status |
+|----------|---------------|--------|
+| 双指展开放大图片 | Task 006 (ZoomableImage) | ✅ |
+| 双指收缩缩小图片 | Task 006 (ZoomableImage) | ✅ |
+| 缩放小于1时回弹 | Task 006 (ZoomableImage) | ✅ |
+| 缩放时平移图片 | Task 006 (ZoomableImage) | ✅ |
+| 图片边缘限制平移 | Task 006 (ZoomableImage) | ✅ |
+| 视频不支持缩放 | Task 010 (DetailScreen 条件渲染) | ✅ |
+| 双击重置缩放 | Task 006 (可选) | ✅ |
+| 缩放状态下切换图片 | Task 010 (DetailScreen 状态重置) | ✅ |
+| 最大缩放限制 | Task 006 (ZoomableImage) | ✅ |
+| 缩放动画流畅 | Task 006 (性能) | ✅ |
 
 ## Dependency Chain
 
@@ -150,7 +159,7 @@ tasks:
   │
   └──→ 011
 
-003 ──→ 004 ──→ 007 ──→ 008
+003 ──→ 004 ──→ 007 ──→ 008 ──→ 012
 
 005 ──→ 006 ──→ 009 ──→ 010
 ```
@@ -160,13 +169,49 @@ tasks:
 - **004 → 007**: useSwipeSelection Hook 必须完成才能在 PhotoGrid 中集成
 - **006 → 009**: ZoomableImage 组件必须完成才能在 DetailScreen 中集成
 - **001 → 002/011**: 依赖安装后才能配置 GestureHandlerRootView 和 Babel
+- **008 → 012**: PhotoGrid 集成完成后才能进行手势优化
 
 ## 验收检查清单
 
-- [ ] 所有单元测试通过
+- [x] 所有单元测试通过
 - [ ] 代码覆盖率 > 80%
 - [ ] 无运行时错误和构建错误
 - [ ] 滑动批量选中功能正常
-- [ ] 图片双指缩放功能正常
-- [ ] 视频不支持缩放
+  - [x] 基础滑动选中
+  - [x] 矩形区域选择
+  - [ ] **TODO**: 滑动与滚动手势区分优化
+  - [ ] **TODO**: 轻触与滑动行为细化
+  - [x] 全不选保持选中模式
+  - [x] 点击 X 退出选中模式
+- [x] 图片双指缩放功能正常
+- [x] 视频不支持缩放
 - [ ] 与现有交互模式无冲突
+
+## 已知问题与 TODO
+
+### 滑动选中 (Swipe Selection)
+
+| 问题 | 状态 | 优先级 | 说明 |
+|------|------|--------|------|
+| 滑动与滚动手势冲突 | 🟡 待优化 | P1 | 当前使用 `activeOffsetX/Y` 区分，需要微调阈值 |
+| 轻触 vs 滑动区分 | 🟡 待优化 | P1 | 轻触应选单个，滑动应选多个，需优化手势识别 |
+| 矩形区域选择 | ✅ 已完成 | - | 斜向滑动正确选中矩形区域内所有项 |
+| 全不选行为 | ✅ 已完成 | - | 全不选保持选中模式，X 退出 |
+| 选中模式状态 | ✅ 已完成 | - | `isSelectionModeActive` 独立状态管理 |
+
+### 待优化手势参数
+
+```typescript
+// useSwipeSelection.ts
+const panGesture = Gesture.Pan()
+  .enabled(isSelectionMode)
+  .minDistance(8)           // TODO: 可能需要调整到 15-20
+  .activeOffsetX([-10, 10]) // TODO: 可能需要调整到 15-20
+  .activeOffsetY([-20, 20]) // TODO: 可能需要更大容忍度如 30-40
+```
+
+## 下一步工作
+
+1. **手势优化**: 调整手势参数，测试不同阈值下的用户体验
+2. **真机测试**: 在实际设备上验证手势响应
+3. **边界测试**: 测试快速滑动、短距离滑动等边界情况

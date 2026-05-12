@@ -1,0 +1,5 @@
+appId: com.jt.mistapmediacleaner
+name: Check Scan Complete
+---
+# 检查扫描是否完成 - 简单等待
+- waitForAnimationToEnd

@@ -35,7 +35,6 @@ import {
 import {
   loadScanRange,
   saveScanRange,
-  VALID_SCAN_RANGES,
   type ScanRange,
 } from '../../services/storage/scan-range-storage';
 import {
@@ -57,7 +56,7 @@ import { DesignIcon } from '../icons/DesignIcon';
 
 const LIGHT_THEME_PREVIEW = getAppTheme('light');
 const DARK_THEME_PREVIEW = getAppTheme('dark');
-const SETTINGS_SCAN_RANGE_OPTIONS = [1, 3, 6, 12] as const;
+const SETTINGS_SCAN_RANGE_OPTIONS = [1, 3, 6, 12, 24] as const;
 
 interface SettingsSectionProps {
   title: string;
@@ -624,17 +623,6 @@ export function SettingsScreen() {
                 </Pressable>
               );
             })}
-            <View style={[styles.chip, styles.chipDisabled]}>
-              <Text
-                style={[styles.chipText, styles.chipDisabledText]}
-                testID="scan-range-option-all-disabled"
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.82}
-              >
-                {settingsCopy.scanRangeAllLabel}
-              </Text>
-            </View>
           </View>
         </View>
       </View>

@@ -9,15 +9,19 @@ import type { AppLanguage } from '../../../i18n/app-language';
 import { formatLocalizedSize } from '../../../i18n/app-copy';
 import type { AppThemePalette } from '../../../theme/app-theme';
 import type { MediaGridLayout } from '../screen-layout';
+import type { SwipeSelectionReason } from '../../hooks/useSwipeSelection';
+import { buildSelectionHeaderTitle } from './selection-mode-labels';
 
 interface PhotoGridWorkspaceProps {
   title: string;
   itemCount: number;
   onBack: () => void;
+  onCloseSelection?: () => void;
   displayedCandidates: CleanupCandidate[];
   selectedIds: string[];
   isSelectionMode: boolean;
   onSelect: (id: string) => void;
+  onSelectionChange?: (nextIds: string[], reason: SwipeSelectionReason) => void;
   onItemPress: (candidate: CleanupCandidate) => void;
   theme: AppThemePalette;
   gridTestID: string;
@@ -45,10 +49,12 @@ export function PhotoGridWorkspace({
   title,
   itemCount,
   onBack,
+  onCloseSelection,
   displayedCandidates,
   selectedIds,
   isSelectionMode,
   onSelect,
+  onSelectionChange,
   onItemPress,
   theme,
   gridTestID,
@@ -76,18 +82,18 @@ export function PhotoGridWorkspace({
       language === 'en-US'
         ? {
             titleWithCount: (value: string, count: number) => `${value} (${count})`,
-            footerTitle: (count: number) => `${count} items selected`,
-            footerSize: (formattedSize: string) => formattedSize,
+            footerTitle: (formattedSize: string) => `Selected ${formattedSize}`,
+            emptyIssueTitle: 'No media of this type',
           }
         : {
             titleWithCount: (value: string, count: number) => `${value} (${count})`,
-            footerTitle: (count: number) => `已选 ${count} 项`,
-            footerSize: (formattedSize: string) => formattedSize,
+            footerTitle: (formattedSize: string) => `已选 ${formattedSize}`,
+            emptyIssueTitle: '暂无该类型媒体',
           },
     [language],
   );
   const footerSizeText = useMemo(
-    () => copy.footerSize(formatLocalizedSize(selectedBytes, language)),
+    () => copy.footerTitle(formatLocalizedSize(selectedBytes, language)),
     [copy, language, selectedBytes],
   );
   const headerShellStyle = useMemo(
@@ -120,20 +126,41 @@ export function PhotoGridWorkspace({
     <View style={styles.shell}>
       <View style={headerShellStyle}>
         <View style={styles.headerRow}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={onBack}
-            style={styles.backButton}
-            testID="photo-grid-back-button"
-          >
-            <Ionicons name="arrow-back" size={24} color={theme.pageTextPrimary} />
-          </Pressable>
+          {isSelectionMode ? (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                onPress={onCloseSelection ?? onBack}
+                style={styles.backButton}
+                testID="photo-grid-close-button"
+              >
+                <Ionicons name="close" size={24} color={theme.pageTextPrimary} />
+              </Pressable>
 
-          <View style={styles.headerCopy}>
-            <Text style={styles.headerTitle} testID="photo-grid-workspace-title">
-              {copy.titleWithCount(title, itemCount)}
-            </Text>
-          </View>
+              <View style={styles.headerCopy}>
+                <Text style={styles.headerTitle} testID="photo-grid-workspace-title">
+                  {buildSelectionHeaderTitle(language, selectedCount)}
+                </Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                onPress={onBack}
+                style={styles.backButton}
+                testID="photo-grid-back-button"
+              >
+                <Ionicons name="arrow-back" size={24} color={theme.pageTextPrimary} />
+              </Pressable>
+
+              <View style={styles.headerCopy}>
+                <Text style={styles.headerTitle} testID="photo-grid-workspace-title">
+                  {copy.titleWithCount(title, itemCount)}
+                </Text>
+              </View>
+            </>
+          )}
 
           {isSelectionMode ? (
             <Pressable
@@ -149,26 +176,32 @@ export function PhotoGridWorkspace({
       </View>
 
       <View style={styles.gridStage} testID="photo-grid-stage">
-        <PhotoGrid
-          candidates={displayedCandidates}
-          selectedIds={selectedIds}
-          selectionMode={isSelectionMode}
-          onSelect={onSelect}
-          onItemPress={onItemPress}
-          theme={theme}
-          mediaType="all"
-          gridTestID={gridTestID}
-          itemTestID={itemTestID}
-          contentPadding={gridContentPadding}
-          gridLayout={gridLayout}
-        />
+        {displayedCandidates.length > 0 ? (
+          <PhotoGrid
+            candidates={displayedCandidates}
+            selectedIds={selectedIds}
+            selectionMode={isSelectionMode}
+            onSelect={onSelect}
+            onSelectionChange={onSelectionChange}
+            onItemPress={onItemPress}
+            theme={theme}
+            mediaType="all"
+            gridTestID={gridTestID}
+            itemTestID={itemTestID}
+            contentPadding={gridContentPadding}
+            gridLayout={gridLayout}
+          />
+        ) : (
+          <View style={styles.emptyIssueState} testID="photo-grid-issue-empty-state">
+            <Text style={styles.emptyIssueText}>{copy.emptyIssueTitle}</Text>
+          </View>
+        )}
       </View>
 
       {isSelectionMode ? (
         <View style={styles.footerShell}>
           <View style={styles.footerCard}>
             <View style={styles.footerSummary}>
-              <Text style={styles.footerTitle}>{copy.footerTitle(selectedCount)}</Text>
               <Text style={styles.footerBody}>{footerSizeText}</Text>
             </View>
 
@@ -244,6 +277,20 @@ function createWorkspaceStyles(theme: AppThemePalette, isCompact = false) {
     gridStage: {
       flex: 1,
       paddingTop: isCompact ? 10 : 8,
+    },
+    emptyIssueState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+      paddingBottom: isCompact ? 72 : 96,
+    },
+    emptyIssueText: {
+      fontSize: isCompact ? 16 : 18,
+      lineHeight: isCompact ? 22 : 24,
+      fontWeight: '700',
+      textAlign: 'center',
+      color: theme.pageTextSecondary,
     },
     footerShell: {
       position: 'absolute',

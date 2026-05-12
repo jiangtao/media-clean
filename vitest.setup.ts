@@ -113,6 +113,66 @@ vi.mock('expo-image', () => ({
   Image: 'Image',
 }));
 
+function createGestureMock(extra: Record<string, unknown> = {}) {
+  const gesture: Record<string, unknown> = { ...extra };
+  const chainableMethods = [
+    'enabled',
+    'minDistance',
+    'activeOffsetX',
+    'activeOffsetY',
+    'failOffsetX',
+    'failOffsetY',
+    'onBegin',
+    'onStart',
+    'onUpdate',
+    'onEnd',
+    'onFinalize',
+    'onTouchesDown',
+    'onTouchesMove',
+    'manualActivation',
+    'numberOfTaps',
+    'runOnJS',
+  ];
+
+  for (const method of chainableMethods) {
+    gesture[method] = () => gesture;
+  }
+
+  return gesture;
+}
+
+// Mock react-native-gesture-handler
+vi.mock('react-native-gesture-handler', () => ({
+  Gesture: {
+    Pan: () => createGestureMock(),
+    Pinch: () => createGestureMock(),
+    Tap: () => createGestureMock(),
+    Simultaneous: (...gestures: any[]) => ({
+      gestures,
+    }),
+  },
+  GestureDetector: ({ children }: { children: any }) => children,
+  GestureHandlerRootView: ({ children }: { children: any }) => children,
+}));
+
+// Mock react-native-reanimated
+vi.mock('react-native-reanimated', () => {
+  const reanimatedMock = {
+    View: 'AnimatedView',
+    useSharedValue: (initial: number) => ({ value: initial }),
+    useAnimatedStyle: () => ({}),
+    createAnimatedComponent: (component: any) => component,
+    withSpring: (toValue: number) => toValue,
+    withTiming: (toValue: number) => toValue,
+    runOnJS: (fn: any) => fn,
+  };
+
+  return {
+    ...reanimatedMock,
+    default: reanimatedMock,
+  };
+});
+
 // Mock @expo/vector-icons
 vi.mock('@expo/vector-icons', () => ({
   Ionicons: ({

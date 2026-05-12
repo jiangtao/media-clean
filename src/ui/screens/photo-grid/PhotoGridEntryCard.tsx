@@ -77,6 +77,8 @@ export function PhotoGridEntryCard({
       ? Math.min(Math.round((progress.current / progress.total) * 100), 100)
       : 0;
   const breakdownItems = resultBreakdown ?? [];
+  const heroIconScale = variant === 'scanReady' ? 1.5 : 1;
+  const heroIconSize = Math.round(metrics.entryArtworkIcon * heroIconScale);
 
   if (variant === 'scanResult') {
     return (
@@ -214,7 +216,7 @@ export function PhotoGridEntryCard({
           </Text>
           {body ? <Text style={styles.progressBody}>{body}</Text> : null}
 
-          <View style={styles.supportList}>
+          <View style={styles.supportList} testID="photo-grid-support-list">
             <View style={styles.supportRow}>
               <View
                 style={styles.supportIconShell}
@@ -331,22 +333,31 @@ export function PhotoGridEntryCard({
 
           <View
             style={[styles.entryCard, variant === 'scanReady' && styles.entryCardScanReady]}
-            testID={isPermissionDenied ? 'photo-grid-permission-hero-card' : undefined}
+            testID={
+              variant === 'scanReady'
+                ? 'photo-grid-ready-surface'
+                : isPermissionDenied
+                  ? 'photo-grid-permission-hero-card'
+                  : undefined
+            }
           >
           <View style={[styles.entryArtwork, variant === 'scanReady' && styles.entryArtworkScanReady]}>
             <View style={styles.entryArtworkGlow} />
             <DesignIcon
               name={heroIconName}
-              width={metrics.entryArtworkIcon}
-              height={metrics.entryArtworkIcon}
+              width={heroIconSize}
+              height={heroIconSize}
               color={accentColor}
               secondaryColor={theme?.buttonSecondaryBackground ?? '#BFDBFE'}
+              testID={variant === 'scanReady' ? 'photo-grid-ready-static-file-icon' : undefined}
             />
           </View>
 
-          <Text style={styles.entryTitle} testID={titleTestID}>
-            {heroTitle}
-          </Text>
+          {heroTitle ? (
+            <Text style={styles.entryTitle} testID={titleTestID}>
+              {heroTitle}
+            </Text>
+          ) : null}
           {heroBody ? <Text style={styles.entryBody}>{heroBody}</Text> : null}
 
           {actionLabel ? (
@@ -367,15 +378,26 @@ export function PhotoGridEntryCard({
             </Pressable>
           ) : null}
 
-          <View style={styles.supportPill}>
-            <DesignIcon name="check" width={16} height={16} color={accentColor} />
+          <View style={styles.supportPill} testID="photo-grid-support-prompt">
+            <View
+              style={styles.supportIconShell}
+              testID="photo-grid-ready-support-icon-hint"
+            >
+              <DesignIcon
+                name="check"
+                width={metrics.supportIcon}
+                height={metrics.supportIcon}
+                align="start"
+                color={accentColor}
+              />
+            </View>
             <Text style={styles.supportText}>
               {note ?? (isPermissionDenied ? copy.readyHint : copy.readyHint)}
             </Text>
           </View>
 
           <View style={styles.entryDivider} />
-          <View style={styles.supportList}>
+          <View style={styles.supportList} testID="photo-grid-support-list">
             <View style={styles.supportRow}>
               <View
                 style={styles.supportIconShell}
@@ -509,7 +531,7 @@ function getChromeCopy(language: AppLanguage) {
       localOnlyCaption: 'Every recognition and cleanup step stays on the device',
       supportsPhotosAndVideos: 'Supports both photos and videos',
       supportsPhotosAndVideosCaption: 'Duplicate, blurry, and similar items are reviewed together',
-      fastLocalScan: 'The current batch stays attached even if Android resumes it in the background',
+      fastLocalScan: 'Return to the page to reattach to the current batch progress',
     };
   }
 
@@ -524,7 +546,7 @@ function getChromeCopy(language: AppLanguage) {
     localOnlyCaption: '所有识别与清理操作均在本地完成',
     supportsPhotosAndVideos: '支持照片与视频',
     supportsPhotosAndVideosCaption: '重复、模糊与相似内容会统一进入后续判断',
-    fastLocalScan: 'Android 后台恢复当前批次后，页面会自动接回真实进度',
+    fastLocalScan: '离开后再回到页面，会自动接回当前批次进度',
   };
 }
 
@@ -550,6 +572,7 @@ function createCardMetrics(compact: boolean) {
     entryArtworkRadius: compact ? 24 : 28,
     entryArtworkGlowSize: compact ? 190 : 240,
     entryArtworkIcon: compact ? 58 : 72,
+    scanReadyTopOffset: compact ? 34 : 54,
     entryArtworkMarginBottom: compact ? 18 : 24,
     entryTitleSize: compact ? 22 : 28,
     entryTitleLine: compact ? 28 : 36,
@@ -562,7 +585,6 @@ function createCardMetrics(compact: boolean) {
     secondaryActionHeight: compact ? 50 : 58,
     secondaryActionTextSize: compact ? 14 : 18,
     supportPillMarginTop: compact ? 14 : 18,
-    supportPillPaddingHorizontal: compact ? 14 : 16,
     supportPillPaddingVertical: compact ? 9 : 11,
     supportTextSize: compact ? 12 : 14,
     supportTextLine: compact ? 17 : 20,
@@ -748,6 +770,7 @@ function createCardStyles(theme: AppThemePalette | undefined, metrics: PhotoGrid
       elevation: 0,
     },
     entryCardScanReady: {
+      marginTop: metrics.scanReadyTopOffset,
       paddingTop: Math.max(10, Math.floor(metrics.entryPaddingVertical * 0.58)),
     },
     entryArtwork: {
@@ -824,12 +847,12 @@ function createCardStyles(theme: AppThemePalette | undefined, metrics: PhotoGrid
       marginTop: metrics.supportPillMarginTop,
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      alignSelf: 'center',
-      maxWidth: '92%',
+      justifyContent: 'flex-start',
+      gap: metrics.supportRowGap,
+      width: '100%',
+      maxWidth: metrics.supportListMaxWidth,
+      alignSelf: 'flex-start',
       borderRadius: 999,
-      paddingHorizontal: metrics.supportPillPaddingHorizontal,
       paddingVertical: metrics.supportPillPaddingVertical,
       backgroundColor: 'transparent',
     },
@@ -838,7 +861,7 @@ function createCardStyles(theme: AppThemePalette | undefined, metrics: PhotoGrid
       fontSize: metrics.supportTextSize,
       lineHeight: metrics.supportTextLine,
       color: accent,
-      textAlign: 'center',
+      textAlign: 'left',
     },
     entryDivider: {
       height: 1,
@@ -850,7 +873,7 @@ function createCardStyles(theme: AppThemePalette | undefined, metrics: PhotoGrid
       gap: metrics.supportListGap,
       width: '100%',
       maxWidth: metrics.supportListMaxWidth,
-      alignSelf: 'center',
+      alignSelf: 'flex-start',
     },
     supportRow: {
       flexDirection: 'row',

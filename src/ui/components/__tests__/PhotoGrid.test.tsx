@@ -1,6 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
+
+const mockUseSwipeSelection = vi.hoisted(() =>
+  vi.fn(() => ({
+    panGesture: { testID: 'mock-pan-gesture' },
+    isSwiping: false,
+    getItemAtPosition: vi.fn(),
+  })),
+);
 
 vi.mock('react-native', () => {
   const ReactModule = require('react') as typeof import('react');
@@ -45,6 +53,10 @@ vi.mock('react-native', () => {
       ),
   };
 });
+
+vi.mock('../../hooks/useSwipeSelection', () => ({
+  useSwipeSelection: mockUseSwipeSelection,
+}));
 
 import { PhotoGrid } from '../PhotoGrid';
 import type { CleanupCandidate } from '../../../domain/recognition/types';
@@ -160,6 +172,15 @@ function flattenStyle(style: unknown): Record<string, unknown> {
 }
 
 describe('PhotoGrid', () => {
+  beforeEach(() => {
+    mockUseSwipeSelection.mockClear();
+    mockUseSwipeSelection.mockReturnValue({
+      panGesture: { testID: 'mock-pan-gesture' },
+      isSwiping: false,
+      getItemAtPosition: vi.fn(),
+    });
+  });
+
   describe('Scenario 2.2: Segmented control filtering', () => {
     it('should be a function component that accepts mediaType prop', () => {
       expect(typeof PhotoGrid).toBe('function');
@@ -586,6 +607,65 @@ describe('PhotoGrid', () => {
 
       expect(onSelect).toHaveBeenCalledWith('1');
       expect(onItemPress).not.toHaveBeenCalled();
+    });
+
+    it('keeps light taps routed to onSelect for unselected items in selection mode', () => {
+      const onSelect = vi.fn();
+      const onItemPress = vi.fn();
+      let renderer!: ReturnType<typeof TestRenderer.create>;
+
+      act(() => {
+        renderer = TestRenderer.create(
+          <PhotoGrid
+            candidates={[createMockCandidate('1', 'photo')]}
+            selectedIds={[]}
+            selectionMode
+            onSelect={onSelect}
+            onItemPress={onItemPress}
+            theme={mockTheme}
+          />,
+        );
+      });
+
+      act(() => {
+        renderer.root.findByProps({ testID: 'photo-grid-item' }).props.onPress();
+      });
+
+      expect(onSelect).toHaveBeenCalledWith('1');
+      expect(onItemPress).not.toHaveBeenCalled();
+    });
+
+    it('passes batch swipe selection API props through to useSwipeSelection', () => {
+      const candidates = [
+        createMockCandidate('1', 'photo'),
+        createMockCandidate('2', 'photo'),
+        createMockCandidate('3', 'photo'),
+      ];
+      const onSelectionChange = vi.fn();
+
+      act(() => {
+        TestRenderer.create(
+          <PhotoGrid
+            candidates={candidates}
+            selectedIds={['1']}
+            selectionMode
+            onSelect={vi.fn()}
+            onItemPress={vi.fn()}
+            onSelectionChange={onSelectionChange}
+            theme={mockTheme}
+          />,
+        );
+      });
+
+      expect(mockUseSwipeSelection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          candidates,
+          contentTopOffset: 10,
+          selectedIds: ['1'],
+          isSelectionMode: true,
+          onSelectionChange,
+        }),
+      );
     });
 
     it('renders video thumbnails from previewUri when one exists', () => {

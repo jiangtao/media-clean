@@ -1,11 +1,12 @@
 import * as MediaLibrary from 'expo-media-library';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { PhotoGrid } from '../components/PhotoGrid';
+import type { SwipeSelectionReason } from '../hooks/useSwipeSelection';
 import { DetailScreen } from './DetailScreen';
 import { TouchSurface } from '../components/TouchSurface';
 import { DesignIcon } from '../icons/DesignIcon';
@@ -18,11 +19,13 @@ import type { AppThemePalette } from '../../theme/app-theme';
 import { scanMediaLibrary } from '../../features/scan/scan-media-library';
 import { buildDefaultScanWindowStartAt } from '../../features/scan/scan-config';
 import {
+  loadCleanupReportSnapshot,
   loadRecycleBinSnapshotCache,
   loadRecycleBinIds,
   saveRecycleBinIds,
   saveRecycleBinSnapshotCache,
   syncPersistedMediaLedger,
+  type CleanupReportSnapshot,
 } from '../../services/storage/app-storage';
 import {
   buildBottomActionLayout,
@@ -33,6 +36,10 @@ import {
   RECYCLE_BIN_DESIGN_CONTENT_WIDTH,
 } from './screen-layout';
 import { ensureMediaLibraryDeletePermissionsAsync } from '../../services/media-library-permissions';
+import {
+  buildSelectionHeaderTitle,
+  buildSelectionToggleLabel,
+} from './photo-grid/selection-mode-labels';
 
 function normalizeIds(ids: string[]) {
   return Array.from(new Set(ids)).sort();
@@ -110,6 +117,12 @@ function sumCandidateBytes(candidates: readonly CleanupCandidate[]) {
   return candidates.reduce((total, candidate) => total + (candidate.asset.fileSize ?? 0), 0);
 }
 
+const EMPTY_CLEANUP_REPORT: CleanupReportSnapshot = {
+  cleanedItemCount: 0,
+  cleanedBytes: 0,
+  lastCleanedAt: null,
+};
+
 type RecycleBinScreenProps = {
   recycleBinIds?: string[];
   onRecycleBinIdsChange?: (ids: string[]) => void;
@@ -149,9 +162,12 @@ export function RecycleBinScreen({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
   const [hasHydrated, setHasHydrated] = useState(false);
+  const [isSelectionModeActive, setIsSelectionModeActive] = useState(false);
+  const [cleanupReport, setCleanupReport] =
+    useState<CleanupReportSnapshot>(EMPTY_CLEANUP_REPORT);
   const hasRecycleBinItems = state.recycleBin.length > 0;
   const selectionCount = state.selectedIds.length;
-  const isSelectionMode = selectionCount > 0;
+  const isSelectionMode = hasRecycleBinItems && isSelectionModeActive;
   const contentPadding = useMemo(
     () => ({
       ...baseContentPadding,
@@ -168,9 +184,27 @@ export function RecycleBinScreen({
   );
   const pendingCandidates = state.recycleBin;
   const pendingBytes = useMemo(() => sumCandidateBytes(pendingCandidates), [pendingCandidates]);
+  const cleanupHistorySizeText =
+    cleanupReport.cleanedBytes > 0
+      ? formatLocalizedSize(cleanupReport.cleanedBytes, language)
+      : '0 KB';
+  const cleanupHistoryPrefix = `${recycleBinCopy.cleanupHistoryTitle}${
+    language === 'zh-CN' ? '： ' : ': '
+  }${recycleBinCopy.cleanupHistoryReleased('')}`;
   const summaryTitle = recycleBinCopy.pendingSummary(state.recycleBin.length);
   const isCompact = gridLayout.isSELike;
   const summaryIconSize = gridLayout.isSELike ? 26 : 34;
+  const headerTitle = isSelectionMode
+    ? buildSelectionHeaderTitle(language, selectionCount)
+    : recycleBinTexts.title;
+  const selectionToggleLabel = buildSelectionToggleLabel(language, isAllRecycleBinSelected);
+  const shouldShowCleanupHistoryLine = hasHydrated && !hasRecycleBinItems;
+
+  useEffect(() => {
+    if (!hasRecycleBinItems && isSelectionModeActive) {
+      setIsSelectionModeActive(false);
+    }
+  }, [hasRecycleBinItems, isSelectionModeActive]);
 
   useFocusEffect(
     useCallback(() => {
@@ -179,6 +213,7 @@ export function RecycleBinScreen({
       async function hydrateRecycleBin() {
         setIsHydrating(true);
         setErrorMessage(null);
+        setIsSelectionModeActive(false);
 
         try {
           const recycleBinSnapshotPromise = loadRecycleBinSnapshotCache();
@@ -186,12 +221,18 @@ export function RecycleBinScreen({
             recycleBinIds && recycleBinIds.length > 0
               ? Promise.resolve(recycleBinIds)
               : loadRecycleBinIds();
-          const recycleBinSnapshot = await recycleBinSnapshotPromise;
+          const cleanupReportPromise = loadCleanupReportSnapshot();
+          const [recycleBinSnapshot, nextCleanupReport] = await Promise.all([
+            recycleBinSnapshotPromise,
+            cleanupReportPromise,
+          ]);
           const cachedRecycleBin = recycleBinSnapshot?.candidates ?? [];
 
           if (!isActive) {
             return;
           }
+
+          setCleanupReport(nextCleanupReport);
 
           if (cachedRecycleBin.length > 0) {
             setState(buildHydratedRecycleBinState([], cachedRecycleBin));
@@ -277,20 +318,42 @@ export function RecycleBinScreen({
     }, [copy.alerts.scanFailed, onRecycleBinIdsChange, recycleBinIds])
   );
 
+  const exitSelectionMode = useCallback(() => {
+    setIsSelectionModeActive(false);
+    setState((prev) => ({
+      ...prev,
+      selectedIds: [],
+    }));
+  }, []);
+
   const handleSelect = useCallback((id: string) => {
+    setIsSelectionModeActive(true);
     setState(prev => applyCleanupAction(prev, { type: 'toggle-select', id }));
+  }, []);
+
+  const handleSelectionChange = useCallback((nextIds: string[], _reason: SwipeSelectionReason) => {
+    setIsSelectionModeActive(true);
+    setState((prev) => {
+      const recycleBinIdSet = new Set(prev.recycleBin.map((candidate) => candidate.id));
+
+      return {
+        ...prev,
+        selectedIds: nextIds.filter((id) => recycleBinIdSet.has(id)),
+      };
+    });
   }, []);
 
   const handleItemPress = useCallback((candidate: CleanupCandidate) => {
     if (isSelectionMode) {
-      setState((prev) => applyCleanupAction(prev, { type: 'toggle-select', id: candidate.id }));
+      handleSelect(candidate.id);
       return;
     }
 
     setPreviewCandidate(candidate);
-  }, [isSelectionMode]);
+  }, [handleSelect, isSelectionMode]);
 
   const handleToggleSelectAll = useCallback(() => {
+    setIsSelectionModeActive(true);
     setState((prev) => ({
       ...prev,
       selectedIds: isAllRecycleBinSelected ? [] : prev.recycleBin.map((candidate) => candidate.id),
@@ -366,7 +429,9 @@ export function RecycleBinScreen({
         deletedIds: ids,
       });
 
+      const nextCleanupReport = await loadCleanupReportSnapshot();
       setState(nextState);
+      setCleanupReport(nextCleanupReport);
       setPreviewCandidate((current) =>
         buildNextDetailCandidate(state.recycleBin, current, ids, ids[0] ?? current?.id ?? ''),
       );
@@ -444,12 +509,21 @@ export function RecycleBinScreen({
               style={styles.backButton}
               pressedStyle={styles.backButtonPressed}
               onPress={() => {
+                if (isSelectionMode) {
+                  exitSelectionMode();
+                  return;
+                }
+
                 onBackToPhotos?.();
               }}
               preset="pill"
               testID="recycle-back-button"
             >
-              <Ionicons name="arrow-back" size={24} color={theme.pageTextPrimary} />
+              <Ionicons
+                name={isSelectionMode ? 'close' : 'arrow-back'}
+                size={24}
+                color={theme.pageTextPrimary}
+              />
             </TouchSurface>
 
             <View style={styles.headerCopy}>
@@ -460,7 +534,7 @@ export function RecycleBinScreen({
                 adjustsFontSizeToFit
                 minimumFontScale={0.86}
               >
-                {recycleBinTexts.title}
+                {headerTitle}
               </Text>
             </View>
           </View>
@@ -473,7 +547,7 @@ export function RecycleBinScreen({
               testID="recycle-selection-toggle-button"
             >
               <Text style={[styles.selectionActionText, styles.selectionToggleText]}>
-                {recycleBinCopy.selectionToggle(isAllRecycleBinSelected)}
+                {selectionToggleLabel}
               </Text>
             </TouchSurface>
           ) : null}
@@ -521,6 +595,7 @@ export function RecycleBinScreen({
           selectedIds={state.selectedIds}
           selectionMode={isSelectionMode}
           onSelect={handleSelect}
+          onSelectionChange={handleSelectionChange}
           onItemPress={handleItemPress}
           theme={theme}
           mediaType="all"
@@ -536,10 +611,22 @@ export function RecycleBinScreen({
           </Text>
         </View>
       ) : (
-        <View style={styles.emptyContainer}>
+        <View style={styles.emptyContainer} testID="recycle-bin-empty-state">
           <View style={styles.emptyIconWrap}>
             <DesignIcon name="nav-trash" width={42} height={42} color={theme.pageTextMuted} />
           </View>
+          {shouldShowCleanupHistoryLine ? (
+            <Text
+              style={styles.cleanupHistoryInline}
+              testID="recycle-cleanup-history-released"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.82}
+            >
+              <Text>{cleanupHistoryPrefix}</Text>
+              <Text style={styles.cleanupHistoryValue}>{cleanupHistorySizeText}</Text>
+            </Text>
+          ) : null}
           <Text style={styles.emptyTitle} testID="recycle-bin-empty-title">
             {recycleBinTexts.emptyTitle}
           </Text>
@@ -547,7 +634,7 @@ export function RecycleBinScreen({
         </View>
       )}
 
-      {hasRecycleBinItems && selectionCount > 0 ? (
+      {hasRecycleBinItems && isSelectionMode ? (
         <View style={styles.actionBar}>
           <View style={styles.selectionActionsRow}>
             <TouchSurface
@@ -648,6 +735,7 @@ function createStyles(
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: 32,
+      paddingBottom: isCompact ? 58 : 72,
     },
     emptyIconWrap: {
       width: 84,
@@ -671,6 +759,21 @@ function createStyles(
       color: theme.pageTextMuted,
       textAlign: 'center',
       lineHeight: 20,
+    },
+    cleanupHistoryInline: {
+      marginTop: -4,
+      marginBottom: 14,
+      color: theme.pageTextMuted,
+      fontSize: 14,
+      lineHeight: 20,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    cleanupHistoryValue: {
+      color: theme.buttonSuccessBackground,
+      fontSize: 16,
+      lineHeight: 22,
+      fontWeight: '800',
     },
     loadingContainer: {
       flex: 1,

@@ -1,0 +1,14 @@
+appId: com.jt.mistapmediacleaner
+name: Gesture E2E Suite
+---
+# v0.4.1 手势交互完整测试套件
+
+# 滑动批量选中测试
+- runFlow: swipe-selection.yaml
+
+- takeScreenshot: gesture-suite-after-swipe
+
+# 图片缩放测试
+- runFlow: pinch-zoom.yaml
+
+- takeScreenshot: gesture-suite-complete

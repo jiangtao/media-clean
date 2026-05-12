@@ -197,6 +197,8 @@ interface LocalizedCopy {
       keepAction: string;
       cleanupAction: string;
       releasableSizeLabel: string;
+      cleanupHistoryTitle: string;
+      cleanupHistoryReleased: (formattedSize: string) => string;
     };
   };
   filters: {
@@ -331,7 +333,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       statusTitle: '当前状态',
     },
     hero: {
-      kicker: 'Android 优先 MVP',
+      kicker: '跨端本地清理',
       title: '相册清理建议',
       description: '本地分批扫描整个相册，识别重复、模糊与相似照片，并通过应用内回收站做安全清理。',
       lastScan: '上次扫描',
@@ -418,9 +420,9 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       statusBodyGranted: '可开始扫描相册',
       statusTitlePending: '需要媒体权限',
       statusBodyPending: '进入工作区后授权即可开始扫描',
-      heroTitle: '准备开始扫描',
-      heroBodyGranted: '扫描并分析重复、模糊与相似内容',
-      heroBodyPending: '进入工作区后授权，即可开始扫描并分析重复、模糊与相似内容',
+      heroTitle: '本地扫描',
+      heroBodyGranted: '识别重复、模糊与相似内容',
+      heroBodyPending: '进入工作区后授权，即可识别重复、模糊与相似内容',
       actionReady: '开始扫描',
       actionPending: '进入工作区并授权',
       featurePill: '即将扫描照片与视频',
@@ -466,7 +468,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
         startScan: '开始扫描',
         scanScopeSummary: (count: number) =>
           count > 0 ? `已选择 ${count} 个媒体` : `最近 ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} 个月媒体`,
-        scanScopeHint: `默认先扫描最近 ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} 个月媒体；每次完成后会继续向更早媒体回填，直到整库覆盖完成。Android 会在后台继续当前批次，回到页面后自动接回真实进度。`,
+        scanScopeHint: `默认先扫描最近 ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} 个月媒体；完成后继续回填更早媒体，直到整库覆盖。离开再回来会自动接回进度。`,
         scanProgressTitle: '本地扫描',
         scanProgressValue: (current: number, total: number) => `${current}/${total}`,
         scanProgressFootnote: '重复、模糊与相似候选会持续留在下方，正常媒体会逐步退场。',
@@ -498,6 +500,8 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
         keepAction: '保留',
         cleanupAction: '清理',
         releasableSizeLabel: '释放',
+        cleanupHistoryTitle: '历史清理',
+        cleanupHistoryReleased: (formattedSize: string) => `共释放 ${formattedSize}`,
       },
     },
     filters: {
@@ -655,7 +659,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       statusTitle: 'Current status',
     },
     hero: {
-      kicker: 'Android-first MVP',
+      kicker: 'Cross-platform local cleanup',
       title: 'Media Cleanup Suggestions',
       description: 'Scan the whole library locally in batches, find duplicate, blurry, and similar photos, and clean safely through an app-level recycle bin.',
       lastScan: 'Last scan',
@@ -744,9 +748,9 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       statusBodyGranted: 'Ready to scan the library',
       statusTitlePending: 'Media permission required',
       statusBodyPending: 'Grant access in the workspace to start scanning',
-      heroTitle: 'Ready to start scanning',
-      heroBodyGranted: 'Scan and analyze duplicate, blurry, and similar items',
-      heroBodyPending: 'Open the workspace, grant access, then start scanning the library',
+      heroTitle: 'Local scan',
+      heroBodyGranted: 'Find duplicate, blurry, and similar items',
+      heroBodyPending: 'Open the workspace, grant access, then find duplicate, blurry, and similar items',
       actionReady: 'Open workspace',
       actionPending: 'Open and grant access',
       featurePill: 'Photos and videos will be included',
@@ -792,7 +796,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
         startScan: 'Start scan',
         scanScopeSummary: (count: number) =>
           count > 0 ? `${count} media selected` : `Recent ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} months`,
-        scanScopeHint: `The default scan starts with the last ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} months, then keeps backfilling older media after each completed batch until the whole library is covered. Android keeps the current batch running in the background and reattaches to the real progress when you return.`,
+        scanScopeHint: `The default scan starts with the last ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} months, then backfills older media until the whole library is covered. Return to the app to reattach to the current progress.`,
         scanProgressTitle: 'Local scan',
         scanProgressValue: (current: number, total: number) => `${current}/${total}`,
         scanProgressFootnote: 'Duplicate, blurry, and similar candidates stay below while normal media gradually drops out.',
@@ -825,6 +829,8 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
         keepAction: 'Keep',
         cleanupAction: 'Clean',
         releasableSizeLabel: 'Free up',
+        cleanupHistoryTitle: 'Cleanup history',
+        cleanupHistoryReleased: (formattedSize: string) => `Total freed ${formattedSize}`,
       },
     },
     filters: {

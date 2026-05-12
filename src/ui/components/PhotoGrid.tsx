@@ -1,7 +1,8 @@
-import React, { memo, useCallback, useMemo, useRef } from 'react';
-import { StyleSheet, useWindowDimensions, View, Text, FlatList } from 'react-native';
+import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { NativeScrollEvent, StyleSheet, useWindowDimensions, View, Text, FlatList } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { GestureDetector } from 'react-native-gesture-handler';
 
 import type { CleanupCandidate } from '../../domain/recognition/types';
 import type { AppThemePalette } from '../../theme/app-theme';
@@ -12,12 +13,14 @@ import {
   buildMediaGridLayout,
   type MediaGridLayout,
 } from '../screens/screen-layout';
+import { useSwipeSelection, type SwipeSelectionReason } from '../hooks/useSwipeSelection';
 
 interface PhotoGridProps {
   candidates: CleanupCandidate[];
   selectedIds: string[];
   selectionMode?: boolean;
   onSelect: (id: string) => void;
+  onSelectionChange?: (nextIds: string[], reason: SwipeSelectionReason) => void;
   onItemPress: (candidate: CleanupCandidate) => void;
   onItemLongPress?: (candidate: CleanupCandidate) => void;
   theme: AppThemePalette;
@@ -71,6 +74,7 @@ export function PhotoGrid({
   selectedIds,
   selectionMode,
   onSelect,
+  onSelectionChange,
   onItemPress,
   onItemLongPress,
   theme,
@@ -81,6 +85,7 @@ export function PhotoGrid({
   gridLayout,
 }: PhotoGridProps) {
   const dimensions = useWindowDimensions();
+  const [scrollOffset, setScrollOffset] = useState(0);
   const resolvedGridLayout = useMemo(
     () =>
       gridLayout ??
@@ -94,6 +99,7 @@ export function PhotoGrid({
     () => createStyles(theme, contentPadding, resolvedGridLayout),
     [contentPadding, resolvedGridLayout, theme],
   );
+  const gridContentTopOffset = (contentPadding?.top ?? 0) + 6 + resolvedGridLayout.spacing / 2;
   const isSelectionMode = selectionMode ?? selectedIds.length > 0;
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
@@ -102,6 +108,16 @@ export function PhotoGrid({
     return candidates.filter(c => c.asset.mediaType === mediaType);
   }, [candidates, mediaType]);
   const duplicateCountByGroup = useMemo(() => buildDuplicateCountByGroup(candidates), [candidates]);
+
+  const { panGesture } = useSwipeSelection({
+    candidates: filteredCandidates,
+    selectedIds,
+    onSelectionChange,
+    gridLayout: resolvedGridLayout,
+    scrollOffset,
+    contentTopOffset: gridContentTopOffset,
+    isSelectionMode,
+  });
 
   const renderItem = useCallback(({ item }: { item: CleanupCandidate }) => {
     const duplicateCount = item.duplicateGroup?.groupId
@@ -149,24 +165,32 @@ export function PhotoGrid({
     [resolvedGridLayout],
   );
 
+  const handleScroll = useCallback((event: { nativeEvent: NativeScrollEvent }) => {
+    setScrollOffset(event.nativeEvent.contentOffset.y);
+  }, []);
+
   return (
-    <FlatList
-      key={`photo-grid-${resolvedGridLayout.columns}`}
-      data={filteredCandidates}
-      renderItem={renderItem}
-      keyExtractor={keyExtractor}
-      numColumns={resolvedGridLayout.columns}
-      contentContainerStyle={styles.list}
-      showsVerticalScrollIndicator={false}
-      extraData={`${selectedIds.join(',')}:${resolvedGridLayout.columns}:${resolvedGridLayout.itemSize}`}
-      getItemLayout={getItemLayout}
-      initialNumToRender={18}
-      maxToRenderPerBatch={18}
-      updateCellsBatchingPeriod={16}
-      windowSize={7}
-      removeClippedSubviews
-      testID={gridTestID}
-    />
+    <GestureDetector gesture={panGesture}>
+      <FlatList
+        key={`photo-grid-${resolvedGridLayout.columns}`}
+        data={filteredCandidates}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        numColumns={resolvedGridLayout.columns}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        extraData={`${selectedIds.join(',')}:${resolvedGridLayout.columns}:${resolvedGridLayout.itemSize}`}
+        getItemLayout={getItemLayout}
+        initialNumToRender={18}
+        maxToRenderPerBatch={18}
+        updateCellsBatchingPeriod={16}
+        windowSize={7}
+        removeClippedSubviews
+        scrollEventThrottle={16}
+        onScroll={handleScroll}
+        testID={gridTestID}
+      />
+    </GestureDetector>
   );
 }
 

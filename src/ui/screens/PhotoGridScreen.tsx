@@ -9,6 +9,7 @@ import {
   usePhotoGridSessionController,
   type ScanBatchRangeState,
 } from './photo-grid/usePhotoGridSessionController';
+import { buildSelectionToggleLabel } from './photo-grid/selection-mode-labels';
 import { useAppPreferences } from '../../application/AppPreferencesContext';
 import type { CleanupCandidate } from '../../domain/recognition/types';
 import type { AppThemePalette } from '../../theme/app-theme';
@@ -102,14 +103,6 @@ function buildScanBatchRangeLabel(
       : formatScanRangeDate(range.startAt);
 
   return formatter(startText, formatScanRangeDate(range.endAt));
-}
-
-function buildSelectionToggleLabel(language: string, isAllSelected: boolean) {
-  if (language === 'en-US') {
-    return isAllSelected ? 'Deselect All' : 'Select All';
-  }
-
-  return isAllSelected ? '取消全选' : '全选';
 }
 
 function LegacyInstrumentationSurface({
@@ -218,9 +211,8 @@ function sumCandidateBytes(candidates: readonly CleanupCandidate[]) {
 function buildPhotoGridStateText(language: string) {
   if (language === 'en-US') {
     return {
-      readyTitle: 'Ready to start scanning',
-      readyBody:
-        'Scan the selected library window locally and keep flagged photos and videos on this page.',
+      readyTitle: '',
+      readyBody: 'Find duplicate, blurry, and similar items. Results stay here for review.',
       scanningTitle: 'Scanning your media',
       scanningBody: 'Review the current batch while the device continues scanning locally.',
       recognizingTitle: 'Recognizing results',
@@ -231,8 +223,8 @@ function buildPhotoGridStateText(language: string) {
   }
 
   return {
-    readyTitle: '准备开始扫描',
-    readyBody: '扫描并分析重复、模糊与相似内容，结果会直接留在当前页面继续判断。',
+    readyTitle: '',
+    readyBody: '识别重复、模糊与相似内容，结果留在当前页面继续判断。',
     scanningTitle: '正在扫描照片',
     scanningBody: '正在分析相册中的媒体文件，结果会按本地规则逐步回填到当前会话。',
     recognizingTitle: '识别中',
@@ -258,12 +250,14 @@ export function PhotoGridScreen({
   );
   const screenText = useMemo(() => buildPhotoGridStateText(language), [language]);
   const [activeIssueFilter, setActiveIssueFilter] = useState<IssueFilterKey | null>(null);
+  const [shouldRetainResultCategories, setShouldRetainResultCategories] = useState(false);
   const {
     permissionState,
     selectedIds,
     setSelectedIds,
     displayedCandidates,
     isSelectionMode,
+    exitSelectionMode,
     previewCandidate,
     previewDuplicateCandidates,
     errorMessage,
@@ -276,6 +270,7 @@ export function PhotoGridScreen({
     scanBatchRange,
     scanScopeSelection,
     handleSelect,
+    handleSelectionChange,
     handleItemPress,
     handleCleanupSelected,
     handleKeepSelected,
@@ -361,14 +356,13 @@ export function PhotoGridScreen({
     ],
   );
 
-  const breakdownItems = useMemo(
-    () =>
-      ((entryCopy.resultBreakdown ?? []) as readonly BreakdownItem[]).filter((item) => item.count > 0),
+  const resultBreakdownItems = useMemo(
+    () => (entryCopy.resultBreakdown ?? []) as readonly BreakdownItem[],
     [entryCopy.resultBreakdown],
   );
   const activeIssueItem = useMemo(
-    () => breakdownItems.find((item) => item.key === activeIssueFilter) ?? null,
-    [activeIssueFilter, breakdownItems],
+    () => resultBreakdownItems.find((item) => item.key === activeIssueFilter) ?? null,
+    [activeIssueFilter, resultBreakdownItems],
   );
   const issueWorkspaceCandidates = useMemo(
     () =>
@@ -417,8 +411,26 @@ export function PhotoGridScreen({
   const showScanPrompt = permissionState === 'granted';
   const isRecognizingResults =
     showScanPrompt && isRecognitionRangeState;
+  useEffect(() => {
+    if ((isScanning || !hasCompletedScan) && shouldRetainResultCategories) {
+      setShouldRetainResultCategories(false);
+    }
+  }, [hasCompletedScan, isScanning, shouldRetainResultCategories]);
+  useEffect(() => {
+    if (hasCompletedScan && scanResultsCount > 0 && !shouldRetainResultCategories) {
+      setShouldRetainResultCategories(true);
+    }
+  }, [hasCompletedScan, scanResultsCount, shouldRetainResultCategories]);
   const hasResultState =
-    showScanPrompt && !isScanning && !isRecognizingResults && hasCompletedScan && scanResultsCount > 0;
+    showScanPrompt &&
+    !isScanning &&
+    !isRecognizingResults &&
+    hasCompletedScan &&
+    (scanResultsCount > 0 || shouldRetainResultCategories);
+  const areResultCategoriesEmpty =
+    hasResultState &&
+    resultBreakdownItems.length > 0 &&
+    resultBreakdownItems.every((item) => item.count === 0);
   const isGrantedIdleState = showScanPrompt && !isScanning && !hasCompletedScan;
   const isScanAllCompleteState =
     showScanPrompt &&
@@ -426,14 +438,16 @@ export function PhotoGridScreen({
     !isRecognizingResults &&
     hasCompletedScan &&
     hasCompletedFullScan &&
-    scanResultsCount === 0;
+    scanResultsCount === 0 &&
+    !hasResultState;
   const isScanExhaustedState =
     showScanPrompt &&
     !isScanning &&
     !isRecognizingResults &&
     hasCompletedScan &&
     !hasCompletedFullScan &&
-    scanResultsCount === 0;
+    scanResultsCount === 0 &&
+    !hasResultState;
   const showIssueWorkspace = hasResultState && activeIssueFilter !== null;
 
   useEffect(() => {
@@ -487,12 +501,12 @@ export function PhotoGridScreen({
       return;
     }
 
-    const stillVisible = breakdownItems.some((item) => item.key === activeIssueFilter);
+    const stillVisible = resultBreakdownItems.some((item) => item.key === activeIssueFilter);
     if (!stillVisible) {
       setSelectedIds([]);
       setActiveIssueFilter(null);
     }
-  }, [activeIssueFilter, breakdownItems, setSelectedIds]);
+  }, [activeIssueFilter, resultBreakdownItems, setSelectedIds]);
 
   const handleOpenIssueWorkspace = useCallback(
     (issueFilter: IssueFilterKey) => {
@@ -505,6 +519,9 @@ export function PhotoGridScreen({
     setSelectedIds([]);
     setActiveIssueFilter(null);
   }, [setSelectedIds]);
+  const handleCloseSelection = useCallback(() => {
+    exitSelectionMode();
+  }, [exitSelectionMode]);
   const handleToggleIssueSelectAll = useCallback(() => {
     setSelectedIds((current) => {
       const nextIds = issueWorkspaceCandidates.map((candidate) => candidate.id);
@@ -584,7 +601,21 @@ export function PhotoGridScreen({
       ? 'photo-grid-scan-exhausted-title'
       : undefined;
   const resultActionLabel = copy.screens.photoGrid.continueScan;
-  const resultBody = screenText.resultBody(scanProgress.total || scanScopeSelection.total);
+  const resultTitle = areResultCategoriesEmpty
+    ? hasCompletedFullScan
+      ? copy.screens.photoGrid.scanAllCompleteTitle
+      : copy.screens.photoGrid.scanExhaustedTitle
+    : screenText.resultTitle;
+  const resultBody = areResultCategoriesEmpty
+    ? hasCompletedFullScan
+      ? copy.screens.photoGrid.scanAllCompleteBody
+      : copy.screens.photoGrid.scanExhaustedBody
+    : screenText.resultBody(scanProgress.total || scanScopeSelection.total);
+  const resultNote = areResultCategoriesEmpty
+    ? hasCompletedFullScan
+      ? copy.screens.photoGrid.scanAllCompleteTitle
+      : null
+    : completedScanRangeLabel;
   const recognitionProgressTotal = Math.max(
     scanProgress.total,
     scanProgress.current,
@@ -668,7 +699,7 @@ export function PhotoGridScreen({
                 titleTestID={entryTitleTestID}
                 title={
                   hasResultState
-                    ? screenText.resultTitle
+                    ? resultTitle
                     : isScanning
                       ? screenText.scanningTitle
                       : isRecognizingResults
@@ -689,8 +720,10 @@ export function PhotoGridScreen({
                         : (entryCopy.body ?? null)
                 }
                 note={
-                  hasResultState || isScanExhaustedState
-                    ? completedScanRangeLabel
+                  hasResultState
+                    ? resultNote
+                    : isScanExhaustedState
+                      ? completedScanRangeLabel
                     : isGrantedIdleState
                       ? copy.screens.photoGrid.scanScopeHint
                       : shouldShowScanRangeLabel
@@ -701,7 +734,9 @@ export function PhotoGridScreen({
                   isRecognizingResults
                     ? null
                     : hasResultState
-                    ? resultActionLabel
+                    ? hasCompletedFullScan
+                      ? null
+                      : resultActionLabel
                     : isScanExhaustedState
                       ? copy.screens.photoGrid.continueScan
                       : entryCopy.action
@@ -721,7 +756,7 @@ export function PhotoGridScreen({
                 theme={theme}
                 language={language}
                 compact={gridLayout.isSELike}
-                resultBreakdown={hasResultState ? breakdownItems : undefined}
+                resultBreakdown={hasResultState ? resultBreakdownItems : undefined}
                 onResultBreakdownPress={hasResultState ? handleOpenIssueWorkspace : undefined}
               />
             </View>
@@ -771,10 +806,12 @@ export function PhotoGridScreen({
               title={activeIssueItem.label}
               itemCount={issueWorkspaceCandidates.length}
               onBack={handleBackToSummary}
+              onCloseSelection={handleCloseSelection}
               displayedCandidates={issueWorkspaceCandidates}
               selectedIds={selectedIds}
               isSelectionMode={isSelectionMode}
               onSelect={handleSelect}
+              onSelectionChange={handleSelectionChange}
               onItemPress={handleItemPress}
               theme={theme}
               gridTestID="scan-result-grid"

@@ -1,38 +1,9 @@
-name: Android Release PR Check
+name: Android Release Build Smoke
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/android-pr-check.yml"
-      - ".github/workflows/android-release.yml"
-      - ".github/workflows/android-debug.yml"
-      - "app.json"
-      - "package.json"
-      - "plugins/**"
-      - "scripts/android/**"
-      - "android/**"
-      - "docs/release/android.md"
-      - "docs/release/android.en.md"
-      - "README.md"
-      - "README.en.md"
-  push:
-    branches:
-      - main
-      - master
-      - develop
-    paths:
-      - ".github/workflows/android-pr-check.yml"
-      - ".github/workflows/android-release.yml"
-      - ".github/workflows/android-debug.yml"
-      - "app.json"
-      - "package.json"
-      - "plugins/**"
-      - "scripts/android/**"
-      - "android/**"
-      - "docs/release/android.md"
-      - "docs/release/android.en.md"
-      - "README.md"
-      - "README.en.md"
+  # Release builds are expensive and do not cover normal UI smoke paths.
+  # Run this manually before release/signing changes instead of on every PR.
+  workflow_dispatch:
 
 permissions:
   contents: read

@@ -153,8 +153,8 @@ describe('LandingScreen', () => {
 
     expect(texts).toContain('授权已完成');
     expect(texts).toContain('可开始扫描相册');
-    expect(texts).toContain('准备开始扫描');
-    expect(texts).toContain('扫描并分析重复、模糊与相似内容');
+    expect(texts).toContain('本地扫描');
+    expect(texts).toContain('识别重复、模糊与相似内容');
     expect(texts).toContain('开始扫描');
     expect(texts).toContain('即将扫描照片与视频');
     expect(texts).toContain('仅在本地分析，不上传任何数据');
@@ -223,7 +223,7 @@ describe('LandingScreen', () => {
 
     expect(texts).toContain('需要媒体权限');
     expect(texts).toContain('进入工作区后授权即可开始扫描');
-    expect(texts).toContain('进入工作区后授权，即可开始扫描并分析重复、模糊与相似内容');
+    expect(texts).toContain('进入工作区后授权，即可识别重复、模糊与相似内容');
     expect(texts).toContain('进入工作区并授权');
 
     await act(async () => {

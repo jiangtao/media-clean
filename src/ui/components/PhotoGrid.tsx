@@ -13,13 +13,14 @@ import {
   buildMediaGridLayout,
   type MediaGridLayout,
 } from '../screens/screen-layout';
-import { useSwipeSelection } from '../hooks/useSwipeSelection';
+import { useSwipeSelection, type SwipeSelectionReason } from '../hooks/useSwipeSelection';
 
 interface PhotoGridProps {
   candidates: CleanupCandidate[];
   selectedIds: string[];
   selectionMode?: boolean;
   onSelect: (id: string) => void;
+  onSelectionChange?: (nextIds: string[], reason: SwipeSelectionReason) => void;
   onItemPress: (candidate: CleanupCandidate) => void;
   onItemLongPress?: (candidate: CleanupCandidate) => void;
   theme: AppThemePalette;
@@ -73,6 +74,7 @@ export function PhotoGrid({
   selectedIds,
   selectionMode,
   onSelect,
+  onSelectionChange,
   onItemPress,
   onItemLongPress,
   theme,
@@ -97,24 +99,25 @@ export function PhotoGrid({
     () => createStyles(theme, contentPadding, resolvedGridLayout),
     [contentPadding, resolvedGridLayout, theme],
   );
+  const gridContentTopOffset = (contentPadding?.top ?? 0) + 6 + resolvedGridLayout.spacing / 2;
   const isSelectionMode = selectionMode ?? selectedIds.length > 0;
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
-
-  // Swipe selection hook
-  const { panGesture } = useSwipeSelection({
-    candidates,
-    selectedIds,
-    onSelect,
-    gridLayout: resolvedGridLayout,
-    scrollOffset,
-    isSelectionMode,
-  });
 
   const filteredCandidates = useMemo(() => {
     if (mediaType === 'all') return candidates;
     return candidates.filter(c => c.asset.mediaType === mediaType);
   }, [candidates, mediaType]);
   const duplicateCountByGroup = useMemo(() => buildDuplicateCountByGroup(candidates), [candidates]);
+
+  const { panGesture } = useSwipeSelection({
+    candidates: filteredCandidates,
+    selectedIds,
+    onSelectionChange,
+    gridLayout: resolvedGridLayout,
+    scrollOffset,
+    contentTopOffset: gridContentTopOffset,
+    isSelectionMode,
+  });
 
   const renderItem = useCallback(({ item }: { item: CleanupCandidate }) => {
     const duplicateCount = item.duplicateGroup?.groupId

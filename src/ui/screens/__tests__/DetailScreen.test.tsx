@@ -282,8 +282,9 @@ describe('DetailScreen', () => {
     expect(renderer.root.findByProps({ testID: 'detail-pagination' })).toBeTruthy();
     expect(texts).toContain('清理');
     expect(texts).toContain('保留');
-    expect(closeButtonStyle.width).toBe(34);
-    expect(closeButtonStyle.height).toBe(34);
+    expect(closeButtonStyle.width).toBe(44);
+    expect(closeButtonStyle.height).toBe(44);
+    expect(closeButtonStyle.zIndex).toBe(11);
     expect(stageWrapStyle.width).toBe('100%');
     expect(floatingFooterStyle.position).toBe('absolute');
     expect(tagRowStyle.flexWrap).toBe('nowrap');
@@ -441,6 +442,19 @@ describe('DetailScreen', () => {
     const { renderer } = renderDetailScreen(videoCandidate);
 
     expect(renderer.root.findByProps({ testID: 'mock-video-player' })).toBeTruthy();
+  });
+
+  it('wires the close button for photo and video detail viewers', () => {
+    const photo = renderDetailScreen(abnormalCandidate);
+    const video = renderDetailScreen(videoCandidate);
+
+    act(() => {
+      photo.renderer.root.findByProps({ testID: 'detail-close-button' }).props.onPress();
+      video.renderer.root.findByProps({ testID: 'detail-close-button' }).props.onPress();
+    });
+
+    expect(photo.onClose).toHaveBeenCalledTimes(1);
+    expect(video.onClose).toHaveBeenCalledTimes(1);
   });
 
   it('swallows async action failures instead of throwing from detail button presses', async () => {

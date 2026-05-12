@@ -197,6 +197,8 @@ describe('SettingsScreen', () => {
       description: '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
     });
     expect(renderedTexts).toContain('最近 3 个月');
+    expect(renderedTexts).toContain('24');
+    expect(renderer.root.findAllByProps({ testID: 'scan-range-option-all-disabled' })).toHaveLength(0);
     expect(renderedTexts).toContain('每周一 20:30 提醒你检查识别结果');
   });
 
@@ -352,7 +354,7 @@ describe('SettingsScreen', () => {
 
 describe('SettingsScreen support logic', () => {
   it('keeps the supported scan range presets stable', () => {
-    expect(scanRangeStorage.VALID_SCAN_RANGES).toEqual([1, 2, 3, 6, 12]);
+    expect(scanRangeStorage.VALID_SCAN_RANGES).toEqual([1, 2, 3, 6, 12, 24]);
   });
 
   it('builds safe-area aware layout paddings for notch and gesture insets', () => {

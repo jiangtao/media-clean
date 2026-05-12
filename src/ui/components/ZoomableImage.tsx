@@ -5,8 +5,9 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
+import { buildSizedImageSource } from './image-source';
 
 interface ZoomableImageProps {
   uri: string;
@@ -45,13 +46,14 @@ function ZoomableImageComponent({
     .onEnd(() => {
       // Boundary checks and bounce back
       if (scale.value < minScale) {
-        scale.value = withSpring(minScale, { damping: 15, stiffness: 150 });
-        translateX.value = withSpring(0);
-        translateY.value = withSpring(0);
+        // Quick bounce back to minScale without animation
+        scale.value = minScale;
+        translateX.value = 0;
+        translateY.value = 0;
         savedTranslateX.value = 0;
         savedTranslateY.value = 0;
       } else if (scale.value > maxScale) {
-        scale.value = withSpring(maxScale);
+        scale.value = withTiming(maxScale, { duration: 150 });
       }
 
       savedScale.value = scale.value;
@@ -92,9 +94,10 @@ function ZoomableImageComponent({
     .enabled(doubleTapReset)
     .onEnd(() => {
       if (scale.value > minScale) {
-        scale.value = withSpring(minScale, { damping: 15, stiffness: 150 });
-        translateX.value = withSpring(0);
-        translateY.value = withSpring(0);
+        // Quick reset without animation
+        scale.value = minScale;
+        translateX.value = 0;
+        translateY.value = 0;
         savedScale.value = minScale;
         savedTranslateX.value = 0;
         savedTranslateY.value = 0;
@@ -123,10 +126,12 @@ function ZoomableImageComponent({
     <GestureDetector gesture={composedGesture}>
       <Animated.View style={[{ width, height }, animatedStyle]} testID="zoomable-image">
         <AnimatedImage
-          source={{ uri }}
+          source={buildSizedImageSource(uri, width, height)}
           style={StyleSheet.absoluteFill}
           contentFit="contain"
           cachePolicy="memory-disk"
+          priority="high"
+          allowDownscaling
           testID="zoomable-image-content"
         />
       </Animated.View>

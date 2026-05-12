@@ -92,6 +92,7 @@ import { reconcileReminderRuntimeInForeground } from '../../../features/reminder
 import { captureLastValidScanBaseline } from '../../../services/notifications/cleanup-reminders';
 import { notifyScanCompletionIfNeeded } from '../../../services/notifications/scan-completion-notifications';
 import { PHOTO_GRID_ENTRY_INTERACTION_STANDARD } from '../screen-layout';
+import type { SwipeSelectionReason } from '../../hooks/useSwipeSelection';
 
 type PermissionState = 'loading' | 'granted' | 'denied';
 type ScanScopeSelection = { total: number; photo: number; video: number };
@@ -1092,6 +1093,7 @@ export function usePhotoGridSessionController({
   const [permissionState, setPermissionState] = useState<PermissionState>(initialPermissionState);
   const [filter, setFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isSelectionModeActive, setIsSelectionModeActive] = useState(false);
   const [candidates, setCandidates] = useState<CleanupCandidate[]>(
     initialHasCompletedScan ? initialVisibleCandidates : [],
   );
@@ -1984,10 +1986,22 @@ export function usePhotoGridSessionController({
   );
 
   const handleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id],
-    );
+    setSelectedIds((prev) => {
+      const isSelecting = !prev.includes(id);
+      if (isSelecting) {
+        setIsSelectionModeActive(true);
+      }
+      return prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id];
+    });
   }, []);
+
+  const handleSelectionChange = useCallback(
+    (nextIds: string[], _reason: SwipeSelectionReason) => {
+      setIsSelectionModeActive(true);
+      setSelectedIds(nextIds);
+    },
+    [],
+  );
 
   const handleItemPress = useCallback(
     (candidate: CleanupCandidate) => {
@@ -2093,6 +2107,7 @@ export function usePhotoGridSessionController({
       setCandidates(nextCandidates);
       setStreamingCandidates(nextCandidates);
       setSelectedIds([]);
+      setIsSelectionModeActive(false);
       setScanResultsCount(nextCandidates.length);
       setScanScopeSelection(buildScopeSelectionFromCandidates(nextCandidates));
       completedScanBatchRangeRef.current = nextScanBatchRange;
@@ -2137,6 +2152,7 @@ export function usePhotoGridSessionController({
       setCandidates(nextCandidates);
       setStreamingCandidates(nextCandidates);
       setSelectedIds([]);
+      setIsSelectionModeActive(false);
       setScanResultsCount(nextCandidates.length);
       setScanScopeSelection(buildScopeSelectionFromCandidates(nextCandidates));
       completedScanBatchRangeRef.current = nextScanBatchRange;
@@ -3532,7 +3548,11 @@ export function usePhotoGridSessionController({
     selectedIds,
     setSelectedIds,
     displayedCandidates,
-    isSelectionMode: selectedIds.length > 0,
+    isSelectionMode: isSelectionModeActive,
+    exitSelectionMode: useCallback(() => {
+      setIsSelectionModeActive(false);
+      setSelectedIds([]);
+    }, []),
     isAllSelectableSelected,
     previewCandidate,
     previewDuplicateCandidates,
@@ -3546,6 +3566,7 @@ export function usePhotoGridSessionController({
     scanBatchRange,
     scanScopeSelection,
     handleSelect,
+    handleSelectionChange,
     handleItemPress,
     handleCleanupSelected,
     handleKeepSelected,

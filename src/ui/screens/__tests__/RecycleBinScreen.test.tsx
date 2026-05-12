@@ -14,6 +14,7 @@ import {
 
 const loadRecycleBinIdsMock = vi.hoisted(() => vi.fn());
 const loadRecycleBinCandidateCacheMock = vi.hoisted(() => vi.fn());
+const loadCleanupReportSnapshotMock = vi.hoisted(() => vi.fn());
 const loadRecycleBinSnapshotCacheMock = vi.hoisted(() => vi.fn());
 const saveRecycleBinIdsMock = vi.hoisted(() => vi.fn());
 const saveRecycleBinCandidateCacheMock = vi.hoisted(() => vi.fn());
@@ -99,6 +100,7 @@ vi.mock('../../../application/AppPreferencesContext', () => ({
 }));
 
 vi.mock('../../../services/storage/app-storage', () => ({
+  loadCleanupReportSnapshot: loadCleanupReportSnapshotMock,
   loadRecycleBinCandidateCache: loadRecycleBinCandidateCacheMock,
   loadRecycleBinIds: loadRecycleBinIdsMock,
   loadRecycleBinSnapshotCache: loadRecycleBinSnapshotCacheMock,
@@ -128,6 +130,7 @@ vi.mock('../../components/PhotoGrid', () => {
     selectedIds,
     selectionMode,
     onSelect,
+    onSelectionChange,
     onItemPress,
     onItemLongPress,
   }: {
@@ -135,6 +138,15 @@ vi.mock('../../components/PhotoGrid', () => {
     selectedIds: string[];
     selectionMode?: boolean;
     onSelect: (id: string) => void;
+    onSelectionChange?: (
+      nextIds: string[],
+      reason: {
+        source: 'swipe-selection';
+        action: 'add' | 'remove';
+        anchorId: string;
+        rangeIds: string[];
+      },
+    ) => void;
     onItemPress: (candidate: CleanupCandidate) => void;
     onItemLongPress?: (candidate: CleanupCandidate) => void;
   }) {
@@ -143,6 +155,19 @@ vi.mock('../../components/PhotoGrid', () => {
       { testID: 'mock-photo-grid' },
       ReactModule.createElement('Text', { testID: 'mock-photo-grid-selection-mode' }, String(Boolean(selectionMode))),
       ReactModule.createElement('Text', { testID: 'mock-photo-grid-selected-count' }, String(selectedIds.length)),
+      ReactModule.createElement('Pressable', {
+        testID: 'mock-recycle-grid-swipe-select-first-two',
+        onPress: () =>
+          onSelectionChange?.(
+            candidates.slice(0, 2).map((candidate) => candidate.id),
+            {
+              source: 'swipe-selection',
+              action: 'add',
+              anchorId: candidates[0]?.id ?? '',
+              rangeIds: candidates.slice(0, 2).map((candidate) => candidate.id),
+            },
+          ),
+      }),
       ...candidates.flatMap((candidate) => [
         ReactModule.createElement(
           'Text',
@@ -333,6 +358,11 @@ describe('RecycleBinScreen', () => {
     vi.clearAllMocks();
     loadRecycleBinIdsMock.mockResolvedValue([]);
     loadRecycleBinCandidateCacheMock.mockResolvedValue([]);
+    loadCleanupReportSnapshotMock.mockResolvedValue({
+      cleanedItemCount: 0,
+      cleanedBytes: 0,
+      lastCleanedAt: null,
+    });
     loadRecycleBinSnapshotCacheMock.mockResolvedValue(null);
     saveRecycleBinIdsMock.mockResolvedValue(undefined);
     saveRecycleBinCandidateCacheMock.mockResolvedValue(undefined);
@@ -410,7 +440,7 @@ describe('RecycleBinScreen', () => {
     expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selection-mode' }).props.children).toBe('false');
     expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selected-count' }).props.children).toBe('0');
     expect(renderer.root.findByProps({ testID: 'recycle-pending-bytes' }).props.children).toBe('664 KB');
-    expect(findTextNode(renderer, '取消全选')).toBeUndefined();
+    expect(findTextNode(renderer, '全不选')).toBeUndefined();
     expect(renderer.root.findAllByProps({ testID: 'recycle-restore-selected-button' })).toHaveLength(0);
     expect(renderer.root.findAllByProps({ testID: 'recycle-delete-selected-button' })).toHaveLength(0);
     expect(renderer.root.findAllByProps({ testID: 'recycle-restore-selected-icon' })).toHaveLength(0);
@@ -470,6 +500,37 @@ describe('RecycleBinScreen', () => {
     expect(emptyRenderer.root.findByProps({ testID: 'recycle-bin-empty-title' }).props.children).toBe(
       '这里还没有待最终处理的项目',
     );
+  });
+
+  it('shows cleanup history under the empty-state icon when the recycle bin is empty', async () => {
+    loadRecycleBinIdsMock.mockResolvedValueOnce([]);
+    loadCleanupReportSnapshotMock.mockResolvedValueOnce({
+      cleanedItemCount: 4,
+      cleanedBytes: 50.5 * 1024 * 1024,
+      lastCleanedAt: 1_710_000_000_000,
+    });
+
+    const renderer = await renderRecycleBinScreen();
+    const historyNode = renderer.root.findByProps({ testID: 'recycle-cleanup-history-released' });
+    const historyChildren = historyNode.props.children as Array<React.ReactElement<{ style?: unknown }>>;
+    const historyValueNode = historyChildren[1];
+
+    expect(renderer.root.findAllByProps({ testID: 'recycle-cleanup-history-footer' })).toHaveLength(0);
+    expect(renderer.root.findByProps({ testID: 'recycle-bin-empty-state' })).toBeTruthy();
+    expect(flattenText(historyNode.props.children)).toBe('历史清理： 共释放 50.5 MB');
+    expect(historyNode.props.style).toEqual(
+      expect.objectContaining({
+        fontSize: 14,
+        lineHeight: 20,
+      }),
+    );
+    expect(historyValueNode.props.style).toEqual(
+      expect.objectContaining({
+        fontSize: 16,
+        lineHeight: 22,
+      }),
+    );
+    expect(renderer.root.findAllByProps({ testID: 'cleanup-report-card' })).toHaveLength(0);
   });
 
   it('renders the persisted recycle-bin snapshot before recycle-bin ids finish loading, then refreshes in the background', async () => {
@@ -790,7 +851,7 @@ describe('RecycleBinScreen', () => {
 
     expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selection-mode' }).props.children).toBe('true');
     expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selected-count' }).props.children).toBe('2');
-    expect(findTextNode(renderer, '取消全选')).toBeTruthy();
+    expect(findTextNode(renderer, '全不选')).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'recycle-restore-selected-button' })).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'recycle-delete-selected-button' })).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'recycle-bin-summary-title' }).props.children).toBe('清理 2 项');
@@ -799,13 +860,47 @@ describe('RecycleBinScreen', () => {
       renderer.root.findByProps({ testID: 'recycle-selection-toggle-button' }).props.onPress();
     });
 
-    expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selection-mode' }).props.children).toBe('false');
+    expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selection-mode' }).props.children).toBe('true');
     expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selected-count' }).props.children).toBe('0');
-    expect(renderer.root.findAllByProps({ testID: 'recycle-restore-selected-button' })).toHaveLength(0);
-    expect(renderer.root.findAllByProps({ testID: 'recycle-delete-selected-button' })).toHaveLength(0);
+    expect(renderer.root.findByProps({ testID: 'recycle-restore-selected-button' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'recycle-delete-selected-button' })).toBeTruthy();
     expect(renderer.root.findAllByProps({ testID: 'recycle-restore-selected-icon' })).toHaveLength(0);
     expect(renderer.root.findAllByProps({ testID: 'recycle-delete-selected-icon' })).toHaveLength(0);
-    expect(findTextNode(renderer, '取消全选')).toBeUndefined();
+    expect(findTextNode(renderer, '全不选')).toBeUndefined();
+    expect(findTextNode(renderer, '全选')).toBeTruthy();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'recycle-back-button' }).props.onPress();
+    });
+
+    expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selection-mode' }).props.children).toBe('false');
+    expect(renderer.root.findAllByProps({ testID: 'recycle-restore-selected-button' })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ testID: 'recycle-delete-selected-button' })).toHaveLength(0);
+  });
+
+  it('keeps recycle-bin batch actions wired to swipe selection changes', async () => {
+    const first = createCandidate('recycle-1');
+    const second = createCandidate('recycle-2');
+    const third = createCandidate('recycle-3');
+    loadRecycleBinIdsMock.mockResolvedValueOnce(['recycle-1', 'recycle-2', 'recycle-3']);
+    scanMediaLibraryMock.mockResolvedValueOnce(createScanResult([first, second, third]));
+
+    const renderer = await renderRecycleBinScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'candidate-press-recycle-1' }).props.onLongPress();
+    });
+
+    expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selected-count' }).props.children).toBe('1');
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'mock-recycle-grid-swipe-select-first-two' }).props.onPress();
+    });
+
+    expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selection-mode' }).props.children).toBe('true');
+    expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selected-count' }).props.children).toBe('2');
+    expect(renderer.root.findByProps({ testID: 'recycle-restore-selected-button' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'recycle-delete-selected-button' })).toBeTruthy();
   });
 
   it('closes detail back to the recycle-bin grid', async () => {

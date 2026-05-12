@@ -230,6 +230,8 @@ export function DetailScreen({
           style={styles.closeButton}
           pressedStyle={styles.closeButtonPressed}
           preset="icon"
+          accessibilityRole="button"
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           testID="detail-close-button"
         >
           <Ionicons name="close" size={16} color="#ffffff" />
@@ -362,6 +364,8 @@ function createStyles(insets: { top: number; bottom: number; left: number; right
       marginBottom: 10,
       paddingLeft: 16 + insets.left,
       paddingRight: 16 + insets.right,
+      zIndex: 10,
+      elevation: 10,
     },
     indexText: {
       color: '#ffffff',
@@ -370,12 +374,14 @@ function createStyles(insets: { top: number; bottom: number; left: number; right
       letterSpacing: 0.2,
     },
     closeButton: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: 'rgba(255, 255, 255, 0.14)',
+      zIndex: 11,
+      elevation: 11,
     },
     closeButtonPressed: {
       backgroundColor: 'rgba(255, 255, 255, 0.22)',

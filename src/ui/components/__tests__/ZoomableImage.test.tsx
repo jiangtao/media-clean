@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/react-native';
-import { ZoomableImage } from '../ZoomableImage';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import React from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { describe, expect, it, vi } from 'vitest';
+
+import { ZoomableImage } from '../ZoomableImage';
 
 describe('ZoomableImage', () => {
   const defaultProps = {
@@ -15,85 +16,78 @@ describe('ZoomableImage', () => {
     <GestureHandlerRootView style={{ flex: 1 }}>{children}</GestureHandlerRootView>
   );
 
-  it('should render without error', async () => {
-    const { getByTestId } = await render(
-      <Wrapper>
-        <ZoomableImage {...defaultProps} />
-      </Wrapper>
-    );
+  function renderZoomableImage(props: Partial<React.ComponentProps<typeof ZoomableImage>> = {}) {
+    let renderer!: ReturnType<typeof TestRenderer.create>;
 
-    expect(getByTestId('zoomable-image')).toBeDefined();
+    act(() => {
+      renderer = TestRenderer.create(
+        <Wrapper>
+          <ZoomableImage {...defaultProps} {...props} />
+        </Wrapper>
+      );
+    });
+
+    return renderer;
+  }
+
+  it('should render without error', () => {
+    const renderer = renderZoomableImage();
+
+    expect(renderer.root.findByProps({ testID: 'zoomable-image' })).toBeDefined();
   });
 
-  it('should apply default min and max scale', async () => {
-    const { getByTestId } = await render(
-      <Wrapper>
-        <ZoomableImage {...defaultProps} maxScale={3} minScale={1} />
-      </Wrapper>
-    );
+  it('should apply default min and max scale', () => {
+    const renderer = renderZoomableImage({ maxScale: 3, minScale: 1 });
 
-    expect(getByTestId('zoomable-image')).toBeDefined();
+    expect(renderer.root.findByProps({ testID: 'zoomable-image' })).toBeDefined();
   });
 
-  it('should handle custom scale limits', async () => {
-    const { getByTestId } = await render(
-      <Wrapper>
-        <ZoomableImage {...defaultProps} maxScale={5} minScale={0.5} />
-      </Wrapper>
-    );
+  it('should handle custom scale limits', () => {
+    const renderer = renderZoomableImage({ maxScale: 5, minScale: 0.5 });
 
-    expect(getByTestId('zoomable-image')).toBeDefined();
+    expect(renderer.root.findByProps({ testID: 'zoomable-image' })).toBeDefined();
   });
 
-  it('should pass image URI correctly', async () => {
-    const { getByTestId } = await render(
-      <Wrapper>
-        <ZoomableImage {...defaultProps} uri="custom-image.png" />
-      </Wrapper>
-    );
+  it('should pass image URI correctly', () => {
+    const renderer = renderZoomableImage({ uri: 'custom-image.png' });
+    const image = renderer.root.findByProps({ testID: 'zoomable-image-content' });
 
-    const image = getByTestId('zoomable-image');
-    expect(image).toBeDefined();
+    expect(image.props.source).toMatchObject({
+      uri: 'custom-image.png',
+      width: 300,
+      height: 400,
+      scale: 3,
+    });
   });
 
-  it('should apply correct dimensions', async () => {
-    const { getByTestId } = await render(
-      <Wrapper>
-        <ZoomableImage {...defaultProps} width={500} height={600} />
-      </Wrapper>
-    );
+  it('should apply correct dimensions', () => {
+    const renderer = renderZoomableImage({ width: 500, height: 600 });
+    const image = renderer.root.findByProps({ testID: 'zoomable-image-content' });
 
-    expect(getByTestId('zoomable-image')).toBeDefined();
+    expect(image.props.source).toMatchObject({
+      uri: 'test-image.jpg',
+      width: 500,
+      height: 600,
+      scale: 3,
+    });
   });
 
-  it('should call onScaleChange callback', async () => {
+  it('should call onScaleChange callback', () => {
     const onScaleChange = vi.fn();
-    const { getByTestId } = await render(
-      <Wrapper>
-        <ZoomableImage {...defaultProps} onScaleChange={onScaleChange} />
-      </Wrapper>
-    );
+    const renderer = renderZoomableImage({ onScaleChange });
 
-    expect(getByTestId('zoomable-image')).toBeDefined();
+    expect(renderer.root.findByProps({ testID: 'zoomable-image' })).toBeDefined();
   });
 
-  it('should support double tap reset when enabled', async () => {
-    const { getByTestId } = await render(
-      <Wrapper>
-        <ZoomableImage {...defaultProps} doubleTapReset={true} />
-      </Wrapper>
-    );
+  it('should support double tap reset when enabled', () => {
+    const renderer = renderZoomableImage({ doubleTapReset: true });
 
-    expect(getByTestId('zoomable-image')).toBeDefined();
+    expect(renderer.root.findByProps({ testID: 'zoomable-image' })).toBeDefined();
   });
 
-  it('should disable double tap reset when false', async () => {
-    const { getByTestId } = await render(
-      <Wrapper>
-        <ZoomableImage {...defaultProps} doubleTapReset={false} />
-      </Wrapper>
-    );
+  it('should disable double tap reset when false', () => {
+    const renderer = renderZoomableImage({ doubleTapReset: false });
 
-    expect(getByTestId('zoomable-image')).toBeDefined();
+    expect(renderer.root.findByProps({ testID: 'zoomable-image' })).toBeDefined();
   });
 });

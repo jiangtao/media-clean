@@ -8,6 +8,7 @@
    - 当前拆分：P0 Rust Core、P0 CLI、P1 Electron Desktop、P2 v0.5.1 多语言/主题治理。
    - 依赖结论：Rust Core 是 CLI 和 Desktop 的硬依赖；v0.5.1 治理可并行但不阻塞 P0；Desktop 等 Rust Core / CLI contract 稳定后产品化。
    - 后续执行方案：[v0.5 后续 Goal 拆分执行方案](./v0-5-goal-split-execution/_index.md)。
+   - 可执行 plans：[v0.5 Goal 拆分计划包](../plans/2026-05-13-v0-5-goal-split-design/_index.md)。
 
 ## 后续执行依据
 

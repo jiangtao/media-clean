@@ -8,6 +8,7 @@
    - Current split: P0 Rust Core, P0 CLI, P1 Electron Desktop, P2 v0.5.1 i18n/theme governance.
    - Dependency conclusion: Rust Core is the hard dependency for CLI and Desktop; v0.5.1 governance can run in parallel but does not block P0; Desktop productization waits for stable Rust Core / CLI contracts.
    - Follow-up execution plan: [v0.5 Follow-up Goal Split Execution Plan](./v0-5-goal-split-execution/_index.md).
+   - Executable plans: [v0.5 Goal Split Plan Pack](../plans/2026-05-13-v0-5-goal-split-design/_index.md).
 
 ## Evidence and Plans for Execution
 

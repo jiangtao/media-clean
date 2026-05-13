@@ -121,6 +121,8 @@ transport: usb
 
 当前本地 release smoke 已是 `0.0.4` / `versionCode=4`，但仍使用临时 keystore。执行本地安装时，先因已有不同签名包触发 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`；卸载用户 0 / 10 后，MIUI 仍以 `INSTALL_FAILED_USER_RESTRICTED` 拒绝 USB 安装。真机安装验收需要手机侧允许 USB 安装，或使用正式 release workflow 生成同一签名链的 APK 后再验证。
 
+最终验收：2026-05-14，经手机侧继续处理安装限制后，用户确认本地手机安装和主要功能均正常。0.0.4 release candidate 的人工可用性验收通过。
+
 ## 后续候选项实测结果
 
 在 Stage 1 基础上，继续用本地 release smoke 对三个候选项做了实测：
@@ -202,7 +204,7 @@ npm run compare:android:apk-size -- \
 
 ## 下一步
 
-1. 默认正式 release 仍先采用 Stage 1：`armeabi-v7a,arm64-v8a`，当前 0.0.4 本地结果为 51.829 MiB，并用正式签名链做真机安装复核。
+1. 默认正式 release 仍先采用 Stage 1：`armeabi-v7a,arm64-v8a`，当前 0.0.4 本地结果为 51.829 MiB，且本地手机人工可用性验收已通过；CI 正式 release 后继续复核正式签名链。
 2. 若产品确认可以放弃 32-bit ARM，下一版可切 Stage 4：`arm64-v8a` 单 ABI；0.0.4 当前估算约 37.875 MiB，需要重新构建确认。
 3. 若要默认启用 R8 / resource shrink，必须基于 main-merged 版本重新打包，并用正式签名 APK 完成权限、通知、后台扫描、SQLite、图片 / 视频预览和 native scan 回归。
 4. Stage 7 的 28.909 MiB 是 merge 前最小候选；main-merged 版本需要重新实测，不能只因历史候选体积最小就直接发布。

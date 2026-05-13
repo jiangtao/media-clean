@@ -121,6 +121,8 @@ Reason: at that time the device already had `com.jt.mistapmediacleaner` version 
 
 The current local release smoke APK is now `0.0.4` / `versionCode=4`, but it is still signed with a temporary keystore. Local installation first hit `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because a differently signed package was already installed. After uninstalling user 0 / 10, MIUI still rejected USB installation with `INSTALL_FAILED_USER_RESTRICTED`. Real-device install acceptance needs USB installation enabled on the device, or a formally signed APK from the release workflow that uses the same signing chain.
 
+Final acceptance: on 2026-05-14, after the device-side install restriction was handled, the user confirmed that local phone installation and core functionality are normal. The 0.0.4 release candidate passes manual usability acceptance.
+
 ## Follow-up Candidate Measurements
 
 After Stage 1, three additional candidates were measured with local release smoke builds:
@@ -202,7 +204,7 @@ Track at least:
 
 ## Next Steps
 
-1. Keep the default official release on Stage 1 first: `armeabi-v7a,arm64-v8a`; the current 0.0.4 local result is 51.829 MiB and still needs real-device validation with the formal signing chain.
+1. Keep the default official release on Stage 1 first: `armeabi-v7a,arm64-v8a`; the current 0.0.4 local result is 51.829 MiB and manual local-phone usability acceptance has passed. After the CI release, re-check the formal signing chain.
 2. If product/device support confirms 32-bit ARM can be dropped, move the next release candidate to Stage 4: `arm64-v8a`; the current 0.0.4 estimate is about 37.875 MiB and needs a rebuild to confirm.
 3. Before enabling R8 / resource shrinking by default, rebuild from the main-merged baseline and validate permissions, notifications, background scan, SQLite, image/video preview, and native scan with a formally signed APK.
 4. Stage 7 at 28.909 MiB is the smallest pre-merge candidate; the main-merged version must be remeasured and cannot be released just because the historical candidate was smallest.

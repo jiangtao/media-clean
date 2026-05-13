@@ -11,6 +11,7 @@ on:
       - ".github/workflows/android-release.yml"
       - "page/**"
       - "scripts/release/verify-android-release-page-contract.mjs"
+      - "scripts/release/prepare-page-android-download.mjs"
 
 permissions:
   contents: read
@@ -28,8 +29,9 @@ jobs:
       EXPO_NO_TELEMETRY: "1"
       VERCEL_ORG_ID: team_KMAhi2p340W6VAP8OPUVhJh7
       VERCEL_PROJECT_ID: prj_MP950Qnus5voEiUep7mT2GHeP8wq
-      PAGE_PRODUCTION_URL: https://mc-khaki.vercel.app
-      ANDROID_LATEST_APK_URL: https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk
+      PAGE_PRODUCTION_URL: https://mc.jerret.me
+      ANDROID_LATEST_APK_URL: https://mc.jerret.me/download/android-latest.apk
+      ANDROID_LATEST_APK_SOURCE_URL: https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk
 
     steps:
       - name: Checkout
@@ -39,6 +41,9 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24.11.0
+
+      - name: Hydrate Android download asset
+        run: node scripts/release/prepare-page-android-download.mjs --from-url "${ANDROID_LATEST_APK_SOURCE_URL}"
 
       - name: Verify release-page contract
         run: node scripts/release/verify-android-release-page-contract.mjs
@@ -73,11 +78,12 @@ jobs:
 
       - name: Verify production page content
         run: |
-          curl -I -L "${PAGE_PRODUCTION_URL}"
+          curl -fsSIL "${PAGE_PRODUCTION_URL}"
           PAGE_HTML="$(curl -sS "${PAGE_PRODUCTION_URL}")"
           printf '%s' "${PAGE_HTML}" | grep -q '下载 Android'
           printf '%s' "${PAGE_HTML}" | grep -q 'Android APK'
           printf '%s' "${PAGE_HTML}" | grep -q "${ANDROID_LATEST_APK_URL}"
+          curl -fsSIL "${ANDROID_LATEST_APK_URL}"
 
       - name: Publish page deployment summary
         env:
@@ -89,4 +95,5 @@ jobs:
             echo "- Vercel deployment URL: ${DEPLOYMENT_URL}"
             echo "- Production alias: ${PAGE_PRODUCTION_URL}"
             echo "- Android download URL: ${ANDROID_LATEST_APK_URL}"
+            echo "- Android hydrate source: ${ANDROID_LATEST_APK_SOURCE_URL}"
           } >> "${GITHUB_STEP_SUMMARY}"

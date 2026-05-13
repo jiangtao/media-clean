@@ -70,7 +70,7 @@ const baseSettings: ReminderSettings = {
   minute: 30,
   notificationId: null,
   nextTriggerAt: null,
-  summary: '定期检查最近拍摄的照片和视频，优先清理误触、异常与重复内容。',
+  summary: '定期检查最近拍摄的照片和视频，优先清理重复、模糊与相似内容。',
 };
 
 describe('reminder background task registration', () => {

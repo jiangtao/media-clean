@@ -6,7 +6,7 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
-  Switch,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -35,7 +35,6 @@ import {
 import {
   loadScanRange,
   saveScanRange,
-  VALID_SCAN_RANGES,
   type ScanRange,
 } from '../../services/storage/scan-range-storage';
 import {
@@ -48,15 +47,16 @@ import {
   loadGeneratedAnalysisFileCacheSizeBytes,
 } from '../../services/media/analysis-temp-file-cache';
 import { useAppPreferences } from '../../application/AppPreferencesContext';
-import { buildSettingsScreenLayout } from './screen-layout';
+import {
+  buildSettingsScreenLayout,
+  type SettingsScreenLayout,
+} from './screen-layout';
 import { formatLocalizedSize } from '../../i18n/app-copy';
+import { DesignIcon } from '../icons/DesignIcon';
 
-type SettingsScreenLayout = {
-  headerTop: number;
-  contentBottom: number;
-  left: number;
-  right: number;
-};
+const LIGHT_THEME_PREVIEW = getAppTheme('light');
+const DARK_THEME_PREVIEW = getAppTheme('dark');
+const SETTINGS_SCAN_RANGE_OPTIONS = [1, 3, 6, 12, 24] as const;
 
 interface SettingsSectionProps {
   title: string;
@@ -85,15 +85,13 @@ function SettingsSection({ title, children, theme, leftInset, rightInset }: Sett
 function createSectionStyles(theme: AppThemePalette, leftInset: number, rightInset: number) {
   return StyleSheet.create({
     section: {
-      marginBottom: 24,
+      marginBottom: 22,
     },
     sectionTitle: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: theme.pageTextMuted,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-      marginBottom: 12,
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.pageTextPrimary,
+      marginBottom: 10,
       paddingLeft: leftInset,
       paddingRight: rightInset,
     },
@@ -148,7 +146,7 @@ function createRowStyles(theme: AppThemePalette, isLast: boolean) {
   return StyleSheet.create({
     row: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       justifyContent: 'space-between',
       paddingVertical: 14,
       paddingHorizontal: 16,
@@ -163,6 +161,7 @@ function createRowStyles(theme: AppThemePalette, isLast: boolean) {
       fontSize: 16,
       color: theme.pageTextPrimary,
       flex: 1,
+      fontWeight: '600',
     },
     rightContent: {
       flexDirection: 'row',
@@ -178,7 +177,11 @@ function createRowStyles(theme: AppThemePalette, isLast: boolean) {
 
 export function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const layout = useMemo(() => buildSettingsScreenLayout(insets), [insets]);
+  const dimensions = useWindowDimensions();
+  const layout = useMemo(
+    () => buildSettingsScreenLayout(insets, dimensions),
+    [dimensions, insets],
+  );
   const {
     language,
     languagePreference,
@@ -199,6 +202,7 @@ export function SettingsScreen() {
   const [isClearingPersistentCache, setIsClearingPersistentCache] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const styles = useMemo(() => createStyles(theme, layout), [theme, layout]);
+  const settingsCopy = copy.settings;
   const reminderChannelCopy = useMemo(
     () => ({
       name: copy.reminder.channelName,
@@ -379,6 +383,25 @@ export function SettingsScreen() {
     }
   }, [language, reminderChannelCopy, reminderSettings]);
 
+  const handleReminderTimeSet = useCallback(async (hour: number, minute: number) => {
+    if (hour === reminderSettings.hour && minute === reminderSettings.minute) {
+      return;
+    }
+
+    try {
+      const reminderRuntime = await syncReminderRuntimeSettings(
+        reminderSettings,
+        { hour, minute },
+        language,
+        reminderChannelCopy,
+      );
+      setReminderSettings(reminderRuntime.settings);
+      setNotificationPermissionGranted(reminderRuntime.permissionGranted);
+    } catch (error) {
+      console.error('Failed to update reminder time:', error);
+    }
+  }, [language, reminderChannelCopy, reminderSettings]);
+
   const handleClearPersistentScanCache = useCallback(async () => {
     if (isClearingPersistentCache) {
       return;
@@ -413,10 +436,7 @@ export function SettingsScreen() {
   };
 
   const getScanRangeDisplay = (range: ScanRange): string => {
-    if (language === 'zh-CN') {
-      return `最近 ${range} 个月`;
-    }
-    return `Last ${range} month${range > 1 ? 's' : ''}`;
+    return settingsCopy.scanRangeRecentMonths(range);
   };
 
   const getLastScanDisplay = (): string => {
@@ -444,28 +464,41 @@ export function SettingsScreen() {
     () => [
       {
         value: 'system' as const,
-        label: language === 'zh-CN' ? `跟随系统（当前：${copy.languageOptions.find((option) => option.value === language)?.label ?? '简体中文'}）` : `System (${copy.languageOptions.find((option) => option.value === language)?.label ?? 'English'})`,
+        label: settingsCopy.followSystemLanguage(
+          copy.languageOptions.find((option) => option.value === language)?.label ?? 'English',
+        ),
       },
       ...copy.languageOptions,
     ],
-    [copy.languageOptions, language],
+    [copy.languageOptions, language, settingsCopy],
+  );
+  const currentLanguageValue = useMemo(
+    () =>
+      languageOptions.find((option) => option.value === languagePreference)?.label ??
+      copy.languageOptions.find((option) => option.value === language)?.label ??
+      'English',
+    [copy.languageOptions, language, languageOptions, languagePreference],
+  );
+  const reminderSummary = useMemo(
+    () => buildReminderSummary(reminderSettings, language),
+    [language, reminderSettings],
   );
 
   const getPersistentCacheActionLabel = (): string => {
     if (isClearingPersistentCache) {
-      return language === 'zh-CN' ? '清除中...' : 'Clearing...';
+      return settingsCopy.clearingAction;
     }
 
-    return language === 'zh-CN' ? '清除' : 'Clear';
+    return settingsCopy.clearAction;
   };
 
   const getPersistentCacheRowLabel = (): string => {
     if (persistentCacheSizeBytes > 0) {
       const formattedSize = formatLocalizedSize(persistentCacheSizeBytes, language);
-      return language === 'zh-CN' ? `清除缓存 ${formattedSize}` : `Clear cache ${formattedSize}`;
+      return settingsCopy.clearCacheWithSize(formattedSize);
     }
 
-    return language === 'zh-CN' ? '清除缓存' : 'Clear cache';
+    return settingsCopy.clearCache;
   };
 
   const getReminderStatusLabel = (): string => {
@@ -513,10 +546,27 @@ export function SettingsScreen() {
   if (isLoading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={styles.loadingText}>{settingsCopy.loading}</Text>
       </View>
     );
   }
+
+  const cacheSizeText = formatLocalizedSize(persistentCacheSizeBytes, language);
+  const cacheMetaText = `${settingsCopy.lastScanTitle} ${getLastScanDisplay()}`;
+  const reminderToggleLabel = reminderSettings.enabled
+    ? settingsCopy.reminderDisableAction
+    : settingsCopy.reminderEnableAction;
+  const dailyReminderOption = reminderFrequencyOptions.find((option) => option.value === 'daily');
+  const weeklyReminderOption = reminderFrequencyOptions.find((option) => option.value === 'weekly');
+  const mondayOption = reminderWeekdayOptions.find((option) => option.value === 1);
+  const settingsIconSize = layout.isSELike ? 14 : 21;
+  const scanIconSize = layout.isSELike ? 15 : 24;
+  const footerIconSize = layout.isSELike ? 14 : 22;
+  const compactSystemLabel = language === 'zh-CN' ? '系统' : 'System';
+  const reminderPrimaryLabel =
+    layout.isSELike && !reminderSettings.enabled
+      ? copy.reminder.disabled
+      : reminderSummary;
 
   return (
     <ScrollView
@@ -525,290 +575,339 @@ export function SettingsScreen() {
       showsVerticalScrollIndicator={false}
       testID="settings-scroll-view"
     >
-      <View style={styles.header} testID="settings-header">
-        <Text style={styles.headerTitle}>{copy.common.statusTitle}</Text>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle} testID="settings-header">
+          {settingsCopy.headerTitle}
+        </Text>
       </View>
 
-      <SettingsSection
-        title={language === 'zh-CN' ? '扫描范围' : 'Scan Range'}
-        theme={theme}
-        leftInset={layout.left}
-        rightInset={layout.right}
-      >
-        <View style={styles.scanRangeContainer}>
-          <Text style={styles.scanRangeValue}>{getScanRangeDisplay(scanRange)}</Text>
-          <View style={styles.scanRangeOptions}>
-            {VALID_SCAN_RANGES.map((range) => (
-              <Pressable
-                key={range}
-                onPress={() => handleScanRangeChange(range)}
-                style={[
-                  styles.scanRangeOption,
-                  scanRange === range && styles.scanRangeOptionActive,
-                ]}
-                testID={`scan-range-option-${range}`}
-              >
-                <Text
-                  style={[
-                    styles.scanRangeOptionText,
-                    scanRange === range && styles.scanRangeOptionTextActive,
-                  ]}
-                >
-                  {range}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      </SettingsSection>
-
-      <SettingsSection title={copy.reminder.title} theme={theme} leftInset={layout.left} rightInset={layout.right}>
-        <View style={styles.reminderContainer}>
-          <View style={styles.reminderHeaderRow}>
-            <View style={styles.reminderHeaderText}>
-              <Text style={styles.reminderSummaryValue}>
-                {buildReminderSummary(reminderSettings, language)}
-              </Text>
-              <Text style={styles.reminderStatusValue}>
-                {copy.reminder.permissionLabel}
-                {language === 'zh-CN' ? '：' : ': '}
-                {notificationPermissionGranted
-                  ? copy.reminder.permissionOn
-                  : copy.reminder.permissionOff}
-                {' · '}
-                {getReminderStatusLabel()}
-              </Text>
-            </View>
-            <Switch
-              value={reminderSettings.enabled}
-              onValueChange={() => void handleReminderToggle()}
-              trackColor={{
-                false: theme.cardMutedBackground,
-                true: theme.buttonPrimaryBackground,
-              }}
-              thumbColor={theme.buttonPrimaryText}
-              testID="reminder-settings-toggle"
+      <View style={styles.designCard} testID="settings-scan-range-card">
+        <View style={styles.cardHeaderRow}>
+          <View style={[styles.cardIcon, styles.scanIcon]}>
+            <DesignIcon
+              name="scan"
+              width={scanIconSize}
+              height={scanIconSize}
+              color={theme.buttonPrimaryBackground}
             />
           </View>
-          <Text style={styles.reminderHint}>
-            {copy.reminder.eligibilityHint(scanRange)}
+          <Text style={styles.cardTitle}>{settingsCopy.scanRangeTitle}</Text>
+        </View>
+        <View style={styles.cardMainRow}>
+          <Text
+            style={styles.primaryValue}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.82}
+          >
+            {getScanRangeDisplay(scanRange)}
           </Text>
-          <Text style={styles.reminderFootnote}>{copy.reminder.footnote}</Text>
+          <View style={styles.compactChipRow}>
+            {SETTINGS_SCAN_RANGE_OPTIONS.map((range) => {
+              const active = scanRange === range;
+              return (
+                <Pressable
+                  key={range}
+                  onPress={() => void handleScanRangeChange(range)}
+                  style={[styles.chip, active && styles.scanChipActive]}
+                  testID={`scan-range-option-${range}`}
+                >
+                  <Text
+                    style={[styles.chipText, active && styles.scanChipTextActive]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.82}
+                  >
+                    {range}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
-        {reminderSettings.enabled ? (
-          <>
-            <SettingsRow
-              label={getReminderNextLabel()}
-              value={getReminderNextDisplay()}
-              theme={theme}
-            />
-            <View style={styles.reminderControlsSection}>
-              <Text style={styles.reminderFieldLabel}>{copy.reminder.frequencyLabel}</Text>
-              <View style={styles.reminderChipRow}>
-                {reminderFrequencyOptions.map((option) => {
-                  const active = reminderSettings.frequency === option.value;
-                  return (
-                    <Pressable
-                      key={option.value}
-                      onPress={() => void handleReminderFrequencyChange(option.value)}
-                      style={[
-                        styles.reminderChip,
-                        active && styles.reminderChipActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.reminderChipText,
-                          active && styles.reminderChipTextActive,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-            {reminderSettings.frequency === 'weekly' ? (
-              <View style={styles.reminderControlsSection}>
-                <Text style={styles.reminderFieldLabel}>{copy.reminder.weekdayLabel}</Text>
-                <View style={styles.reminderChipRow}>
-                  {reminderWeekdayOptions.map((option) => {
-                    const active = reminderSettings.weekday === option.value;
-                    return (
-                      <Pressable
-                        key={option.value}
-                        onPress={() => void handleReminderWeekdayChange(option.value)}
-                        style={[
-                          styles.reminderChip,
-                          active && styles.reminderChipActive,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.reminderChipText,
-                            active && styles.reminderChipTextActive,
-                          ]}
-                        >
-                          {option.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            ) : null}
-            <View style={styles.reminderControlsSection}>
-              <Text style={styles.reminderFieldLabel}>{copy.reminder.timeLabel}</Text>
-              <Text style={styles.reminderTimeValue}>
-                {formatReminderTime(reminderSettings)}
-              </Text>
-              <View style={styles.reminderAdjustRow}>
-                <Pressable
-                  onPress={() => void handleReminderTimeAdjust(-60)}
-                  style={styles.reminderAdjustButton}
-                >
-                  <Text style={styles.reminderAdjustButtonText}>{copy.reminder.hourMinus}</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => void handleReminderTimeAdjust(60)}
-                  style={styles.reminderAdjustButton}
-                >
-                  <Text style={styles.reminderAdjustButtonText}>{copy.reminder.hourPlus}</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => void handleReminderTimeAdjust(-15)}
-                  style={styles.reminderAdjustButton}
-                >
-                  <Text style={styles.reminderAdjustButtonText}>{copy.reminder.minuteMinus}</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => void handleReminderTimeAdjust(15)}
-                  style={styles.reminderAdjustButton}
-                >
-                  <Text style={styles.reminderAdjustButtonText}>{copy.reminder.minutePlus}</Text>
-                </Pressable>
-              </View>
-            </View>
-          </>
-        ) : null}
-      </SettingsSection>
+      </View>
 
-      <SettingsSection title={copy.languageLabel} theme={theme} leftInset={layout.left} rightInset={layout.right}>
-        <View style={styles.languageSelector}>
-          {languageOptions.map((option, index) => (
+      <View style={styles.designCard} testID="settings-reminder-card">
+        <View style={styles.cardHeaderRow}>
+          <View style={[styles.cardIcon, styles.reminderIcon]}>
+            <DesignIcon
+              name="check"
+              width={settingsIconSize}
+              height={settingsIconSize}
+              color={theme.buttonSuccessBackground}
+            />
+          </View>
+          <Text style={styles.cardTitle}>{settingsCopy.reminderTitle}</Text>
+        </View>
+        <View style={styles.cardMainRow}>
+          <View style={styles.reminderCopyGroup}>
+            <Text
+              style={styles.primaryValue}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
+            >
+              {reminderPrimaryLabel}
+            </Text>
+            <Text style={styles.secondaryLine}>
+              {reminderSettings.enabled
+                ? notificationPermissionGranted
+                  ? copy.reminder.permissionOn
+                  : copy.reminder.permissionOff
+                : getReminderStatusLabel()}
+            </Text>
+          </View>
+          <View style={styles.compactChipRow}>
             <Pressable
-              key={option.value}
-              onPress={() => handleLanguageChange(option.value)}
+              onPress={() => void handleReminderToggle()}
               style={[
-                styles.languageOption,
-                languagePreference === option.value && styles.languageOptionActive,
-                index === languageOptions.length - 1 && styles.languageOptionLast,
+                styles.chip,
+                reminderSettings.enabled && styles.reminderChipActive,
               ]}
-              testID={`language-option-${option.value}`}
+              testID="reminder-settings-toggle"
             >
               <Text
                 style={[
-                  styles.languageOptionText,
-                  languagePreference === option.value && styles.languageOptionTextActive,
+                  styles.chipText,
+                  reminderSettings.enabled && styles.reminderChipTextActive,
                 ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.82}
               >
-                {option.label}
+                {reminderToggleLabel}
               </Text>
-              {languagePreference === option.value ? (
-                <Ionicons name="checkmark-circle" size={18} color={theme.buttonPrimaryBackground} />
-              ) : null}
             </Pressable>
-          ))}
-        </View>
-      </SettingsSection>
-
-      <SettingsSection title={copy.appearance.title} theme={theme} leftInset={layout.left} rightInset={layout.right}>
-        <View style={styles.themeSelector}>
-          {APP_THEME_PREFERENCES.map((pref, index) => (
-            <Pressable
-              key={pref}
-              onPress={() => handleThemeChange(pref)}
-              style={[
-                styles.themeOption,
-                themePreference === pref && styles.themeOptionActive,
-                index === APP_THEME_PREFERENCES.length - 1 && styles.themeOptionLast,
-              ]}
-              testID={`theme-option-${pref}`}
-            >
-              <View style={styles.themeOptionLeft}>
-                <View
-                  style={[
-                    styles.themePreview,
-                    pref === 'light' && styles.themePreviewLight,
-                    pref === 'dark' && styles.themePreviewDark,
-                    pref === 'system' && (
-                      resolvedThemeScheme === 'dark'
-                        ? styles.themePreviewDark
-                        : styles.themePreviewLight
-                    ),
-                  ]}
-                />
+            {dailyReminderOption ? (
+              <Pressable
+                onPress={() => void handleReminderFrequencyChange('daily')}
+                style={[
+                  styles.chip,
+                  reminderSettings.frequency === 'daily' && styles.reminderChipActive,
+                ]}
+                testID="reminder-frequency-daily"
+              >
                 <Text
                   style={[
-                    styles.themeOptionText,
-                    themePreference === pref && styles.themeOptionTextActive,
+                    styles.chipText,
+                    reminderSettings.frequency === 'daily' && styles.reminderChipTextActive,
                   ]}
-                >
-                  {getThemeLabel(pref)}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.82}
+              >
+                {dailyReminderOption.label}
                 </Text>
-              </View>
-              {themePreference === pref ? (
-                <Ionicons name="checkmark-circle" size={18} color={theme.buttonPrimaryBackground} />
-              ) : null}
+              </Pressable>
+            ) : null}
+            {weeklyReminderOption ? (
+              <Pressable
+                onPress={() => void handleReminderFrequencyChange('weekly')}
+                style={[
+                  styles.chip,
+                  reminderSettings.frequency === 'weekly' && styles.reminderChipActive,
+                ]}
+                testID="reminder-frequency-weekly"
+              >
+                <Text
+                  style={[
+                    styles.chipText,
+                    reminderSettings.frequency === 'weekly' && styles.reminderChipTextActive,
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.82}
+              >
+                {weeklyReminderOption.label}
+                </Text>
+              </Pressable>
+            ) : null}
+            {mondayOption && reminderSettings.frequency === 'weekly' ? (
+              <Pressable
+                onPress={() => void handleReminderWeekdayChange(1)}
+                style={[
+                  styles.chip,
+                  reminderSettings.weekday === 1 && styles.reminderChipActive,
+                ]}
+                testID="reminder-weekday-monday"
+              >
+                <Text
+                  style={[
+                    styles.chipText,
+                    reminderSettings.weekday === 1 && styles.reminderChipTextActive,
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.82}
+              >
+                {mondayOption.label}
+                </Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={() => void handleReminderTimeSet(8, 30)}
+              style={[
+                styles.chip,
+                reminderSettings.hour === 8 && reminderSettings.minute === 30 && styles.reminderChipActive,
+              ]}
+              testID="reminder-time-0830"
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  reminderSettings.hour === 8 && reminderSettings.minute === 30 && styles.reminderChipTextActive,
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.82}
+              >
+                08:30
+              </Text>
             </Pressable>
-          ))}
+            <Pressable
+              onPress={() => void handleReminderTimeSet(20, 30)}
+              style={[
+                styles.chip,
+                reminderSettings.hour === 20 && reminderSettings.minute === 30 && styles.reminderChipActive,
+              ]}
+              testID="reminder-time-2030"
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  reminderSettings.hour === 20 && reminderSettings.minute === 30 && styles.reminderChipTextActive,
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.82}
+              >
+                20:30
+              </Text>
+            </Pressable>
+          </View>
         </View>
-      </SettingsSection>
+      </View>
 
-      <SettingsSection
-        title={language === 'zh-CN' ? '上次扫描' : 'Last Scan'}
-        theme={theme}
-        leftInset={layout.left}
-        rightInset={layout.right}
-      >
-        <View style={styles.lastScanContainer}>
-          <Text style={styles.lastScanValue}>{getLastScanDisplay()}</Text>
+      <View style={styles.designCard} testID="settings-language-theme-card">
+        <View style={styles.cardHeaderRow}>
+          <View style={[styles.cardIcon, styles.languageIcon]}>
+            <DesignIcon
+              name="local-analysis"
+              width={settingsIconSize}
+              height={settingsIconSize}
+              color={theme.chipActiveText}
+              secondaryColor={theme.buttonPrimaryBackground}
+            />
+          </View>
+          <Text style={styles.cardTitle}>{settingsCopy.languageThemeTitle}</Text>
         </View>
-      </SettingsSection>
+        <View style={styles.preferenceLine}>
+          <Text style={styles.preferenceLabel}>{copy.languageLabel}</Text>
+          <View style={styles.compactChipRow}>
+            {languageOptions.map((option) => {
+              const active = languagePreference === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  onPress={() => void handleLanguageChange(option.value)}
+                  style={[styles.chip, styles.preferenceChip, active && styles.languageChipActive]}
+                  testID={`language-option-${option.value}`}
+                >
+                  <Text
+                    style={[styles.chipText, active && styles.languageChipTextActive]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.72}
+                  >
+                    {layout.isSELike && option.value === 'system' ? compactSystemLabel : option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+        <View style={styles.preferenceDivider} />
+        <View style={styles.preferenceLine}>
+          <Text style={styles.preferenceLabel}>{copy.appearance.title}</Text>
+          <View style={styles.compactChipRow}>
+            {APP_THEME_PREFERENCES.map((pref) => {
+              const active = themePreference === pref;
+              return (
+                <Pressable
+                  key={pref}
+                  onPress={() => void handleThemeChange(pref)}
+                  style={[styles.chip, styles.preferenceChip, active && styles.languageChipActive]}
+                  testID={`theme-option-${pref}`}
+                >
+                  <Text
+                    style={[styles.chipText, active && styles.languageChipTextActive]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.72}
+                  >
+                    {layout.isSELike && pref === 'system' ? compactSystemLabel : getThemeLabel(pref)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </View>
 
-      <SettingsSection
-        title={language === 'zh-CN' ? '缓存数据' : 'Cached Data'}
-        theme={theme}
-        leftInset={layout.left}
-        rightInset={layout.right}
-      >
-        <Pressable
-          testID="clear-persistent-scan-cache-button"
-          onPress={() => void handleClearPersistentScanCache()}
-          disabled={isClearingPersistentCache}
-          style={({ pressed }) => [
-            styles.cacheActionRow,
-            (pressed || isClearingPersistentCache) && styles.cacheActionRowPressed,
-          ]}
-        >
-          <View style={styles.cacheActionTextGroup}>
-            <Text style={styles.cacheActionLabel}>
-              {getPersistentCacheRowLabel()}
+      <View style={styles.designCard} testID="settings-cache-card">
+        <View style={styles.cardHeaderRow}>
+          <View style={[styles.cardIcon, styles.cacheIcon]}>
+            <DesignIcon
+              name="nav-trash"
+              width={settingsIconSize}
+              height={settingsIconSize}
+              color={theme.buttonDangerBackground}
+            />
+          </View>
+          <Text style={styles.cardTitle}>{settingsCopy.cachedDataTitle}</Text>
+        </View>
+        <View style={styles.cacheMainRow}>
+          <View style={styles.cacheMetricGroup}>
+            <Text
+              style={styles.primaryValue}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.82}
+            >
+              {cacheSizeText}
+            </Text>
+            <Text
+              style={styles.secondaryLine}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
+            >
+              {cacheMetaText}
             </Text>
           </View>
-          <Text style={styles.cacheActionValue}>
-            {getPersistentCacheActionLabel()}
-          </Text>
-        </Pressable>
-      </SettingsSection>
+          <Pressable
+            testID="clear-persistent-scan-cache-button"
+            onPress={() => void handleClearPersistentScanCache()}
+            disabled={isClearingPersistentCache}
+            style={({ pressed }) => [
+              styles.clearButton,
+              (pressed || isClearingPersistentCache) && styles.clearButtonPressed,
+            ]}
+          >
+            <Text style={styles.clearButtonText}>{getPersistentCacheActionLabel()}</Text>
+          </Pressable>
+        </View>
+      </View>
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          {language === 'zh-CN'
-            ? '当前主题: '
-            : 'Current theme: '}
-          <Text style={styles.footerValue}>{getCurrentThemeValue()}</Text>
+      <View style={styles.localOnlyFooter}>
+        <DesignIcon
+          name="check"
+          width={footerIconSize}
+          height={footerIconSize}
+          color={theme.pageTextMuted}
+        />
+        <Text style={styles.localOnlyText} testID="settings-local-only-note">
+          {settingsCopy.localOnlyNote}
         </Text>
       </View>
     </ScrollView>
@@ -819,10 +918,14 @@ function createStyles(
   theme: AppThemePalette,
   layout: SettingsScreenLayout,
 ) {
+  const isCompact = layout.isSELike;
+  const screenBackground = theme.scheme === 'light' ? '#f7f9fd' : theme.safeArea;
+  const cardBorder = theme.scheme === 'light' ? '#edf2fa' : theme.cardBorder;
+
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.safeArea,
+      backgroundColor: screenBackground,
     },
     contentContainer: {
       paddingBottom: layout.contentBottom,
@@ -839,15 +942,304 @@ function createStyles(
       paddingLeft: layout.left,
       paddingRight: layout.right,
       paddingTop: layout.headerTop,
-      paddingBottom: 8,
+      paddingBottom: isCompact ? 6 : 10,
+      alignItems: 'center',
+    },
+    headerEyebrow: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: theme.pageTextMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      marginBottom: 8,
     },
     headerTitle: {
-      fontSize: 28,
+      fontSize: isCompact ? 18 : 28,
+      lineHeight: isCompact ? 23 : 36,
+      fontWeight: '800',
+      color: theme.pageTextPrimary,
+      marginBottom: isCompact ? 6 : 8,
+      textAlign: 'center',
+    },
+    headerBody: {
+      fontSize: 14,
+      lineHeight: 22,
+      color: theme.pageTextSecondary,
+    },
+    designCard: {
+      marginLeft: layout.left,
+      marginRight: layout.right,
+      marginBottom: layout.cardGap,
+      padding: layout.cardPadding,
+      borderRadius: isCompact ? 18 : 28,
+      backgroundColor: theme.cardBackground,
+      borderWidth: 1,
+      borderColor: cardBorder,
+      shadowColor: theme.shadowColor,
+      shadowOffset: { width: 0, height: isCompact ? 5 : 14 },
+      shadowOpacity: theme.scheme === 'dark' ? 0.14 : 0.045,
+      shadowRadius: isCompact ? 14 : 28,
+      elevation: isCompact ? 1 : 3,
+    },
+    cardHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: isCompact ? 8 : 16,
+      marginBottom: isCompact ? 7 : 20,
+    },
+    cardIcon: {
+      width: isCompact ? 22 : 44,
+      height: isCompact ? 22 : 44,
+      borderRadius: isCompact ? 8 : 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    scanIcon: {
+      backgroundColor: theme.scheme === 'dark' ? '#1a2a4f' : '#e9efff',
+    },
+    reminderIcon: {
+      backgroundColor: theme.scheme === 'dark' ? '#103c33' : '#e3f8f1',
+    },
+    languageIcon: {
+      backgroundColor: theme.scheme === 'dark' ? '#2c2249' : '#efe8ff',
+    },
+    cacheIcon: {
+      backgroundColor: theme.scheme === 'dark' ? '#3b2028' : '#ffe8eb',
+    },
+    cardTitle: {
+      fontSize: isCompact ? 13 : 22,
+      lineHeight: isCompact ? 18 : 28,
+      fontWeight: '800',
+      color: theme.pageTextPrimary,
+    },
+    cardMainRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: isCompact ? 8 : 18,
+    },
+    primaryValue: {
+      flexShrink: 1,
+      fontSize: isCompact ? 18 : 34,
+      lineHeight: isCompact ? 23 : 42,
       fontWeight: '700',
       color: theme.pageTextPrimary,
     },
-    languageSelector: {
+    secondaryLine: {
+      fontSize: isCompact ? 11 : 17,
+      lineHeight: isCompact ? 15 : 24,
+      color: theme.pageTextSecondary,
+    },
+    compactChipRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'flex-end',
+      gap: isCompact ? 5 : 10,
+      flexShrink: 1,
+    },
+    chip: {
+      minWidth: layout.chipMinWidth,
+      minHeight: layout.chipMinHeight,
+      paddingVertical: isCompact ? 3 : 10,
+      paddingHorizontal: isCompact ? 8 : 18,
+      borderRadius: isCompact ? 12 : 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.cardMutedBackground,
+      borderWidth: 1,
+      borderColor: theme.cardMutedBorder,
+    },
+    chipText: {
+      fontSize: isCompact ? 11 : 18,
+      lineHeight: isCompact ? 15 : 24,
+      color: theme.pageTextSecondary,
+      fontWeight: '500',
+    },
+    scanChipActive: {
+      backgroundColor: theme.scheme === 'dark' ? '#1d3671' : '#dfe8ff',
+      borderColor: theme.scheme === 'dark' ? '#274a98' : '#d7e3ff',
+    },
+    scanChipTextActive: {
+      color: '#4f7cff',
+      fontWeight: '800',
+    },
+    chipDisabled: {
+      opacity: 0.82,
+    },
+    chipDisabledText: {
+      color: theme.pageTextMuted,
+    },
+    reminderCopyGroup: {
+      flexShrink: 1,
+      gap: isCompact ? 4 : 8,
+    },
+    reminderChipActive: {
+      backgroundColor: theme.scheme === 'dark' ? '#174b3f' : '#dcf7ec',
+      borderColor: theme.scheme === 'dark' ? '#1d694f' : '#c9f0e2',
+    },
+    reminderChipTextActive: {
+      color: theme.buttonSuccessBackground,
+      fontWeight: '800',
+    },
+    preferenceLine: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: isCompact ? 8 : 18,
+    },
+    preferenceDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: theme.cardBorder,
+      marginVertical: isCompact ? 12 : 24,
+    },
+    preferenceLabel: {
+      minWidth: isCompact ? 38 : 64,
+      paddingTop: isCompact ? 3 : 10,
+      fontSize: isCompact ? 11 : 18,
+      lineHeight: isCompact ? 15 : 24,
+      color: theme.pageTextSecondary,
+    },
+    preferenceChip: {
+      minWidth: isCompact ? 52 : 112,
+    },
+    languageChipActive: {
+      backgroundColor: theme.scheme === 'dark' ? '#34274d' : '#efe6ff',
+      borderColor: theme.scheme === 'dark' ? '#4b3a72' : '#e4d7ff',
+    },
+    languageChipTextActive: {
+      color: theme.scheme === 'dark' ? '#b99cff' : '#765fff',
+      fontWeight: '800',
+    },
+    cacheMetricGroup: {
+      flexShrink: 1,
+      gap: isCompact ? 4 : 8,
+    },
+    cacheMainRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: isCompact ? 8 : 18,
+    },
+    clearButton: {
+      minHeight: isCompact ? 28 : 54,
+      paddingHorizontal: isCompact ? 12 : 28,
+      borderRadius: 27,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.scheme === 'dark' ? '#4a242c' : '#ffe8eb',
+    },
+    clearButtonPressed: {
+      opacity: 0.72,
+    },
+    clearButtonText: {
+      fontSize: isCompact ? 11 : 18,
+      lineHeight: isCompact ? 15 : 24,
+      color: theme.scheme === 'dark' ? '#ff8790' : '#ff6570',
+      fontWeight: '800',
+    },
+    localOnlyFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      marginLeft: layout.left,
+      marginRight: layout.right,
+      marginTop: isCompact ? 14 : 24,
+      marginBottom: isCompact ? 16 : 22,
+    },
+    localOnlyText: {
+      fontSize: isCompact ? 11 : 18,
+      lineHeight: isCompact ? 16 : 24,
+      color: theme.pageTextMuted,
+    },
+    overviewCard: {
+      marginLeft: layout.left,
+      marginRight: layout.right,
+      marginBottom: 24,
+      padding: 18,
+      borderRadius: 22,
+      backgroundColor: theme.cardBackground,
+      borderWidth: 1,
+      borderColor: theme.cardBorder,
+      shadowColor: theme.shadowColor,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: theme.scheme === 'dark' ? 0.16 : 0.08,
+      shadowRadius: 18,
+      elevation: 3,
+    },
+    overviewTitle: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: theme.pageTextPrimary,
+      marginBottom: 12,
+    },
+    overviewMetricsRow: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 12,
+    },
+    overviewMetricCard: {
+      flex: 1,
+      minHeight: 92,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 16,
+      backgroundColor: theme.cardMutedBackground,
+      borderWidth: 1,
+      borderColor: theme.cardBorder,
+      justifyContent: 'space-between',
+    },
+    overviewMetricLabel: {
+      fontSize: 12,
+      color: theme.pageTextMuted,
+    },
+    overviewMetricValue: {
+      fontSize: 15,
+      lineHeight: 22,
+      fontWeight: '700',
+      color: theme.pageTextPrimary,
+    },
+    overviewPillRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    overviewPill: {
+      borderRadius: 999,
       paddingVertical: 8,
+      paddingHorizontal: 12,
+      backgroundColor: theme.buttonSecondaryBackground,
+      borderWidth: 1,
+      borderColor: theme.cardBorder,
+    },
+    overviewPillText: {
+      fontSize: 13,
+      color: theme.buttonSecondaryText,
+      fontWeight: '600',
+    },
+    sectionBlock: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 8,
+      gap: 6,
+    },
+    blockTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.pageTextPrimary,
+    },
+    blockHint: {
+      fontSize: 13,
+      lineHeight: 20,
+      color: theme.pageTextSecondary,
+    },
+    sectionDivider: {
+      marginHorizontal: 16,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: theme.cardBorder,
+    },
+    languageSelector: {
+      paddingBottom: 8,
     },
     languageOption: {
       flexDirection: 'row',
@@ -873,7 +1265,7 @@ function createStyles(
       color: theme.pageTextPrimary,
     },
     themeSelector: {
-      paddingVertical: 8,
+      paddingBottom: 8,
     },
     themeOption: {
       flexDirection: 'row',
@@ -902,12 +1294,12 @@ function createStyles(
       borderWidth: 1,
     },
     themePreviewLight: {
-      backgroundColor: '#f3ecdf',
-      borderColor: '#e7dcc7',
+      backgroundColor: LIGHT_THEME_PREVIEW.safeArea,
+      borderColor: LIGHT_THEME_PREVIEW.cardBorder,
     },
     themePreviewDark: {
-      backgroundColor: '#0d1218',
-      borderColor: '#283342',
+      backgroundColor: DARK_THEME_PREVIEW.safeArea,
+      borderColor: DARK_THEME_PREVIEW.cardBorder,
     },
     themeOptionText: {
       fontSize: 16,
@@ -1012,17 +1404,10 @@ function createStyles(
       borderColor: theme.cardBorder,
       backgroundColor: theme.cardMutedBackground,
     },
-    reminderChipActive: {
-      backgroundColor: theme.buttonPrimaryBackground,
-      borderColor: theme.buttonPrimaryBackground,
-    },
     reminderChipText: {
       fontSize: 13,
       fontWeight: '500',
       color: theme.pageTextPrimary,
-    },
-    reminderChipTextActive: {
-      color: theme.buttonPrimaryText,
     },
     reminderTimeValue: {
       fontSize: 24,
@@ -1048,13 +1433,11 @@ function createStyles(
       fontWeight: '600',
       color: theme.pageTextPrimary,
     },
-    lastScanContainer: {
-      paddingVertical: 14,
+    maintenanceHintBlock: {
       paddingHorizontal: 16,
-    },
-    lastScanValue: {
-      fontSize: 16,
-      color: theme.pageTextPrimary,
+      paddingTop: 16,
+      paddingBottom: 8,
+      gap: 6,
     },
     cacheActionRow: {
       minHeight: 64,
@@ -1079,20 +1462,6 @@ function createStyles(
       fontSize: 15,
       fontWeight: '600',
       color: theme.buttonPrimaryBackground,
-    },
-    footer: {
-      paddingLeft: layout.left,
-      paddingRight: layout.right,
-      paddingTop: 8,
-      paddingBottom: 24,
-    },
-    footerText: {
-      fontSize: 13,
-      color: theme.pageTextMuted,
-    },
-    footerValue: {
-      color: theme.pageTextSecondary,
-      fontWeight: '500',
     },
   });
 }

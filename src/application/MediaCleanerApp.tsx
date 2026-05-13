@@ -14,6 +14,7 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { applyCleanupAction, createInitialCleanupState } from '../features/cleanup/cleanup-state';
 import type { CleanupAction, CleanupState } from '../features/cleanup/cleanup-state';
@@ -700,7 +701,8 @@ export function MediaCleanerApp() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style={theme.statusBarStyle} />
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <StatusBar style={theme.statusBarStyle} />
       <View style={styles.backgroundOrbTop} />
       <View style={styles.backgroundOrbBottom} />
 
@@ -798,9 +800,9 @@ export function MediaCleanerApp() {
             <Text style={styles.summaryCaption}>{copy.summary.candidatesCaption}</Text>
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>{copy.summary.highConfidenceLabel}</Text>
+            <Text style={styles.summaryLabel}>{copy.summary.suggestedCleanupLabel}</Text>
             <Text style={styles.summaryValue}>{effectiveSummary.highConfidenceCount}</Text>
-            <Text style={styles.summaryCaption}>{copy.summary.highConfidenceCaption}</Text>
+            <Text style={styles.summaryCaption}>{copy.summary.suggestedCleanupCaption}</Text>
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>{copy.summary.recycleLabel}</Text>
@@ -1077,6 +1079,7 @@ export function MediaCleanerApp() {
         onPrimaryAction={handlePreviewPrimaryAction}
         onHardDelete={handlePreviewHardDelete}
       />
+      </GestureHandlerRootView>
     </SafeAreaView>
   );
 }

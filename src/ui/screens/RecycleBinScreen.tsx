@@ -1,25 +1,26 @@
 import * as MediaLibrary from 'expo-media-library';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { PhotoGrid } from '../components/PhotoGrid';
+import type { SwipeSelectionReason } from '../hooks/useSwipeSelection';
 import { DetailScreen } from './DetailScreen';
 import { TouchSurface } from '../components/TouchSurface';
+import { DesignIcon } from '../icons/DesignIcon';
 import { useAppPreferences } from '../../application/AppPreferencesContext';
 import type { CleanupCandidate } from '../../domain/recognition/types';
 import type { CleanupState } from '../../features/cleanup/cleanup-state';
 import { createInitialCleanupState, applyCleanupAction } from '../../features/cleanup/cleanup-state';
 import { formatLocalizedSize } from '../../i18n/app-copy';
-import type { AppLanguage } from '../../i18n/app-language';
 import type { AppThemePalette } from '../../theme/app-theme';
 import { scanMediaLibrary } from '../../features/scan/scan-media-library';
 import { buildDefaultScanWindowStartAt } from '../../features/scan/scan-config';
 import {
-  loadRecycleBinSnapshotCache,
   loadCleanupReportSnapshot,
+  loadRecycleBinSnapshotCache,
   loadRecycleBinIds,
   saveRecycleBinIds,
   saveRecycleBinSnapshotCache,
@@ -27,14 +28,18 @@ import {
   type CleanupReportSnapshot,
 } from '../../services/storage/app-storage';
 import {
+  buildBottomActionLayout,
+  buildMediaGridLayout,
   buildPhotoGridContentPadding,
-  buildFloatingActionBarInsets,
   buildRecycleBinHeaderInsets,
   buildRecycleBinTexts,
+  RECYCLE_BIN_DESIGN_CONTENT_WIDTH,
 } from './screen-layout';
 import { ensureMediaLibraryDeletePermissionsAsync } from '../../services/media-library-permissions';
-
-const EXPIRATION_DAYS = 30;
+import {
+  buildSelectionHeaderTitle,
+  buildSelectionToggleLabel,
+} from './photo-grid/selection-mode-labels';
 
 function normalizeIds(ids: string[]) {
   return Array.from(new Set(ids)).sort();
@@ -49,11 +54,16 @@ function areSameIds(left: string[], right: string[]) {
 }
 
 function buildHydratedRecycleBinState(activeCandidates: CleanupCandidate[], recycleBin: CleanupCandidate[]) {
-  return applyCleanupAction(createInitialCleanupState([]), {
+  const hydratedState = applyCleanupAction(createInitialCleanupState([]), {
     type: 'hydrate',
     activeCandidates,
     recycleBin,
   });
+
+  return {
+    ...hydratedState,
+    selectedIds: [],
+  };
 }
 
 function getDuplicateGroupCandidates(
@@ -103,90 +113,98 @@ function filterRecycleBinCandidateCache(
   return candidates.filter((candidate) => recycleBinIdSet.has(candidate.id));
 }
 
-function buildSelectionToggleLabel(language: string, isAllSelected: boolean) {
-  if (language === 'en-US') {
-    return isAllSelected ? 'Deselect All' : 'Select All';
-  }
-
-  return isAllSelected ? '取消全选' : '全选';
+function sumCandidateBytes(candidates: readonly CleanupCandidate[]) {
+  return candidates.reduce((total, candidate) => total + (candidate.asset.fileSize ?? 0), 0);
 }
 
-const ZERO_CLEANUP_REPORT: CleanupReportSnapshot = {
+const EMPTY_CLEANUP_REPORT: CleanupReportSnapshot = {
   cleanedItemCount: 0,
   cleanedBytes: 0,
   lastCleanedAt: null,
 };
 
-function buildCleanupReportCopy(language: string) {
-  if (language === 'en-US') {
-    return {
-      title: 'Cleanup report',
-      itemCountLabel: 'Cleaned items',
-      sizeLabel: 'Cleaned size',
-      lastCleanedLabel: 'Last cleaned',
-      emptyLabel: 'No cleanup yet',
-    };
-  }
-
-  return {
-    title: '累计清理报告',
-    itemCountLabel: '累计清理条目',
-    sizeLabel: '累计清理体积',
-    lastCleanedLabel: '最近清理',
-    emptyLabel: '暂无清理记录',
-  };
-}
-
-function formatCleanupReportTime(timestamp: number, language: string) {
-  const date = new Date(timestamp);
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return language === 'en-US'
-    ? `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
-    : `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
 type RecycleBinScreenProps = {
   recycleBinIds?: string[];
   onRecycleBinIdsChange?: (ids: string[]) => void;
+  onBackToPhotos?: () => void;
 };
 
 export function RecycleBinScreen({
   recycleBinIds,
   onRecycleBinIdsChange,
+  onBackToPhotos,
 }: RecycleBinScreenProps = {}) {
   const { copy, theme, language } = useAppPreferences();
-  const appLanguage: AppLanguage = language === 'en-US' ? 'en-US' : 'zh-CN';
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(theme, insets), [insets, theme]);
-  const baseContentPadding = useMemo(() => buildPhotoGridContentPadding(insets), [insets]);
-  const contentPadding = useMemo(
-    () => ({
-      ...baseContentPadding,
-      bottom: baseContentPadding.bottom + 180,
-    }),
-    [baseContentPadding],
+  const dimensions = useWindowDimensions();
+  const gridLayout = useMemo(
+    () => buildMediaGridLayout(insets, dimensions),
+    [dimensions, insets],
   );
-  const recycleBinTexts = useMemo(() => buildRecycleBinTexts(copy, EXPIRATION_DAYS), [copy]);
-  const cleanupReportCopy = useMemo(() => buildCleanupReportCopy(appLanguage), [appLanguage]);
-  const loadingLabel = appLanguage === 'zh-CN' ? '加载保留和清理…' : 'Loading keep and clean…';
+  const actionLayout = useMemo(
+    () =>
+      buildBottomActionLayout(insets, dimensions, {
+        maxContentWidth: gridLayout.isSELike ? RECYCLE_BIN_DESIGN_CONTENT_WIDTH : 560,
+      }),
+    [dimensions, gridLayout.isSELike, insets],
+  );
+  const styles = useMemo(
+    () => createStyles(theme, insets, actionLayout),
+    [actionLayout, insets, theme],
+  );
+  const baseContentPadding = useMemo(() => buildPhotoGridContentPadding(insets), [insets]);
+  const recycleBinTexts = useMemo(() => buildRecycleBinTexts(copy), [copy]);
+  const recycleBinCopy = copy.screens.recycleBin;
+  const loadingLabel = recycleBinCopy.loading;
 
   const [state, setState] = useState<CleanupState>(createInitialCleanupState([]));
   const [previewCandidate, setPreviewCandidate] = useState<CleanupCandidate | null>(null);
-  const [cleanupReport, setCleanupReport] = useState<CleanupReportSnapshot>(ZERO_CLEANUP_REPORT);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
   const [hasHydrated, setHasHydrated] = useState(false);
-  const isSelectionMode = state.selectedIds.length > 0;
+  const [isSelectionModeActive, setIsSelectionModeActive] = useState(false);
+  const [cleanupReport, setCleanupReport] =
+    useState<CleanupReportSnapshot>(EMPTY_CLEANUP_REPORT);
+  const hasRecycleBinItems = state.recycleBin.length > 0;
+  const selectionCount = state.selectedIds.length;
+  const isSelectionMode = hasRecycleBinItems && isSelectionModeActive;
+  const contentPadding = useMemo(
+    () => ({
+      ...baseContentPadding,
+      bottom: baseContentPadding.bottom + (isSelectionMode ? 150 : 36),
+    }),
+    [baseContentPadding, isSelectionMode],
+  );
   const isAllRecycleBinSelected =
     state.recycleBin.length > 0 &&
     state.recycleBin.every((candidate) => state.selectedIds.includes(candidate.id));
-  const cleanupReportBottom = isSelectionMode
-    ? buildFloatingActionBarInsets(insets).bottom
-    : 16 + insets.bottom;
   const previewDuplicateCandidates = useMemo(
     () => getDuplicateGroupCandidates(state.recycleBin, previewCandidate),
     [previewCandidate, state.recycleBin],
   );
+  const pendingCandidates = state.recycleBin;
+  const pendingBytes = useMemo(() => sumCandidateBytes(pendingCandidates), [pendingCandidates]);
+  const cleanupHistorySizeText =
+    cleanupReport.cleanedBytes > 0
+      ? formatLocalizedSize(cleanupReport.cleanedBytes, language)
+      : '0 KB';
+  const cleanupHistoryPrefix = `${recycleBinCopy.cleanupHistoryTitle}${
+    language === 'zh-CN' ? '： ' : ': '
+  }${recycleBinCopy.cleanupHistoryReleased('')}`;
+  const summaryTitle = recycleBinCopy.pendingSummary(state.recycleBin.length);
+  const isCompact = gridLayout.isSELike;
+  const summaryIconSize = gridLayout.isSELike ? 26 : 34;
+  const headerTitle = isSelectionMode
+    ? buildSelectionHeaderTitle(language, selectionCount)
+    : recycleBinTexts.title;
+  const selectionToggleLabel = buildSelectionToggleLabel(language, isAllRecycleBinSelected);
+  const shouldShowCleanupHistoryLine = hasHydrated && !hasRecycleBinItems;
+
+  useEffect(() => {
+    if (!hasRecycleBinItems && isSelectionModeActive) {
+      setIsSelectionModeActive(false);
+    }
+  }, [hasRecycleBinItems, isSelectionModeActive]);
 
   useFocusEffect(
     useCallback(() => {
@@ -195,17 +213,18 @@ export function RecycleBinScreen({
       async function hydrateRecycleBin() {
         setIsHydrating(true);
         setErrorMessage(null);
+        setIsSelectionModeActive(false);
 
         try {
-          const cleanupReportPromise = loadCleanupReportSnapshot().catch(() => ZERO_CLEANUP_REPORT);
           const recycleBinSnapshotPromise = loadRecycleBinSnapshotCache();
           const recycleBinSourceIdsPromise =
             recycleBinIds && recycleBinIds.length > 0
               ? Promise.resolve(recycleBinIds)
               : loadRecycleBinIds();
-          const [cleanupReportSnapshot, recycleBinSnapshot] = await Promise.all([
-            cleanupReportPromise,
+          const cleanupReportPromise = loadCleanupReportSnapshot();
+          const [recycleBinSnapshot, nextCleanupReport] = await Promise.all([
             recycleBinSnapshotPromise,
+            cleanupReportPromise,
           ]);
           const cachedRecycleBin = recycleBinSnapshot?.candidates ?? [];
 
@@ -213,7 +232,7 @@ export function RecycleBinScreen({
             return;
           }
 
-          setCleanupReport(cleanupReportSnapshot);
+          setCleanupReport(nextCleanupReport);
 
           if (cachedRecycleBin.length > 0) {
             setState(buildHydratedRecycleBinState([], cachedRecycleBin));
@@ -299,20 +318,42 @@ export function RecycleBinScreen({
     }, [copy.alerts.scanFailed, onRecycleBinIdsChange, recycleBinIds])
   );
 
+  const exitSelectionMode = useCallback(() => {
+    setIsSelectionModeActive(false);
+    setState((prev) => ({
+      ...prev,
+      selectedIds: [],
+    }));
+  }, []);
+
   const handleSelect = useCallback((id: string) => {
+    setIsSelectionModeActive(true);
     setState(prev => applyCleanupAction(prev, { type: 'toggle-select', id }));
+  }, []);
+
+  const handleSelectionChange = useCallback((nextIds: string[], _reason: SwipeSelectionReason) => {
+    setIsSelectionModeActive(true);
+    setState((prev) => {
+      const recycleBinIdSet = new Set(prev.recycleBin.map((candidate) => candidate.id));
+
+      return {
+        ...prev,
+        selectedIds: nextIds.filter((id) => recycleBinIdSet.has(id)),
+      };
+    });
   }, []);
 
   const handleItemPress = useCallback((candidate: CleanupCandidate) => {
     if (isSelectionMode) {
-      setState((prev) => applyCleanupAction(prev, { type: 'toggle-select', id: candidate.id }));
+      handleSelect(candidate.id);
       return;
     }
 
     setPreviewCandidate(candidate);
-  }, [isSelectionMode]);
+  }, [handleSelect, isSelectionMode]);
 
   const handleToggleSelectAll = useCallback(() => {
+    setIsSelectionModeActive(true);
     setState((prev) => ({
       ...prev,
       selectedIds: isAllRecycleBinSelected ? [] : prev.recycleBin.map((candidate) => candidate.id),
@@ -344,11 +385,6 @@ export function RecycleBinScreen({
         }),
       ]);
 
-      if ((options?.deletedIds?.length ?? 0) > 0) {
-        const nextCleanupReport = await loadCleanupReportSnapshot().catch(() => ZERO_CLEANUP_REPORT);
-        setCleanupReport(nextCleanupReport);
-      }
-
       onRecycleBinIdsChange?.(nextRecycleBinIds);
     },
     [onRecycleBinIdsChange],
@@ -375,7 +411,7 @@ export function RecycleBinScreen({
     }
   }, [copy.alerts.deleteFailedBody, persistRecycleBinState, state]);
 
-  const handleDelete = useCallback(async (ids = state.selectedIds) => {
+  const performDelete = useCallback(async (ids = state.selectedIds) => {
     if (ids.length === 0) {
       return;
     }
@@ -393,7 +429,9 @@ export function RecycleBinScreen({
         deletedIds: ids,
       });
 
+      const nextCleanupReport = await loadCleanupReportSnapshot();
       setState(nextState);
+      setCleanupReport(nextCleanupReport);
       setPreviewCandidate((current) =>
         buildNextDetailCandidate(state.recycleBin, current, ids, ids[0] ?? current?.id ?? ''),
       );
@@ -402,6 +440,39 @@ export function RecycleBinScreen({
       setErrorMessage(error instanceof Error ? error.message : copy.alerts.deleteFailedBody);
     }
   }, [copy.alerts.deleteFailedBody, persistRecycleBinState, state]);
+
+  const requestDeleteConfirmation = useCallback(
+    (ids = state.selectedIds, source: 'selection' | 'detail' = 'selection') => {
+      if (ids.length === 0) {
+        return;
+      }
+
+      Alert.alert(
+        source === 'detail' ? copy.alerts.previewDeleteTitle : copy.alerts.confirmAgainTitle,
+        source === 'detail' ? copy.alerts.previewDeleteBody : copy.alerts.confirmAgainBody,
+        [
+          { text: copy.common.cancel, style: 'cancel' },
+          {
+            text: copy.common.deleteConfirm,
+            style: 'destructive',
+            onPress: () => {
+              void performDelete(ids);
+            },
+          },
+        ],
+      );
+    },
+    [
+      copy.alerts.confirmAgainBody,
+      copy.alerts.confirmAgainTitle,
+      copy.alerts.previewDeleteBody,
+      copy.alerts.previewDeleteTitle,
+      copy.common.cancel,
+      copy.common.deleteConfirm,
+      performDelete,
+      state.selectedIds,
+    ],
+  );
 
   const handleClosePreview = useCallback(() => {
     setPreviewCandidate(null);
@@ -424,7 +495,7 @@ export function RecycleBinScreen({
         mode="recycle"
         onClose={handleClosePreview}
         onPrimaryAction={(ids) => void handleRestore(ids)}
-        onHardDelete={(ids) => void handleDelete(ids)}
+        onHardDelete={(ids) => requestDeleteConfirmation(ids, 'detail')}
       />
     );
   }
@@ -432,10 +503,55 @@ export function RecycleBinScreen({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle} testID="recycle-bin-header-title">
-          {recycleBinTexts.title}
-        </Text>
-        <Text style={styles.expireHint}>{recycleBinTexts.expireHint}</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.headerLeading}>
+            <TouchSurface
+              style={styles.backButton}
+              pressedStyle={styles.backButtonPressed}
+              onPress={() => {
+                if (isSelectionMode) {
+                  exitSelectionMode();
+                  return;
+                }
+
+                onBackToPhotos?.();
+              }}
+              preset="pill"
+              testID="recycle-back-button"
+            >
+              <Ionicons
+                name={isSelectionMode ? 'close' : 'arrow-back'}
+                size={24}
+                color={theme.pageTextPrimary}
+              />
+            </TouchSurface>
+
+            <View style={styles.headerCopy}>
+              <Text
+                style={styles.headerTitle}
+                testID="recycle-bin-header-title"
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.86}
+              >
+                {headerTitle}
+              </Text>
+            </View>
+          </View>
+          {hasRecycleBinItems && isSelectionMode ? (
+            <TouchSurface
+              style={[styles.selectionToggleButton, styles.selectionToggleButtonTop]}
+              pressedStyle={styles.selectionToggleButtonPressed}
+              onPress={handleToggleSelectAll}
+              preset="pill"
+              testID="recycle-selection-toggle-button"
+            >
+              <Text style={[styles.selectionActionText, styles.selectionToggleText]}>
+                {selectionToggleLabel}
+              </Text>
+            </TouchSurface>
+          ) : null}
+        </View>
       </View>
 
       {errorMessage ? (
@@ -445,18 +561,48 @@ export function RecycleBinScreen({
         </View>
       ) : null}
 
-      {state.recycleBin.length > 0 ? (
+      {hasRecycleBinItems ? (
+        <View style={styles.summaryCard} testID="cleanup-report-card">
+          <View style={styles.summaryMetricRow}>
+            <View style={styles.summaryLeadingIconShell}>
+              <DesignIcon
+                name="nav-trash"
+                width={summaryIconSize}
+                height={summaryIconSize}
+                color="#ff3138"
+              />
+            </View>
+            <View style={styles.summaryPrimaryMetric}>
+              <Text style={styles.summaryTitle} testID="recycle-bin-summary-title">
+                {summaryTitle}
+              </Text>
+            </View>
+            <View style={styles.summaryMetricDivider} />
+            <View style={styles.summarySizeMetric}>
+              <Text style={styles.pendingMetricLabel}>{recycleBinCopy.releasableSizeLabel}</Text>
+              <Text style={styles.summarySizeValue} testID="recycle-pending-bytes">
+                {formatLocalizedSize(pendingBytes, language)}
+              </Text>
+            </View>
+          </View>
+          <View pointerEvents="none" style={styles.summaryBottomShadow} />
+        </View>
+      ) : null}
+
+      {hasRecycleBinItems ? (
         <PhotoGrid
           candidates={state.recycleBin}
           selectedIds={state.selectedIds}
           selectionMode={isSelectionMode}
           onSelect={handleSelect}
+          onSelectionChange={handleSelectionChange}
           onItemPress={handleItemPress}
           theme={theme}
           mediaType="all"
           gridTestID="recycle-bin-grid"
           itemTestID="recycle-bin-item"
           contentPadding={contentPadding}
+          gridLayout={gridLayout}
         />
       ) : !hasHydrated && isHydrating ? (
         <View style={styles.loadingContainer}>
@@ -465,10 +611,22 @@ export function RecycleBinScreen({
           </Text>
         </View>
       ) : (
-        <View style={styles.emptyContainer}>
+        <View style={styles.emptyContainer} testID="recycle-bin-empty-state">
           <View style={styles.emptyIconWrap}>
-            <Ionicons name="trash-outline" size={42} color={theme.pageTextMuted} />
+            <DesignIcon name="nav-trash" width={42} height={42} color={theme.pageTextMuted} />
           </View>
+          {shouldShowCleanupHistoryLine ? (
+            <Text
+              style={styles.cleanupHistoryInline}
+              testID="recycle-cleanup-history-released"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.82}
+            >
+              <Text>{cleanupHistoryPrefix}</Text>
+              <Text style={styles.cleanupHistoryValue}>{cleanupHistorySizeText}</Text>
+            </Text>
+          ) : null}
           <Text style={styles.emptyTitle} testID="recycle-bin-empty-title">
             {recycleBinTexts.emptyTitle}
           </Text>
@@ -476,74 +634,34 @@ export function RecycleBinScreen({
         </View>
       )}
 
-      <View
-        style={[styles.cleanupReportCard, { bottom: cleanupReportBottom }]}
-        testID="cleanup-report-card"
-      >
-        <Text style={styles.cleanupReportTitle}>{cleanupReportCopy.title}</Text>
-        <View style={styles.cleanupReportMetricsRow}>
-          <View style={styles.cleanupReportMetric}>
-            <Text style={styles.cleanupReportMetricLabel}>{cleanupReportCopy.itemCountLabel}</Text>
-            <Text style={styles.cleanupReportMetricValue} testID="cleanup-report-count">
-              {cleanupReport.cleanedItemCount}
-            </Text>
-          </View>
-          <View style={styles.cleanupReportMetric}>
-            <Text style={styles.cleanupReportMetricLabel}>{cleanupReportCopy.sizeLabel}</Text>
-            <Text style={styles.cleanupReportMetricValue} testID="cleanup-report-bytes">
-              {formatLocalizedSize(cleanupReport.cleanedBytes, appLanguage)}
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.cleanupReportFooterText} testID="cleanup-report-last-cleaned">
-          {cleanupReport.lastCleanedAt
-            ? `${cleanupReportCopy.lastCleanedLabel} · ${formatCleanupReportTime(
-                cleanupReport.lastCleanedAt,
-                appLanguage,
-              )}`
-            : cleanupReportCopy.emptyLabel}
-        </Text>
-      </View>
-
-      {isSelectionMode && (
+      {hasRecycleBinItems && isSelectionMode ? (
         <View style={styles.actionBar}>
           <View style={styles.selectionActionsRow}>
-            <TouchSurface
-              style={[styles.selectionActionButton, styles.selectionToggleButton]}
-              pressedStyle={styles.selectionToggleButtonPressed}
-              onPress={handleToggleSelectAll}
-              preset="pill"
-              testID="recycle-selection-toggle-button"
-            >
-              <Text style={[styles.selectionActionText, styles.selectionToggleText]}>
-                {buildSelectionToggleLabel(appLanguage, isAllRecycleBinSelected)}
-              </Text>
-            </TouchSurface>
             <TouchSurface
               style={[styles.selectionActionButton, styles.selectionRestoreButton]}
               pressedStyle={styles.selectionRestoreButtonPressed}
               onPress={() => void handleRestore()}
               preset="pill"
+              hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
               testID="recycle-restore-selected-button"
             >
-              <Text style={styles.selectionActionText}>
-                {copy.screens.recycleBin.restore} ({state.selectedIds.length})
+              <Text style={[styles.selectionActionText, styles.selectionRestoreText]}>
+                {recycleBinCopy.keepAction}
               </Text>
             </TouchSurface>
             <TouchSurface
               style={[styles.selectionActionButton, styles.selectionDeleteButton]}
               pressedStyle={styles.selectionDeleteButtonPressed}
-              onPress={() => void handleDelete()}
+              onPress={() => requestDeleteConfirmation()}
               preset="pill"
+              hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
               testID="recycle-delete-selected-button"
             >
-              <Text style={styles.selectionActionText}>
-                {copy.screens.recycleBin.delete} ({state.selectedIds.length})
-              </Text>
+              <Text style={styles.selectionActionText}>{recycleBinCopy.cleanupAction}</Text>
             </TouchSurface>
           </View>
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -551,13 +669,22 @@ export function RecycleBinScreen({
 function createStyles(
   theme: AppThemePalette,
   insets: { top: number; bottom: number; left: number; right: number },
+  actionLayout: {
+    bottom: number;
+    left: number;
+    right: number;
+    isSELike?: boolean;
+  } = {
+    bottom: Math.max(insets.bottom, 8),
+    left: 16 + insets.left,
+    right: 16 + insets.right,
+    isSELike: true,
+  },
 ) {
-  const SIZE_DEFAULT = 14;
-  const MUTED_DANGER = '#d8646a';
-  const MUTED_DANGER_PRESSED = '#c65a60';
-  const MUTED_KEEP = '#18bf63';
-  const MUTED_KEEP_PRESSED = '#15ad59';
+  const isCompact = actionLayout.isSELike ?? true;
   const headerInsets = buildRecycleBinHeaderInsets(insets);
+  const headerTopPadding = isCompact ? insets.top + 4 : headerInsets.top;
+  const headerBottomPadding = isCompact ? 0 : 10;
 
   return StyleSheet.create({
     container: {
@@ -565,27 +692,50 @@ function createStyles(
       backgroundColor: theme.safeArea,
     },
     header: {
-      paddingHorizontal: 16,
-      paddingTop: headerInsets.top,
-      paddingBottom: 8,
+      paddingHorizontal: isCompact ? 20 : 24,
+      paddingTop: headerTopPadding,
+      paddingBottom: headerBottomPadding,
       marginLeft: headerInsets.left,
       marginRight: headerInsets.right,
     },
-    headerTitle: {
-      fontSize: 28,
-      fontWeight: '700',
-      color: theme.pageTextPrimary,
-      marginBottom: 4,
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
     },
-    expireHint: {
-      fontSize: 13,
-      color: theme.pageTextMuted,
+    headerLeading: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    backButton: {
+      width: isCompact ? 36 : 40,
+      height: isCompact ? 36 : 40,
+      borderRadius: isCompact ? 18 : 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
+    },
+    backButtonPressed: {
+      backgroundColor: theme.cardMutedBackground,
+    },
+    headerCopy: {
+      flex: 1,
+    },
+    headerTitle: {
+      fontSize: isCompact ? 18 : 26,
+      lineHeight: isCompact ? 23 : 34,
+      fontWeight: '800',
+      color: theme.pageTextPrimary,
     },
     emptyContainer: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: 32,
+      paddingBottom: isCompact ? 58 : 72,
     },
     emptyIconWrap: {
       width: 84,
@@ -609,6 +759,21 @@ function createStyles(
       color: theme.pageTextMuted,
       textAlign: 'center',
       lineHeight: 20,
+    },
+    cleanupHistoryInline: {
+      marginTop: -4,
+      marginBottom: 14,
+      color: theme.pageTextMuted,
+      fontSize: 14,
+      lineHeight: 20,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    cleanupHistoryValue: {
+      color: theme.buttonSuccessBackground,
+      fontSize: 16,
+      lineHeight: 22,
+      fontWeight: '800',
     },
     loadingContainer: {
       flex: 1,
@@ -639,120 +804,172 @@ function createStyles(
       color: theme.noticeText,
       lineHeight: 20,
     },
-    cleanupReportCard: {
+    summaryCard: {
+      marginTop: isCompact ? 2 : 22,
+      marginLeft: isCompact ? actionLayout.left : 24 + insets.left,
+      marginRight: isCompact ? actionLayout.right : 24 + insets.right,
+      paddingHorizontal: isCompact ? 16 : 20,
+      paddingVertical: isCompact ? 12 : 18,
+      position: 'relative',
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      borderBottomWidth: 0,
+      shadowColor: 'transparent',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      elevation: 0,
+    },
+    summaryBottomShadow: {
       position: 'absolute',
-      left: 16 + insets.left,
-      right: 16 + insets.right,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      borderRadius: 18,
-      backgroundColor: theme.cardBackground,
-      borderWidth: 1,
-      borderColor: theme.cardBorder,
-      shadowColor: theme.shadowColor,
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: theme.scheme === 'dark' ? 0.18 : 0.08,
-      shadowRadius: 14,
-      elevation: 3,
+      left: 0,
+      right: 0,
+      bottom: -1,
+      height: 1,
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+      backgroundColor:
+        theme.scheme === 'dark'
+          ? 'rgba(248, 250, 252, 0.16)'
+          : 'rgba(255, 255, 255, 0.92)',
+      boxShadow: [
+        {
+          offsetX: 0,
+          offsetY: 1,
+          blurRadius: 0,
+          spreadDistance: 0,
+          color:
+            theme.scheme === 'dark'
+              ? 'rgba(248, 250, 252, 0.16)'
+              : 'rgba(255, 255, 255, 0.92)',
+        },
+      ],
     },
-    cleanupReportTitle: {
-      color: theme.pageTextPrimary,
-      fontSize: 16,
-      fontWeight: '800',
-      marginBottom: 10,
-    },
-    cleanupReportMetricsRow: {
+    summaryMetricRow: {
       flexDirection: 'row',
-      gap: 12,
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: isCompact ? 10 : 14,
     },
-    cleanupReportMetric: {
+    summaryLeadingIconShell: {
+      width: isCompact ? 30 : 42,
+      height: isCompact ? 42 : 52,
+      borderRadius: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
+    },
+    summaryPrimaryMetric: {
       flex: 1,
-      borderRadius: 14,
-      paddingVertical: 10,
-      paddingHorizontal: 12,
-      backgroundColor: theme.cardMutedBackground,
+      minWidth: 0,
     },
-    cleanupReportMetricLabel: {
-      color: theme.pageTextMuted,
-      fontSize: 12,
-      marginBottom: 6,
-    },
-    cleanupReportMetricValue: {
+    summaryTitle: {
       color: theme.pageTextPrimary,
-      fontSize: 18,
+      fontSize: isCompact ? 18 : 24,
+      lineHeight: isCompact ? 24 : 31,
       fontWeight: '800',
     },
-    cleanupReportFooterText: {
-      marginTop: 10,
-      color: theme.pageTextSecondary,
-      fontSize: 12,
+    summaryMetricDivider: {
+      width: 1,
+      alignSelf: 'stretch',
+      backgroundColor: theme.cardBorder,
+    },
+    summarySizeMetric: {
+      minWidth: isCompact ? 112 : 146,
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'flex-end',
+      gap: isCompact ? 7 : 9,
+    },
+    pendingMetricLabel: {
+      color: theme.pageTextMuted,
+      fontSize: isCompact ? 16 : 18,
+      lineHeight: isCompact ? 22 : 25,
+      fontWeight: '700',
+    },
+    summarySizeValue: {
+      color: theme.buttonSuccessBackground,
+      fontSize: isCompact ? 18 : 24,
+      lineHeight: isCompact ? 24 : 31,
+      fontWeight: '800',
     },
     actionBar: {
       position: 'absolute',
       bottom: 0,
-      left: 0,
-      right: 0,
+      left: actionLayout.left,
+      right: actionLayout.right,
       paddingTop: 6,
-      paddingBottom: Math.max(insets.bottom, 8) + 8,
-      paddingHorizontal: 12,
+      paddingBottom: actionLayout.bottom,
       backgroundColor: 'transparent',
     },
+    actionBarTitle: {
+      marginBottom: 10,
+      paddingHorizontal: 4,
+      color: theme.pageTextSecondary,
+      fontSize: 12,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
     selectionToggleButton: {
-      minHeight: 40,
+      minHeight: isCompact ? 30 : 40,
       minWidth: 0,
-      paddingHorizontal: 14,
+      paddingHorizontal: isCompact ? 6 : 8,
       borderRadius: 999,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.buttonSecondaryBackground,
-      borderWidth: 1,
-      borderColor: theme.cardBorder,
-      shadowColor: theme.shadowColor,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: theme.scheme === 'dark' ? 0.16 : 0.08,
-      shadowRadius: 10,
-      elevation: 2,
+      backgroundColor: 'transparent',
+    },
+    selectionToggleButtonTop: {
+      alignSelf: 'flex-start',
     },
     selectionToggleButtonPressed: {
       backgroundColor: theme.cardMutedBackground,
     },
     selectionToggleText: {
-      color: theme.pageTextPrimary,
+      color: theme.buttonPrimaryBackground,
+      fontSize: isCompact ? 12 : 16,
     },
     selectionActionsRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
+      gap: isCompact ? 12 : 14,
     },
     selectionActionButton: {
       flex: 1,
-      minHeight: 44,
-      borderRadius: 14,
+      minHeight: isCompact ? 48 : 58,
+      borderRadius: isCompact ? 14 : 16,
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
+      gap: 0,
       shadowColor: theme.shadowColor,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: theme.scheme === 'dark' ? 0.2 : 0.08,
-      shadowRadius: 10,
-      elevation: 2,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      elevation: 0,
     },
     selectionRestoreButton: {
-      backgroundColor: MUTED_KEEP,
+      backgroundColor: theme.cardBackground,
+      borderWidth: 1.5,
+      borderColor: theme.buttonPrimaryBackground,
     },
     selectionRestoreButtonPressed: {
-      backgroundColor: MUTED_KEEP_PRESSED,
+      backgroundColor: theme.cardMutedBackground,
     },
     selectionDeleteButton: {
-      backgroundColor: MUTED_DANGER,
+      backgroundColor: theme.buttonDangerBackground,
     },
     selectionDeleteButtonPressed: {
-      backgroundColor: MUTED_DANGER_PRESSED,
+      backgroundColor: theme.buttonDangerPressedBackground,
     },
     selectionActionText: {
       color: '#ffffff',
-      fontSize: SIZE_DEFAULT,
+      fontSize: isCompact ? 16 : 18,
       fontWeight: '800',
       letterSpacing: 0.2,
+    },
+    selectionRestoreText: {
+      color: theme.buttonPrimaryBackground,
     },
   });
 }

@@ -43,11 +43,11 @@ interface LocalizedCopy {
     scannedCaption: string;
     candidatesLabel: string;
     candidatesCaption: string;
-    accidentalLabel: string;
-    abnormalLabel: string;
+    blurryLabel: string;
     duplicateLabel: string;
-    highConfidenceLabel: string;
-    highConfidenceCaption: string;
+    similarLabel: string;
+    suggestedCleanupLabel: string;
+    suggestedCleanupCaption: string;
     recycleLabel: string;
     recycleCaption: string;
   };
@@ -107,6 +107,54 @@ interface LocalizedCopy {
     photos: string;
     settings: string;
   };
+  splash: {
+    brand: string;
+    title: string;
+    subtitle: string;
+    body: string;
+  };
+  landing: {
+    statusTitleGranted: string;
+    statusBodyGranted: string;
+    statusTitlePending: string;
+    statusBodyPending: string;
+    heroTitle: string;
+    heroBodyGranted: string;
+    heroBodyPending: string;
+    actionReady: string;
+    actionPending: string;
+    featurePill: string;
+    localOnlyTitle: string;
+    localOnlyBody: string;
+    mediaSupportTitle: string;
+    mediaSupportBody: string;
+  };
+  settings: {
+    loading: string;
+    headerTitle: string;
+    headerBody: string;
+    runtimeTitle: string;
+    preferenceTitle: string;
+    maintenanceTitle: string;
+    languageThemeTitle: string;
+    scanRangeTitle: string;
+    scanRangeHint: string;
+    scanRangeRecentMonths: (months: number) => string;
+    scanRangeAllLabel: string;
+    followSystemLanguage: (currentLabel: string) => string;
+    reminderEnableAction: string;
+    reminderDisableAction: string;
+    reminderTitle: string;
+    lastScanTitle: string;
+    cachedDataTitle: string;
+    localOnlyNote: string;
+    cacheHint: string;
+    clearingAction: string;
+    clearAction: string;
+    clearCache: string;
+    clearCacheWithSize: (formattedSize: string) => string;
+    currentThemePrefix: string;
+  };
   screens: {
     photoGrid: {
       filterAll: string;
@@ -121,6 +169,7 @@ interface LocalizedCopy {
       scanProgressTitle: string;
       scanProgressValue: (current: number, total: number) => string;
       scanProgressFootnote: string;
+      scanCurrentBatchRange: (start: string, end: string) => string;
       scanBatchRange: (start: string, end: string) => string;
       scanCompleteTitle: string;
       scanResultSummary: (count: number) => string;
@@ -138,11 +187,18 @@ interface LocalizedCopy {
       title: string;
       emptyTitle: string;
       emptyBody: string;
-      expireHint: (days: number) => string;
+      loading: string;
+      selectionToggle: (isAllSelected: boolean) => string;
+      pendingSummary: (count: number) => string;
       selectedItems: (count: number) => string;
       cancel: string;
       restore: string;
       delete: string;
+      keepAction: string;
+      cleanupAction: string;
+      releasableSizeLabel: string;
+      cleanupHistoryTitle: string;
+      cleanupHistoryReleased: (formattedSize: string) => string;
     };
   };
   filters: {
@@ -192,6 +248,8 @@ interface LocalizedCopy {
     accidentalPhoto: string;
     abnormalVideo: string;
     abnormalPhoto: string;
+    similarVideo: string;
+    similarPhoto: string;
     duplicateVideo: string;
     duplicatePhoto: string;
     accidentalIssue: string;
@@ -275,9 +333,9 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       statusTitle: '当前状态',
     },
     hero: {
-      kicker: 'Android 优先 MVP',
+      kicker: '跨端本地清理',
       title: '相册清理建议',
-      description: '本地分批扫描整个相册，用可解释规则识别误触、异常与重复内容，并通过应用内回收站做安全清理。',
+      description: '本地分批扫描整个相册，识别重复、模糊与相似照片，并通过应用内回收站做安全清理。',
       lastScan: '上次扫描',
       autoCleanupHint: '自动清理只会软删除，高风险操作始终二次确认。',
     },
@@ -286,11 +344,11 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       scannedCaption: '最近媒体总数',
       candidatesLabel: '识别结果',
       candidatesCaption: '待人工确认处理',
-      accidentalLabel: '误触',
-      abnormalLabel: '异常',
-      duplicateLabel: '重复',
-      highConfidenceLabel: '高置信度',
-      highConfidenceCaption: '适合自动清理',
+      blurryLabel: '模糊照片',
+      duplicateLabel: '重复照片',
+      similarLabel: '相似照片',
+      suggestedCleanupLabel: '建议清理',
+      suggestedCleanupCaption: '优先复核处理',
       recycleLabel: '保留和清理',
       recycleCaption: '最终决策区',
     },
@@ -302,13 +360,13 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     info: {
       title: '首版识别说明',
       firstLine:
-        '当前默认扫描整个相册，并额外保留应用内回收站中的已软删除条目。识别完全在本地完成：误触与异常依赖启发式评分，重复内容依赖图片缩略图指纹，以及视频按时长自适应采样的多帧缩略图与元数据近似分组。扫描过程会分批推进，以控制内存占用与机身发热。',
+        '当前默认扫描整个相册，并额外保留应用内回收站中的已软删除条目。识别完全在本地完成：模糊与相似内容依赖本地启发式评分，重复内容依赖图片缩略图指纹，以及视频按时长自适应采样的多帧缩略图与元数据近似分组。扫描过程会分批推进，以控制内存占用与机身发热。',
       secondLine: '回收站是应用内软删除，不等同于系统回收站；卸载应用或清空本地存储后，软删除记录可能失效。',
     },
     reminder: {
       title: '定期清理准备',
       genericTitle: '定期清理提醒',
-      defaultSummary: '定期检查最近拍摄的照片和视频，优先清理误触、异常与重复内容。',
+      defaultSummary: '定期检查最近拍摄的照片和视频，优先清理重复、模糊与相似内容。',
       disabledSummary: '未开启定期清理提醒',
       weekly: '每周',
       daily: '每天',
@@ -332,7 +390,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       disabled: '未开启',
       unauthorized: '未授权',
       channelName: '定期清理提醒',
-      channelDescription: '提醒你重新扫描最近媒体并清理误触、异常与重复内容。',
+      channelDescription: '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
       nextReminder: '下次提醒',
       estimatedReminder: '预计下次提醒',
       plannedReminder: '计划提醒时间',
@@ -347,9 +405,57 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     },
     tabs: {
       suggestions: '识别结果',
-      recycle: '保留和清理',
+      recycle: '回收站',
       photos: '照片',
       settings: '设置',
+    },
+    splash: {
+      brand: 'Media Clean',
+      title: '智能相册 管理工具',
+      subtitle: '智能识别重复、模糊与相似内容',
+      body: '本地扫描、识别重复、模糊与相似内容',
+    },
+    landing: {
+      statusTitleGranted: '授权已完成',
+      statusBodyGranted: '可开始扫描相册',
+      statusTitlePending: '需要媒体权限',
+      statusBodyPending: '进入工作区后授权即可开始扫描',
+      heroTitle: '本地扫描',
+      heroBodyGranted: '识别重复、模糊与相似内容',
+      heroBodyPending: '进入工作区后授权，即可识别重复、模糊与相似内容',
+      actionReady: '开始扫描',
+      actionPending: '进入工作区并授权',
+      featurePill: '即将扫描照片与视频',
+      localOnlyTitle: '仅在本地分析，不上传任何数据',
+      localOnlyBody: '所有识别与清理操作均在本地完成',
+      mediaSupportTitle: '支持照片与视频',
+      mediaSupportBody: '全面识别，快速定位重复、模糊与相似内容',
+    },
+    settings: {
+      loading: '加载中...',
+      headerTitle: '设置',
+      headerBody: '统一调整扫描范围、提醒节奏、语言主题与本地缓存，让清理流程保持稳定、连续、可理解。',
+      runtimeTitle: '当前状态',
+      preferenceTitle: '核心偏好',
+      maintenanceTitle: '维护与缓存',
+      languageThemeTitle: '语言与主题',
+      scanRangeTitle: '扫描范围',
+      scanRangeHint: '扫描范围决定首轮扫描窗口，也影响后续提醒节奏与回填范围。',
+      scanRangeRecentMonths: (months: number) => `最近 ${months} 个月`,
+      scanRangeAllLabel: '全部',
+      followSystemLanguage: (currentLabel: string) => `跟随系统（当前：${currentLabel}）`,
+      reminderEnableAction: '开启',
+      reminderDisableAction: '关闭',
+      reminderTitle: '定期提醒',
+      lastScanTitle: '上次扫描',
+      cachedDataTitle: '缓存数据',
+      localOnlyNote: '仅在本地分析，不上传任何数据',
+      cacheHint: '清除缓存只会移除本地扫描与分析缓存，不会改变你已保留或已清理的结果。',
+      clearingAction: '清除中...',
+      clearAction: '清除',
+      clearCache: '清除缓存',
+      clearCacheWithSize: (formattedSize: string) => `清除缓存 ${formattedSize}`,
+      currentThemePrefix: '当前主题: ',
     },
     screens: {
       photoGrid: {
@@ -358,17 +464,18 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
         filterVideo: '视频',
         permissionChecking: '正在检查权限...',
         scanPromptTitle: '本地扫描',
-        scanPromptBody: `最近 ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} 个月媒体会在本地分批做模糊、重复、近相似、误触和差质检查，结果直接留在本页。`,
+        scanPromptBody: `最近 ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} 个月媒体会在本地分批检查重复、模糊与相似内容，结果直接留在本页。`,
         startScan: '开始扫描',
         scanScopeSummary: (count: number) =>
           count > 0 ? `已选择 ${count} 个媒体` : `最近 ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} 个月媒体`,
-        scanScopeHint: `默认先扫描最近 ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} 个月媒体；每次完成后会继续向更早媒体回填，直到整库覆盖完成。Android 会在后台继续当前批次，回到页面后自动接回真实进度。`,
+        scanScopeHint: `默认先扫描最近 ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} 个月媒体；完成后继续回填更早媒体，直到整库覆盖。离开再回来会自动接回进度。`,
         scanProgressTitle: '本地扫描',
         scanProgressValue: (current: number, total: number) => `${current}/${total}`,
-        scanProgressFootnote: '模糊、重复、近相似、误触和差质候选会持续留在下方，正常媒体会逐步退场。',
-        scanBatchRange: (start: string, end: string) => `本批范围：${start} - ${end}`,
+        scanProgressFootnote: '重复、模糊与相似候选会持续留在下方，正常媒体会逐步退场。',
+        scanCurrentBatchRange: (start: string, end: string) => `当前扫描批次：${start} - ${end}`,
+        scanBatchRange: (start: string, end: string) => `已扫描范围：${start} - ${end}`,
         scanCompleteTitle: '本地扫描',
-        scanResultSummary: (count: number) => `发现 ${count} 个异常媒体`,
+        scanResultSummary: (count: number) => `发现 ${count} 个待处理媒体`,
         scanResultFootnote: '结果已按本地规则留在当前页面，可继续筛选、查看并决定清理或保留。',
         scanExhaustedTitle: '当前这一批已处理完成',
         scanExhaustedBody: '继续扫描会从上一批之前的更早媒体接着回填；整库已覆盖时，只处理新增或变化媒体。',
@@ -380,21 +487,28 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
         keepSelected: '保留',
       },
       recycleBin: {
-        title: '保留和清理',
+        title: '回收站',
         emptyTitle: '这里还没有待最终处理的项目',
         emptyBody: '自动清理或手动移入应用内回收站后的项目，会在这里统一决定保留还是彻底清理。',
-        expireHint: (days) => `已移入应用内回收站的项目将在 ${days} 天后自动彻底删除`,
+        loading: '加载保留和清理…',
+        selectionToggle: (isAllSelected: boolean) => (isAllSelected ? '取消全选' : '全选'),
+        pendingSummary: (count) => `清理 ${count} 项`,
         selectedItems: (count) => `已选择 ${count} 项`,
         cancel: '取消',
         restore: '恢复',
         delete: '删除',
+        keepAction: '保留',
+        cleanupAction: '清理',
+        releasableSizeLabel: '释放',
+        cleanupHistoryTitle: '历史清理',
+        cleanupHistoryReleased: (formattedSize: string) => `共释放 ${formattedSize}`,
       },
     },
     filters: {
       all: '全部',
-      accidental: '误触',
-      abnormal: '异常',
-      duplicate: '重复',
+      accidental: '模糊照片',
+      abnormal: '相似照片',
+      duplicate: '重复照片',
     },
     empty: {
       suggestionsTitle: '当前没有待处理识别结果',
@@ -404,7 +518,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     },
     actionBar: {
       selectedItems: (count) => `已选中 ${count} 项`,
-      restoreSelected: '恢复选中',
+      restoreSelected: '保留选中',
       cleanupSelected: '选中清理',
       clearSelection: '清空选择',
     },
@@ -414,9 +528,9 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       deleteFailedTitle: '删除失败',
       deleteFailedBody: '系统未能完成永久删除，请稍后重试。',
       noAutoCleanupTitle: '暂无自动清理项',
-      noAutoCleanupBody: '当前没有高置信度候选项，建议先手动预览后再清理。',
+      noAutoCleanupBody: '当前没有可直接建议清理的项目，建议先手动预览后再清理。',
       autoCleanupTitle: '自动清理',
-      autoCleanupBody: (count) => `将把 ${count} 个高置信度候选项移入应用内回收站，不会立刻永久删除。`,
+      autoCleanupBody: (count) => `将把 ${count} 个建议清理项目移入应用内回收站，不会立刻永久删除。`,
       confirmMoveToRecycle: '确认移入回收站',
       selectedCleanupTitle: '选中清理',
       selectedCleanupBody: (count) => `已选中 ${count} 项，请选择处理方式。`,
@@ -430,22 +544,24 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       reminderDisabledBody: '系统通知权限未授予，因此已保留提醒设置但暂不启用。',
     },
     candidate: {
-      highConfidence: '高置信度',
-      mediumConfidence: '中置信度',
-      lowConfidence: '低置信度',
-      accidentalVideo: '疑似误触视频',
-      accidentalPhoto: '疑似误触照片',
-      abnormalVideo: '疑似异常视频',
-      abnormalPhoto: '疑似异常照片',
-      duplicateVideo: '疑似重复视频',
-      duplicatePhoto: '疑似重复照片',
-      accidentalIssue: '误触',
-      abnormalIssue: '异常',
+      highConfidence: '建议清理',
+      mediumConfidence: '建议复核',
+      lowConfidence: '需要确认',
+      accidentalVideo: '模糊视频',
+      accidentalPhoto: '模糊照片',
+      abnormalVideo: '模糊视频',
+      abnormalPhoto: '模糊照片',
+      similarVideo: '相似视频',
+      similarPhoto: '相似照片',
+      duplicateVideo: '重复视频',
+      duplicatePhoto: '重复照片',
+      accidentalIssue: '模糊',
+      abnormalIssue: '模糊',
       duplicateIssue: '重复',
       selected: '已选',
       actionable: '可操作',
       noRisk: '当前无明显风险标记',
-      recycleHint: '已移入应用内回收站，可恢复或彻底删除。',
+      recycleHint: '已移入应用内回收站，可保留或彻底删除。',
       previewHint: '点击查看预览，再决定是否清理。',
       unselect: '取消选择',
       addAction: '加入操作',
@@ -455,8 +571,8 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     preview: {
       title: '媒体预览',
       subtitle: '先确认内容，再决定是否清理',
-      clearAction: '清除',
-      clearCompactAction: '清除',
+      clearAction: '清理',
+      clearCompactAction: '清理',
       judgementTitle: '识别判断',
       mediaInfoTitle: '媒体信息',
       typeLabel: '类型',
@@ -469,8 +585,8 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       keepAction: '保留此媒体',
       keepCompactAction: '保留',
       keepHint: '保留表示这是误报，不再作为待清理项显示。',
-      restore: '恢复当前媒体',
-      restoreCompactAction: '恢复',
+      restore: '保留当前媒体',
+      restoreCompactAction: '保留',
       moveToRecycle: '移入回收站',
       deleteForever: '彻底删除',
       deleteForeverCompactAction: '删除',
@@ -543,9 +659,9 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       statusTitle: 'Current status',
     },
     hero: {
-      kicker: 'Android-first MVP',
+      kicker: 'Cross-platform local cleanup',
       title: 'Media Cleanup Suggestions',
-      description: 'Scan the whole library locally in batches, explain accidental, anomalous, and duplicate media, and clean safely through an app-level recycle bin.',
+      description: 'Scan the whole library locally in batches, find duplicate, blurry, and similar photos, and clean safely through an app-level recycle bin.',
       lastScan: 'Last scan',
       autoCleanupHint: 'Auto cleanup only performs soft delete, and risky actions always require a second confirmation.',
     },
@@ -554,11 +670,11 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       scannedCaption: 'recent media checked',
       candidatesLabel: 'Recognition results',
       candidatesCaption: 'ready for review',
-      accidentalLabel: 'Accidental',
-      abnormalLabel: 'Anomalous',
-      duplicateLabel: 'Duplicate',
-      highConfidenceLabel: 'High confidence',
-      highConfidenceCaption: 'ready for auto cleanup',
+      blurryLabel: 'Blurry photos',
+      duplicateLabel: 'Duplicate photos',
+      similarLabel: 'Similar photos',
+      suggestedCleanupLabel: 'Suggested cleanup',
+      suggestedCleanupCaption: 'review first',
       recycleLabel: 'Keep & clean',
       recycleCaption: 'final decision zone',
     },
@@ -570,14 +686,14 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     info: {
       title: 'MVP Detection Notes',
       firstLine:
-        'The current MVP scans the whole library and also keeps app-level recycle-bin entries visible. Detection stays fully on-device: accidental and anomalous media use heuristic scoring, while duplicate media uses image thumbnail fingerprints plus duration-adaptive multi-frame video thumbnails and metadata similarity. Scanning advances in batches to keep memory usage and device heat under control.',
+        'The current MVP scans the whole library and also keeps app-level recycle-bin entries visible. Detection stays fully on-device: blurry and similar items use local heuristic scoring, while duplicate media uses image thumbnail fingerprints plus duration-adaptive multi-frame video thumbnails and metadata similarity. Scanning advances in batches to keep memory usage and device heat under control.',
       secondLine:
         'The recycle bin is an app-level soft-delete concept, not the system recycle bin. If the app is uninstalled or local storage is cleared, those records may be lost.',
     },
     reminder: {
       title: 'Recurring Cleanup Readiness',
       genericTitle: 'Cleanup Reminder',
-      defaultSummary: 'Regularly review recent photos and videos, prioritizing accidental, anomalous, and duplicate media.',
+      defaultSummary: 'Regularly review recent photos and videos, prioritizing duplicate, blurry, and similar media.',
       disabledSummary: 'Recurring cleanup reminder is off',
       weekly: 'Weekly',
       daily: 'Daily',
@@ -601,7 +717,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       disabled: 'Off',
       unauthorized: 'Unauthorized',
       channelName: 'Cleanup reminders',
-      channelDescription: 'Reminds you to reopen the app, rescan recent media, and clean accidental, anomalous, and duplicate media.',
+      channelDescription: 'Reminds you to reopen the app, rescan recent media, and clean duplicate, blurry, and similar media.',
       nextReminder: 'Next reminder',
       estimatedReminder: 'Estimated next reminder',
       plannedReminder: 'Planned reminder time',
@@ -617,9 +733,57 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     },
     tabs: {
       suggestions: 'Recognition results',
-      recycle: 'Keep & clean',
+      recycle: 'Recycle bin',
       photos: 'Photos',
       settings: 'Settings',
+    },
+    splash: {
+      brand: 'Media Clean',
+      title: 'Smart Album Manager',
+      subtitle: 'Detect duplicate, blurry, and similar media',
+      body: 'Scan and review duplicate, blurry, and similar items locally.',
+    },
+    landing: {
+      statusTitleGranted: 'Permission granted',
+      statusBodyGranted: 'Ready to scan the library',
+      statusTitlePending: 'Media permission required',
+      statusBodyPending: 'Grant access in the workspace to start scanning',
+      heroTitle: 'Local scan',
+      heroBodyGranted: 'Find duplicate, blurry, and similar items',
+      heroBodyPending: 'Open the workspace, grant access, then find duplicate, blurry, and similar items',
+      actionReady: 'Open workspace',
+      actionPending: 'Open and grant access',
+      featurePill: 'Photos and videos will be included',
+      localOnlyTitle: 'Local analysis only, nothing is uploaded',
+      localOnlyBody: 'Every recognition and cleanup action stays on the device',
+      mediaSupportTitle: 'Supports both photos and videos',
+      mediaSupportBody: 'Broader coverage for duplicate, blurry, and similar items',
+    },
+    settings: {
+      loading: 'Loading...',
+      headerTitle: 'Settings',
+      headerBody: 'Adjust scan range, reminder cadence, language, theme, and local cache so the cleanup flow stays stable, continuous, and understandable.',
+      runtimeTitle: 'Current status',
+      preferenceTitle: 'Core preferences',
+      maintenanceTitle: 'Maintenance & cache',
+      languageThemeTitle: 'Language & theme',
+      scanRangeTitle: 'Scan Range',
+      scanRangeHint: 'The scan range sets the first review window and also affects reminder cadence and backfill scope.',
+      scanRangeRecentMonths: (months: number) => `Last ${months} month${months > 1 ? 's' : ''}`,
+      scanRangeAllLabel: 'All',
+      followSystemLanguage: (currentLabel: string) => `System (${currentLabel})`,
+      reminderEnableAction: 'Enable',
+      reminderDisableAction: 'Disable',
+      reminderTitle: 'Reminders',
+      lastScanTitle: 'Last Scan',
+      cachedDataTitle: 'Cached Data',
+      localOnlyNote: 'Analyzed only on this device. Nothing is uploaded.',
+      cacheHint: 'Clearing cache only removes local scan and analysis cache. It does not change items you already kept or cleaned.',
+      clearingAction: 'Clearing...',
+      clearAction: 'Clear',
+      clearCache: 'Clear cache',
+      clearCacheWithSize: (formattedSize: string) => `Clear cache ${formattedSize}`,
+      currentThemePrefix: 'Current theme: ',
     },
     screens: {
       photoGrid: {
@@ -628,45 +792,52 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
         filterVideo: 'Videos',
         permissionChecking: 'Checking permission...',
         scanPromptTitle: 'Local scan',
-        scanPromptBody: `Recent media from the last ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} months is checked locally in batches for blur, duplicates, near-similar, accidental, and poor-quality issues, and the results stay on this page.`,
+        scanPromptBody: `Recent media from the last ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} months is checked locally in batches for duplicate, blurry, and similar items, and the results stay on this page.`,
         startScan: 'Start scan',
         scanScopeSummary: (count: number) =>
           count > 0 ? `${count} media selected` : `Recent ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} months`,
-        scanScopeHint: `The default scan starts with the last ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} months, then keeps backfilling older media after each completed batch until the whole library is covered. Android keeps the current batch running in the background and reattaches to the real progress when you return.`,
+        scanScopeHint: `The default scan starts with the last ${DEFAULT_SCAN_WINDOW_MONTHS_EQUIVALENT} months, then backfills older media until the whole library is covered. Return to the app to reattach to the current progress.`,
         scanProgressTitle: 'Local scan',
         scanProgressValue: (current: number, total: number) => `${current}/${total}`,
-        scanProgressFootnote: 'Blur, duplicate, near-similar, accidental, and poor-quality candidates stay below while normal media gradually drops out.',
-        scanBatchRange: (start: string, end: string) => `Batch range: ${start} - ${end}`,
+        scanProgressFootnote: 'Duplicate, blurry, and similar candidates stay below while normal media gradually drops out.',
+        scanCurrentBatchRange: (start: string, end: string) => `Current batch: ${start} - ${end}`,
+        scanBatchRange: (start: string, end: string) => `Scanned range: ${start} - ${end}`,
         scanCompleteTitle: 'Local scan',
-        scanResultSummary: (count: number) => `Found ${count} anomalous media items`,
+        scanResultSummary: (count: number) => `Found ${count} items to review`,
         scanResultFootnote: 'Results stay on the page under the local first-pass rules so filtering, review, cleanup, or keep actions can continue immediately.',
         scanExhaustedTitle: 'This batch is fully processed',
         scanExhaustedBody: 'Continuing the scan picks up from media older than the previous batch; once the whole library is covered, only new or changed media is processed.',
         scanAllCompleteTitle: 'All media has been scanned',
         scanAllCompleteBody: 'The current media library is fully covered. Only new or changed media needs another scan later.',
-        continueScan: 'Scan again',
+        continueScan: 'Continue scan',
         selectedItems: (count) => `${count} selected`,
-        cleanupSelected: 'Clean up',
+        cleanupSelected: 'Clean',
         keepSelected: 'Keep',
       },
       recycleBin: {
-        title: 'Keep & clean',
+        title: 'Recycle bin',
         emptyTitle: 'Nothing is waiting for a final decision yet',
         emptyBody:
           'Items moved into the app recycle bin by auto cleanup or manual cleanup are finalized here: keep or delete forever.',
-        expireHint: (days) =>
-          `Items already moved into the app recycle bin will be permanently deleted after ${days} days.`,
+        loading: 'Loading keep and clean…',
+        selectionToggle: (isAllSelected: boolean) => (isAllSelected ? 'Deselect All' : 'Select All'),
+        pendingSummary: (count) => `Clean ${count} items`,
         selectedItems: (count) => `${count} selected`,
         cancel: 'Cancel',
         restore: 'Restore',
         delete: 'Delete',
+        keepAction: 'Keep',
+        cleanupAction: 'Clean',
+        releasableSizeLabel: 'Free up',
+        cleanupHistoryTitle: 'Cleanup history',
+        cleanupHistoryReleased: (formattedSize: string) => `Total freed ${formattedSize}`,
       },
     },
     filters: {
       all: 'All',
-      accidental: 'Accidental',
-      abnormal: 'Anomalous',
-      duplicate: 'Duplicate',
+      accidental: 'Blurry photos',
+      abnormal: 'Similar photos',
+      duplicate: 'Duplicate photos',
     },
     empty: {
       suggestionsTitle: 'No recognition results right now',
@@ -677,7 +848,7 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     },
     actionBar: {
       selectedItems: (count) => `${count} selected`,
-      restoreSelected: 'Restore selected',
+      restoreSelected: 'Keep selected',
       cleanupSelected: 'Clean selected',
       clearSelection: 'Clear selection',
     },
@@ -687,9 +858,9 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       deleteFailedTitle: 'Delete failed',
       deleteFailedBody: 'The system could not finish the permanent delete. Please try again later.',
       noAutoCleanupTitle: 'No auto-cleanup items',
-      noAutoCleanupBody: 'There are no high-confidence candidates right now. Preview first before cleaning manually.',
+      noAutoCleanupBody: 'There are no items ready for suggested cleanup right now. Preview first before cleaning manually.',
       autoCleanupTitle: 'Auto cleanup',
-      autoCleanupBody: (count) => `${count} high-confidence candidates will be moved into the app recycle bin, without being permanently deleted immediately.`,
+      autoCleanupBody: (count) => `${count} suggested-cleanup items will be moved into the app recycle bin, without being permanently deleted immediately.`,
       confirmMoveToRecycle: 'Move to recycle bin',
       selectedCleanupTitle: 'Selected cleanup',
       selectedCleanupBody: (count) => `${count} items selected. Choose how to handle them.`,
@@ -703,22 +874,24 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       reminderDisabledBody: 'Notification permission was not granted, so the reminder settings were kept but the reminder stays disabled for now.',
     },
     candidate: {
-      highConfidence: 'High confidence',
-      mediumConfidence: 'Medium confidence',
-      lowConfidence: 'Low confidence',
-      accidentalVideo: 'Likely accidental video',
-      accidentalPhoto: 'Likely accidental photo',
-      abnormalVideo: 'Likely anomalous video',
-      abnormalPhoto: 'Likely anomalous photo',
-      duplicateVideo: 'Likely duplicate video',
-      duplicatePhoto: 'Likely duplicate photo',
-      accidentalIssue: 'Accidental',
-      abnormalIssue: 'Anomalous',
+      highConfidence: 'Suggested cleanup',
+      mediumConfidence: 'Review suggested',
+      lowConfidence: 'Needs review',
+      accidentalVideo: 'Blurry video',
+      accidentalPhoto: 'Blurry photo',
+      abnormalVideo: 'Blurry video',
+      abnormalPhoto: 'Blurry photo',
+      similarVideo: 'Similar video',
+      similarPhoto: 'Similar photo',
+      duplicateVideo: 'Duplicate video',
+      duplicatePhoto: 'Duplicate photo',
+      accidentalIssue: 'Blurry',
+      abnormalIssue: 'Blurry',
       duplicateIssue: 'Duplicate',
       selected: 'Selected',
       actionable: 'Ready',
       noRisk: 'No obvious risk marker',
-      recycleHint: 'Already moved to the app recycle bin. You can restore it or delete it permanently.',
+      recycleHint: 'Already moved to the app recycle bin. You can keep it or delete it permanently.',
       previewHint: 'Open a preview first, then decide whether to clean it.',
       unselect: 'Unselect',
       addAction: 'Add to batch',
@@ -728,8 +901,8 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
     preview: {
       title: 'Media Preview',
       subtitle: 'Confirm the content first, then decide whether to clean it',
-      clearAction: 'Clear',
-      clearCompactAction: 'Clear',
+      clearAction: 'Clean',
+      clearCompactAction: 'Clean',
       judgementTitle: 'Detection result',
       mediaInfoTitle: 'Media details',
       typeLabel: 'Type',
@@ -742,8 +915,8 @@ const COPY: Record<AppLanguage, LocalizedCopy> = {
       keepAction: 'Keep this media',
       keepCompactAction: 'Keep',
       keepHint: 'Keep means this result is a false positive and should not be cleaned.',
-      restore: 'Restore this media',
-      restoreCompactAction: 'Restore',
+      restore: 'Keep this media',
+      restoreCompactAction: 'Keep',
       moveToRecycle: 'Move to recycle bin',
       deleteForever: 'Delete forever',
       deleteForeverCompactAction: 'Delete',
@@ -970,6 +1143,21 @@ export function getCandidateTitle(kind: CleanupKind, language: AppLanguage) {
   }
 }
 
+export function getCandidateDisplayTitle(candidate: CleanupCandidate, language: AppLanguage) {
+  const labels = COPY[language].candidate;
+  const isVideo = candidate.asset.mediaType === 'video';
+
+  if (candidate.duplicateGroup?.relation === 'near') {
+    return isVideo ? labels.similarVideo : labels.similarPhoto;
+  }
+
+  if (candidate.primaryIssueType === 'duplicate') {
+    return isVideo ? labels.duplicateVideo : labels.duplicatePhoto;
+  }
+
+  return isVideo ? labels.accidentalVideo : labels.accidentalPhoto;
+}
+
 export function getMediaTypeLabel(mediaType: MediaType, language: AppLanguage) {
   return mediaType === 'video' ? COPY[language].preview.video : COPY[language].preview.photo;
 }
@@ -1018,8 +1206,8 @@ export function getDetailViewerTags(candidate: CleanupCandidate, language: AppLa
         copy.preview.duplicateSimilarityTag(Math.round(candidate.duplicateGroup.similarity * 100)),
       );
     }
-  } else if (candidate.primaryIssueType === 'accidental') {
-    tags.push(copy.candidate.accidentalIssue);
+  } else {
+    tags.push(getIssueTypeLabel(candidate.primaryIssueType, language));
   }
 
   const compactReasons = candidate.reasons.map((reason) => getCompactReasonLabel(reason, language));
@@ -1109,8 +1297,8 @@ export function buildRecentScanReminderContent(
 
   const detail =
     language === 'zh-CN'
-      ? `本次扫描共检查 ${latestScan.scannedCount} 项媒体，其中 ${latestScan.highConfidenceCount} 项高置信度、${latestScan.mediumConfidenceCount} 项中置信度，保留和清理页里还有 ${latestScan.recycleBinCount} 项待处理。`
-      : `This scan checked ${latestScan.scannedCount} media items: ${latestScan.highConfidenceCount} high-confidence, ${latestScan.mediumConfidenceCount} medium-confidence, and ${latestScan.recycleBinCount} still waiting in keep & clean.`;
+      ? `本次扫描共检查 ${latestScan.scannedCount} 项媒体，其中 ${latestScan.highConfidenceCount} 项建议清理、${latestScan.mediumConfidenceCount} 项建议复核，保留和清理页里还有 ${latestScan.recycleBinCount} 项待处理。`
+      : `This scan checked ${latestScan.scannedCount} media items: ${latestScan.highConfidenceCount} suggested for cleanup, ${latestScan.mediumConfidenceCount} suggested for review, and ${latestScan.recycleBinCount} still waiting in keep & clean.`;
 
   return {
     title: resolveReminderTitle(settings.summary, language),

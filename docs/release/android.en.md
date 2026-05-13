@@ -10,7 +10,8 @@ Formal release entry:
 
 - GitHub Actions: `.github/workflows/android-release.yml`
 - Trigger: `workflow_dispatch`
-- Canonical public Android download URL: `https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk`
+- Canonical public Android download URL: `https://mc.jerret.me/download/android-latest.apk`
+- GitHub Release backup asset: `https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk`
 
 Debug APK:
 
@@ -29,6 +30,7 @@ Notes:
 1. Generating a formally signed release APK is blocked on local machines.
 2. Local release validation is limited to the temp-keystore smoke path.
 3. Formal signing, formal release assets, and the page download entry are maintained only by the workflow so the APK provenance stays unique.
+4. `mc.jerret.me/download/android-latest.apk` is the user-facing download entry; the GitHub Release latest asset is retained only for audit, rollback, and page-only deployment hydration.
 
 ## Pipeline
 
@@ -48,9 +50,10 @@ Official release workflow:
 - Publish result:
   1. create or update the GitHub Release
   2. upload versioned asset `media-clean-android-v<version>.apk`
-  3. upload stable page asset `media-clean-android-latest.apk`
-  4. keep the page download buttons pinned to `releases/latest/download/media-clean-android-latest.apk`
-  5. includes `verify:release:page-contract` so the release asset name and the page download entry cannot drift apart
+  3. upload GitHub backup latest asset `media-clean-android-latest.apk`
+  4. copy the APK to `page/public/download/android-latest.apk`
+  5. deploy Vercel production so page download buttons stay pinned to `https://mc.jerret.me/download/android-latest.apk`
+  6. includes `verify:release:page-contract` so the release asset name, page hydration source, and page download entry cannot drift apart
 
 Official debug workflow:
 
@@ -87,7 +90,8 @@ Release:
 3. SHA256: `artifacts/android-release/app-release.sha256`
 4. Metadata: `artifacts/android-release/release-metadata.json`
 5. Versioned GitHub Release asset: `artifacts/android-release/media-clean-android-v<version>.apk`
-6. Stable page asset on GitHub Release: `artifacts/android-release/media-clean-android-latest.apk`
+6. GitHub Release latest backup asset: `artifacts/android-release/media-clean-android-latest.apk`
+7. Vercel page download copy: `page/public/download/android-latest.apk`, deployed as `https://mc.jerret.me/download/android-latest.apk`
 
 Debug:
 
@@ -103,4 +107,5 @@ Debug:
 3. Metadata must include version, `versionCode`, package name, and checksum
 4. The debug workflow must stably produce `app-debug.apk` and its signing report
 5. The PR check must validate both release and debug pipelines even without production credentials
-6. Every Android download entry on the page must resolve to `releases/latest/download/media-clean-android-latest.apk`
+6. Every Android download entry on the page must resolve to `https://mc.jerret.me/download/android-latest.apk`
+7. Page-only deploys must hydrate `page/public/download/android-latest.apk` from the GitHub latest backup asset before deployment so a new page deployment cannot drop the APK

@@ -10,7 +10,8 @@
 
 - GitHub Actions：`.github/workflows/android-release.yml`
 - 触发方式：`workflow_dispatch`
-- 对外唯一 Android 下载入口：`https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk`
+- 对外唯一 Android 下载入口：`https://mc.jerret.me/download/android-latest.apk`
+- GitHub Release 备份资产：`https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk`
 
 Debug APK：
 
@@ -29,6 +30,7 @@ bash scripts/android/build-release-apk.sh --temp-keystore --skip-install
 1. 本地禁止生成正式签名的 release APK。
 2. 本地若要验证 release 链路，只允许使用临时 keystore smoke。
 3. 正式签名、正式 release 资产与 page 下载入口只通过 workflow 维护，避免本地散发多份来源不一致的 APK。
+4. `mc.jerret.me/download/android-latest.apk` 是用户下载主入口；GitHub Release latest asset 只作为审计、回滚和 page-only deploy hydrate 来源。
 
 ## 发布流程
 
@@ -48,9 +50,10 @@ bash scripts/android/build-release-apk.sh --temp-keystore --skip-install
 - 发布结果：
   1. 创建 / 更新 GitHub Release
   2. 上传版本化资产 `media-clean-android-v<version>.apk`
-  3. 上传 page 固定下载资产 `media-clean-android-latest.apk`
-  4. page 下载按钮固定指向 `releases/latest/download/media-clean-android-latest.apk`
-  5. workflow 内置 `verify:release:page-contract`，确保 release 资产名与 page 下载入口保持一致
+  3. 上传 GitHub 备份 latest 资产 `media-clean-android-latest.apk`
+  4. 复制本次 APK 到 `page/public/download/android-latest.apk`
+  5. 部署 Vercel production，使 page 下载按钮固定指向 `https://mc.jerret.me/download/android-latest.apk`
+  6. workflow 内置 `verify:release:page-contract`，确保 release 资产名、page hydrate 源和 page 下载入口保持一致
 
 正式 debug workflow:
 
@@ -87,7 +90,8 @@ Release:
 3. SHA256：`artifacts/android-release/app-release.sha256`
 4. 元数据：`artifacts/android-release/release-metadata.json`
 5. GitHub Release 版本化资产：`artifacts/android-release/media-clean-android-v<version>.apk`
-6. GitHub Release page 固定资产：`artifacts/android-release/media-clean-android-latest.apk`
+6. GitHub Release latest 备份资产：`artifacts/android-release/media-clean-android-latest.apk`
+7. Vercel page 下载副本：`page/public/download/android-latest.apk`，部署后为 `https://mc.jerret.me/download/android-latest.apk`
 
 Debug:
 
@@ -103,4 +107,5 @@ Debug:
 3. metadata 必须包含版本、`versionCode`、包名与 checksum
 4. debug workflow 必须稳定产出 `app-debug.apk` 与对应签名报告
 5. PR check 必须能在无正式证书前提下，同时跑通 release 与 debug 两条链路
-6. page 中所有 Android 下载入口必须指向 `releases/latest/download/media-clean-android-latest.apk`
+6. page 中所有 Android 下载入口必须指向 `https://mc.jerret.me/download/android-latest.apk`
+7. page-only deploy 必须先从 GitHub latest 备份资产 hydrate `page/public/download/android-latest.apk`，避免新页面部署清空 APK

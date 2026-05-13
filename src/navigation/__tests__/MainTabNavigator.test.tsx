@@ -76,7 +76,7 @@ vi.mock('../../application/AppPreferencesContext', () => ({
     copy: {
       tabs: {
         photos: '照片',
-        recycle: '保留和清理',
+        recycle: '回收站',
         settings: '设置',
       },
     },
@@ -94,7 +94,7 @@ vi.mock('../../application/AppPreferencesContext', () => ({
   }),
 }));
 
-import { MainTabNavigator } from '../MainTabNavigator';
+import { __resetMainTabNavigatorSessionState, MainTabNavigator } from '../MainTabNavigator';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -133,6 +133,7 @@ function getRecycleBinTab() {
 
 describe('MainTabNavigator recycle bin badge', () => {
   beforeEach(() => {
+    __resetMainTabNavigatorSessionState();
     runtime.recycleBinIds = [];
     runtime.recycleBinCount = 0;
     runtime.tabBarSpy.mockReset();
@@ -221,5 +222,24 @@ describe('MainTabNavigator recycle bin badge', () => {
 
     const latestNavigatorProps = runtime.navigatorSpy.mock.lastCall?.[0] as { initialRouteName?: string };
     expect(latestNavigatorProps.initialRouteName).toBe('RecycleBin');
+  });
+
+  it('外部权限 Activity 导致 navigator remount 后，应继续停留在最后一次主动选择的 tab', () => {
+    renderNavigator();
+
+    const tabBarProps = runtime.tabBarSpy.mock.lastCall?.[0] as { onTabPress: (name: string) => void };
+
+    act(() => {
+      tabBarProps.onTabPress('RecycleBin');
+    });
+
+    runtime.navigatorSpy.mockReset();
+    runtime.tabBarSpy.mockReset();
+    runtime.screenSpy.mockReset();
+
+    renderNavigator();
+
+    const remountedNavigatorProps = runtime.navigatorSpy.mock.lastCall?.[0] as { initialRouteName?: string };
+    expect(remountedNavigatorProps.initialRouteName).toBe('RecycleBin');
   });
 });

@@ -116,12 +116,12 @@ describe('cleanup reminders', () => {
         weekday: 1,
         hour: 21,
         minute: 30,
-        summary: '定期检查最近拍摄的照片和视频，优先清理误触、异常与重复内容。',
+        summary: '定期检查最近拍摄的照片和视频，优先清理重复、模糊与相似内容。',
       },
       {
         title: '定期清理提醒',
         summary: '最近一次扫描发现 8 个待处理识别结果，建议在 21:30 再检查一次。',
-        detail: '本次扫描共检查 180 项媒体，其中 5 项高置信度。',
+        detail: '本次扫描共检查 180 项媒体，其中 5 项建议清理。',
       },
     );
 
@@ -170,7 +170,7 @@ describe('cleanup reminders', () => {
         weekday: 1,
         hour: 8,
         minute: 0,
-        summary: 'Regularly review recent photos and videos, prioritizing accidental, anomalous, and duplicate media.',
+        summary: 'Regularly review recent photos and videos, prioritizing duplicate, blurry, and similar media.',
       },
       {
         title: 'Cleanup Reminder',

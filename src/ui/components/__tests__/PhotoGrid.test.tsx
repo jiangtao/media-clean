@@ -1,6 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
+
+const mockUseSwipeSelection = vi.hoisted(() =>
+  vi.fn(() => ({
+    panGesture: { testID: 'mock-pan-gesture' },
+    isSwiping: false,
+    getItemAtPosition: vi.fn(),
+  })),
+);
 
 vi.mock('react-native', () => {
   const ReactModule = require('react') as typeof import('react');
@@ -16,6 +24,7 @@ vi.mock('react-native', () => {
     Dimensions: {
       get: () => ({ width: 375, height: 812 }),
     },
+    useWindowDimensions: () => ({ width: 375, height: 812, scale: 3, fontScale: 1 }),
     PixelRatio: {
       get: () => 3,
     },
@@ -44,6 +53,10 @@ vi.mock('react-native', () => {
       ),
   };
 });
+
+vi.mock('../../hooks/useSwipeSelection', () => ({
+  useSwipeSelection: mockUseSwipeSelection,
+}));
 
 import { PhotoGrid } from '../PhotoGrid';
 import type { CleanupCandidate } from '../../../domain/recognition/types';
@@ -81,11 +94,14 @@ const mockTheme: AppThemePalette = {
   inputText: '#18212f',
   buttonPrimaryBackground: '#173944',
   buttonPrimaryText: '#ffffff',
+  buttonSuccessBackground: '#18bf63',
+  buttonSuccessPressedBackground: '#15ad59',
   buttonSecondaryBackground: '#efe6d6',
   buttonSecondaryText: '#28404c',
   buttonTertiaryBackground: '#304856',
   buttonTertiaryText: '#e2edf0',
   buttonDangerBackground: '#b34f2f',
+  buttonDangerPressedBackground: '#c65a60',
   buttonDangerText: '#ffffff',
   chipBackground: '#efe6d6',
   chipBorder: '#e1d5c2',
@@ -156,6 +172,15 @@ function flattenStyle(style: unknown): Record<string, unknown> {
 }
 
 describe('PhotoGrid', () => {
+  beforeEach(() => {
+    mockUseSwipeSelection.mockClear();
+    mockUseSwipeSelection.mockReturnValue({
+      panGesture: { testID: 'mock-pan-gesture' },
+      isSwiping: false,
+      getItemAtPosition: vi.fn(),
+    });
+  });
+
   describe('Scenario 2.2: Segmented control filtering', () => {
     it('should be a function component that accepts mediaType prop', () => {
       expect(typeof PhotoGrid).toBe('function');
@@ -287,7 +312,7 @@ describe('PhotoGrid', () => {
       expect(photoCandidate.asset.duration).toBe(0);
     });
 
-    it('renders a standard videocam icon for video thumbnails instead of text glyphs', () => {
+    it('renders the design video SVG icon for video thumbnails', () => {
       let renderer!: ReturnType<typeof TestRenderer.create>;
 
       act(() => {
@@ -303,7 +328,15 @@ describe('PhotoGrid', () => {
       });
 
       const icon = renderer.root.findByProps({ testID: 'video-indicator-icon' });
-      expect(icon.props.name).toBe('videocam');
+      expect(icon.props.name).toBe('video');
+      expect(icon.props.color).toBe('#ffffff');
+      expect(icon.props.width).toBe(15);
+      expect(icon.props.height).toBe(13.5);
+      expect(icon.props.align).toBe('start');
+      const svg = icon.findByType('Svg');
+      expect(svg.props.width).toBe(15);
+      expect(svg.props.height).toBe(13.5);
+      expect(svg.props.viewBox).toBe('0.889 2 22.222 20');
     });
 
     it('configures FlatList with virtualization hints for large grids', () => {
@@ -406,6 +439,12 @@ describe('PhotoGrid', () => {
       expect(flattenStyle(filledIndicator.props.style).backgroundColor).toBe(
         '#2f80ff',
       );
+      expect(flattenStyle(filledIndicator.props.style)).toMatchObject({
+        width: 18,
+        height: 18,
+        top: 7,
+        right: 7,
+      });
       expect(item.props.style.opacity).toBeUndefined();
     });
 
@@ -427,7 +466,13 @@ describe('PhotoGrid', () => {
 
       const emptyIndicator = renderer.root.findByProps({ testID: 'selection-indicator-empty' });
 
-      expect(flattenStyle(emptyIndicator.props.style).borderColor).toBe('rgba(255, 255, 255, 0.96)');
+      expect(flattenStyle(emptyIndicator.props.style)).toMatchObject({
+        width: 18,
+        height: 18,
+        top: 7,
+        right: 7,
+        borderColor: 'rgba(255, 255, 255, 0.98)',
+      });
       expect(renderer.root.findAllByProps({ testID: 'selection-checkmark-icon' })).toHaveLength(0);
     });
 
@@ -562,6 +607,65 @@ describe('PhotoGrid', () => {
 
       expect(onSelect).toHaveBeenCalledWith('1');
       expect(onItemPress).not.toHaveBeenCalled();
+    });
+
+    it('keeps light taps routed to onSelect for unselected items in selection mode', () => {
+      const onSelect = vi.fn();
+      const onItemPress = vi.fn();
+      let renderer!: ReturnType<typeof TestRenderer.create>;
+
+      act(() => {
+        renderer = TestRenderer.create(
+          <PhotoGrid
+            candidates={[createMockCandidate('1', 'photo')]}
+            selectedIds={[]}
+            selectionMode
+            onSelect={onSelect}
+            onItemPress={onItemPress}
+            theme={mockTheme}
+          />,
+        );
+      });
+
+      act(() => {
+        renderer.root.findByProps({ testID: 'photo-grid-item' }).props.onPress();
+      });
+
+      expect(onSelect).toHaveBeenCalledWith('1');
+      expect(onItemPress).not.toHaveBeenCalled();
+    });
+
+    it('passes batch swipe selection API props through to useSwipeSelection', () => {
+      const candidates = [
+        createMockCandidate('1', 'photo'),
+        createMockCandidate('2', 'photo'),
+        createMockCandidate('3', 'photo'),
+      ];
+      const onSelectionChange = vi.fn();
+
+      act(() => {
+        TestRenderer.create(
+          <PhotoGrid
+            candidates={candidates}
+            selectedIds={['1']}
+            selectionMode
+            onSelect={vi.fn()}
+            onItemPress={vi.fn()}
+            onSelectionChange={onSelectionChange}
+            theme={mockTheme}
+          />,
+        );
+      });
+
+      expect(mockUseSwipeSelection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          candidates,
+          contentTopOffset: 10,
+          selectedIds: ['1'],
+          isSelectionMode: true,
+          onSelectionChange,
+        }),
+      );
     });
 
     it('renders video thumbnails from previewUri when one exists', () => {

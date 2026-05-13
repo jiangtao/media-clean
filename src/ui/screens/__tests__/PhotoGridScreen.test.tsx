@@ -84,6 +84,7 @@ vi.mock('react-native', () => {
     PixelRatio: {
       get: () => 1,
     },
+    useWindowDimensions: () => ({ width: 375, height: 812, scale: 3, fontScale: 1 }),
     TurboModuleRegistry: {
       get: vi.fn(() => null),
     },
@@ -270,12 +271,12 @@ const appPreferencesState = vi.hoisted(() => ({
       scannedCaption: '最近媒体总数',
       candidatesLabel: '识别结果',
       candidatesCaption: '待人工确认处理',
-      accidentalLabel: '误触',
-      abnormalLabel: '异常',
-      duplicateLabel: '重复',
-      highConfidenceLabel: '高置信度',
-      highConfidenceCaption: '适合自动清理',
-      recycleLabel: '保留和清理',
+      blurryLabel: '模糊照片',
+      duplicateLabel: '重复照片',
+      similarLabel: '相似照片',
+      suggestedCleanupLabel: '建议清理',
+      suggestedCleanupCaption: '优先复核处理',
+      recycleLabel: '回收站',
       recycleCaption: '应用内软删除',
     },
     screens: {
@@ -288,15 +289,16 @@ const appPreferencesState = vi.hoisted(() => ({
         scanPromptBody: '最近媒体会在本地分批做模糊、重复、近相似、误触和差质检查，结果直接留在本页。',
         startScan: '开始扫描',
         scanScopeSummary: (count: number) => `已选择 ${count} 个媒体`,
-        scanScopeHint: '默认先扫描最近 12 个月，之后会继续向更早媒体回填；Android 会在后台继续当前批次，回到页面后自动接回真实进度。',
+        scanScopeHint: '默认先扫描最近 12 个月，之后会继续向更早媒体回填；离开再回来会自动接回进度。',
         scanProgressTitle: '本地扫描',
         scanProgressValue: (current: number, total: number) => `${current}/${total}`,
         scanProgressFootnote: '模糊、重复、近相似、误触和差质候选会持续留在下方，正常媒体会逐步退场。',
-        scanBatchRange: (start: string, end: string) => `本批范围：${start} - ${end}`,
+        scanCurrentBatchRange: (start: string, end: string) => `当前扫描批次：${start} - ${end}`,
+        scanBatchRange: (start: string, end: string) => `已扫描范围：${start} - ${end}`,
         scanCompleteTitle: '本地扫描',
         scanExhaustedTitle: '当前这一批已处理完成',
         scanExhaustedBody: '继续扫描会从上一批之前的更早媒体接着回填；整库已覆盖时，只处理新增或变化媒体。',
-        scanResultSummary: (count: number) => `发现 ${count} 个异常媒体`,
+        scanResultSummary: (count: number) => `发现 ${count} 个待处理媒体`,
         scanResultFootnote: '结果已按本地规则留在当前页面，可继续筛选、查看并决定清理或保留。',
         scanAllCompleteTitle: '全部媒体已扫描完成',
         scanAllCompleteBody: '当前媒体库已经完整覆盖；后续只有新增或变化媒体需要重新进入扫描。',
@@ -308,7 +310,7 @@ const appPreferencesState = vi.hoisted(() => ({
     },
     reminder: {
       channelName: '定期清理提醒',
-      channelDescription: '提醒你重新扫描最近媒体并清理误触、异常与重复内容。',
+      channelDescription: '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
     },
   },
 }));
@@ -353,26 +355,54 @@ vi.mock('../../../services/storage/scan-range-storage', async () => {
 vi.mock('../../components/PhotoGrid', () => ({
   PhotoGrid: ({
     candidates,
+    selectedIds,
     selectionMode,
     mediaType,
     onItemPress,
     onSelect,
+    onSelectionChange,
   }: {
     candidates: Array<{ id: string; asset?: { mediaType?: string } }>;
+    selectedIds?: string[];
     selectionMode?: boolean;
     mediaType: 'all' | 'photo' | 'video';
     onItemPress: (candidate: { id: string; asset?: { mediaType?: string } }) => void;
     onSelect: (id: string) => void;
+    onSelectionChange?: (
+      nextIds: string[],
+      reason: {
+        source: 'swipe-selection';
+        action: 'add' | 'remove';
+        anchorId: string;
+        rangeIds: string[];
+      },
+    ) => void;
   }) => {
     const filteredCandidates =
       mediaType === 'all'
         ? candidates
         : candidates.filter((candidate) => candidate.asset?.mediaType === mediaType);
+    const swipeRangeIds = filteredCandidates.slice(0, 2).map((candidate) => candidate.id);
 
     return React.createElement(
       'View',
       { testID: 'mock-photo-grid' },
       React.createElement('Text', null, `grid-count:${filteredCandidates.length}`),
+      React.createElement('Text', { testID: 'mock-photo-grid-selected-count' }, `selected-count:${selectedIds?.length ?? 0}`),
+      React.createElement(
+        'Pressable',
+        {
+          testID: 'mock-photo-grid-swipe-select-first-two',
+          onPress: () =>
+            onSelectionChange?.(swipeRangeIds, {
+              source: 'swipe-selection',
+              action: 'add',
+              anchorId: swipeRangeIds[0] ?? '',
+              rangeIds: swipeRangeIds,
+            }),
+        },
+        React.createElement('Text', null, 'swipe-select-first-two'),
+      ),
       ...filteredCandidates.flatMap((candidate) => [
         React.createElement('Text', { key: `${candidate.id}-label` }, candidate.id),
         React.createElement(
@@ -471,7 +501,7 @@ vi.mock('../../components/ScanProgress', () => ({
       React.createElement('Text', null, current >= total ? '扫描完成' : '扫描中'),
       React.createElement('Text', null, `${current}/${total}`),
       resultsCount
-        ? React.createElement('Text', null, `发现 ${resultsCount} 个异常媒体`)
+        ? React.createElement('Text', null, `发现 ${resultsCount} 个待处理媒体`)
         : null,
     ),
 }));
@@ -488,6 +518,7 @@ import {
   buildPhotoGridFilterOptions,
   buildPhotoGridScopeBreakdown,
   buildPhotoGridTabOptions,
+  buildMediaGridLayout,
   PHOTO_GRID_ENTRY_INTERACTION_STANDARD,
 } from '../screen-layout';
 
@@ -569,6 +600,24 @@ function collectRenderedTexts(renderer: ReturnType<typeof ReactTestRenderer.crea
     .filter(Boolean);
 }
 
+function flattenStyle(style: unknown): Record<string, unknown> {
+  if (Array.isArray(style)) {
+    return style.reduce<Record<string, unknown>>(
+      (mergedStyle, stylePart) => ({
+        ...mergedStyle,
+        ...flattenStyle(stylePart),
+      }),
+      {},
+    );
+  }
+
+  if (style && typeof style === 'object') {
+    return style as Record<string, unknown>;
+  }
+
+  return {};
+}
+
 async function flushPromises() {
   await Promise.resolve();
   await Promise.resolve();
@@ -576,11 +625,22 @@ async function flushPromises() {
   await Promise.resolve();
 }
 
-async function renderScreen() {
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((innerResolve, innerReject) => {
+    resolve = innerResolve;
+    reject = innerReject;
+  });
+
+  return { promise, resolve, reject };
+}
+
+async function renderScreen(props: React.ComponentProps<typeof PhotoGridScreen> = {}) {
   let renderer: ReturnType<typeof ReactTestRenderer.create>;
 
   await act(async () => {
-    renderer = ReactTestRenderer.create(<PhotoGridScreen />);
+    renderer = ReactTestRenderer.create(<PhotoGridScreen {...props} />);
     await flushPromises();
   });
 
@@ -588,10 +648,11 @@ async function renderScreen() {
 }
 
 async function pressPrimaryButton(renderer: ReturnType<typeof ReactTestRenderer.create>) {
-  const button = renderer.root.findAllByType('Pressable')[0];
-
   await act(async () => {
-    await button.props.onPress();
+    const target =
+      renderer.root.findAllByProps({ testID: 'photo-grid-start-scan-button' })[0] ??
+      renderer.root.findByProps({ testID: 'photo-grid-request-permission-button' });
+    target.props.onPress();
     await flushPromises();
   });
 }
@@ -656,6 +717,33 @@ function createCleanupCandidate(id: string, mediaType: 'photo' | 'video' = 'phot
     primaryIssueType: 'abnormal',
     issueTypes: ['abnormal'],
     reasons: ['测试命中'],
+  } as const;
+}
+
+function createDuplicateCleanupCandidate(
+  id: string,
+  relation: 'exact' | 'near' = 'exact',
+) {
+  const candidate = createCleanupCandidate(id);
+
+  return {
+    ...candidate,
+    kind: 'duplicate-photo',
+    primaryIssueType: 'duplicate',
+    issueTypes: ['duplicate'],
+    reasons: ['重复内容'],
+    duplicateGroup: {
+      groupId: `${id}-group`,
+      representativeId: id,
+      relation,
+      size: 2,
+      similarity: relation === 'exact' ? 1 : 0.92,
+      representativeReason: 'larger-file',
+      representativeWidth: candidate.asset.width,
+      representativeHeight: candidate.asset.height,
+      representativeFileSize: candidate.asset.fileSize,
+      representativeCreationTime: candidate.asset.creationTime,
+    },
   } as const;
 }
 
@@ -1003,7 +1091,7 @@ describe('PhotoGridScreen', () => {
         minute: 30,
         notificationId: null,
         nextTriggerAt: null,
-        summary: '定期检查最近拍摄的照片和视频，优先清理误触、异常与重复内容。',
+        summary: '定期检查最近拍摄的照片和视频，优先清理重复、模糊与相似内容。',
       },
       permissionGranted: false,
     });
@@ -1016,7 +1104,7 @@ describe('PhotoGridScreen', () => {
         minute: 30,
         notificationId: null,
         nextTriggerAt: null,
-        summary: '定期检查最近拍摄的照片和视频，优先清理误触、异常与重复内容。',
+        summary: '定期检查最近拍摄的照片和视频，优先清理重复、模糊与相似内容。',
       },
       permissionGranted: false,
     });
@@ -1183,7 +1271,7 @@ describe('PhotoGridScreen', () => {
 
   it('shows the active scan batch range when entry copy has a range label', () => {
     const copy = getAppCopy('zh-CN');
-    const scanRangeLabel = copy.screens.photoGrid.scanBatchRange('2025.04.24', '2026.04.24');
+    const scanRangeLabel = copy.screens.photoGrid.scanCurrentBatchRange('2025.04.24', '2026.04.24');
 
     expect(
       buildPhotoGridEntryCopy(copy, {
@@ -1215,19 +1303,32 @@ describe('PhotoGridScreen', () => {
         progressTotal: 4,
         resultCount: 4,
         liveCandidates: [
-          { primaryIssueType: 'accidental', confidence: 'medium' },
-          { primaryIssueType: 'abnormal', confidence: 'high' },
-          { primaryIssueType: 'duplicate', confidence: 'high' },
-          { primaryIssueType: 'duplicate', confidence: 'low' },
+          { primaryIssueType: 'accidental' },
+          { primaryIssueType: 'abnormal' },
+          { primaryIssueType: 'duplicate' },
+          {
+            primaryIssueType: 'duplicate',
+            duplicateGroup: {
+              groupId: 'near-group',
+              representativeId: 'near-1',
+              relation: 'near',
+              size: 2,
+              similarity: 0.92,
+              representativeReason: 'higher-resolution',
+              representativeWidth: 1200,
+              representativeHeight: 900,
+              representativeFileSize: 1000,
+              representativeCreationTime: 1,
+            },
+          },
         ],
       }),
     ).toMatchObject({
       result: copy.screens.photoGrid.scanResultSummary(4),
       resultBreakdown: [
-        { key: 'accidental', label: copy.summary.accidentalLabel, count: 1 },
-        { key: 'abnormal', label: copy.summary.abnormalLabel, count: 1 },
-        { key: 'duplicate', label: copy.summary.duplicateLabel, count: 2 },
-        { key: 'highConfidence', label: copy.summary.highConfidenceLabel, count: 2 },
+        { key: 'duplicate', label: copy.summary.duplicateLabel, count: 1 },
+        { key: 'blurry', label: copy.summary.blurryLabel, count: 2 },
+        { key: 'similar', label: copy.summary.similarLabel, count: 1 },
       ],
     });
   });
@@ -1310,6 +1411,51 @@ describe('PhotoGridScreen', () => {
     });
   });
 
+  it('maps the SE design grid onto RN logical dimensions without exported pixel values', () => {
+    const layout = buildMediaGridLayout(
+      { top: 0, bottom: 0, left: 0, right: 0 },
+      { width: 375, height: 812, scale: 3, fontScale: 1 },
+    );
+
+    expect(layout).toEqual({
+      columns: 3,
+      itemSize: 109,
+      spacing: 8,
+      sidePadding: 16,
+      contentWidth: 375,
+      isSELike: true,
+    });
+  });
+
+  it('does not upscale SE design grid tiles on slightly wider phones', () => {
+    const layout = buildMediaGridLayout(
+      { top: 0, bottom: 0, left: 0, right: 0 },
+      { width: 393, height: 852, scale: 3, fontScale: 1 },
+    );
+
+    expect(layout).toEqual({
+      columns: 3,
+      itemSize: 109,
+      spacing: 8,
+      sidePadding: 25,
+      contentWidth: 375,
+      isSELike: true,
+    });
+  });
+
+  it('adds columns on non-SE widths while keeping thumbnails readable', () => {
+    expect(
+      buildMediaGridLayout(
+        { top: 0, bottom: 0, left: 0, right: 0 },
+        { width: 640, height: 900, scale: 2, fontScale: 1 },
+      ),
+    ).toMatchObject({
+      columns: 5,
+      spacing: 10,
+      isSELike: false,
+    });
+  });
+
   it('keeps the top inset clamped on an edge-case special screen', () => {
     const insets = { top: 4, bottom: 0, left: 0, right: 0 };
 
@@ -1325,7 +1471,7 @@ describe('PhotoGridScreen', () => {
     });
   });
 
-  it('prompts for permission first and only shows the scan CTA after access is granted', async () => {
+  it('requests permission and starts scanning from the same CTA', async () => {
     mockGetPermissionsAsync.mockResolvedValue({ granted: false });
     mockRequestPermissionsAsync.mockResolvedValueOnce({ granted: true });
 
@@ -1338,26 +1484,112 @@ describe('PhotoGridScreen', () => {
     expect(
       renderer.root.findByProps({ testID: 'photo-grid-request-permission-button' }),
     ).toBeTruthy();
+    const permissionStatusStyle = flattenStyle(
+      renderer.root.findByProps({ testID: 'photo-grid-permission-status-card' }).props.style,
+    );
+    const permissionHeroStyle = flattenStyle(
+      renderer.root.findByProps({ testID: 'photo-grid-permission-hero-card' }).props.style,
+    );
+    expect(permissionStatusStyle.backgroundColor).toBe('transparent');
+    expect(permissionStatusStyle.borderWidth).toBe(0);
+    expect(permissionStatusStyle.shadowOpacity).toBe(0);
+    expect(permissionStatusStyle.elevation).toBe(0);
+    expect(permissionHeroStyle.backgroundColor).toBe('transparent');
+    expect(permissionHeroStyle.borderWidth).toBe(0);
+    expect(permissionHeroStyle.shadowOpacity).toBe(0);
+    expect(permissionHeroStyle.elevation).toBe(0);
 
     await pressPrimaryButton(renderer);
 
     expect(mockRequestPermissionsAsync).toHaveBeenCalledWith(false);
     expect(mockGetAssetsAsync).toHaveBeenCalled();
-    expect(collectRenderedTexts(renderer)).toContain('已选择 3 个媒体');
-    expect(collectRenderedTexts(renderer)).toContain(
-      appPreferencesState.copy.screens.photoGrid.scanPromptBody,
+    expect(mockScanMediaLibrary).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({
+        onProgress: expect.any(Function),
+      }),
     );
-    expect(
-      collectRenderedTexts(renderer).some((text: string) =>
-        text.includes(appPreferencesState.copy.screens.photoGrid.scanScopeHint),
-      ),
-    ).toBe(true);
     expect(renderer.root.findAllByProps({ testID: 'photo-grid-scope-breakdown' })).toHaveLength(0);
-    expect(collectRenderedTexts(renderer)).toContain('全部 3');
-    expect(collectRenderedTexts(renderer)).toContain('照片 2');
-    expect(collectRenderedTexts(renderer)).toContain('视频 1');
-    expect(collectRenderedTexts(renderer)).toContain('grid-count:3');
-    expect(renderer.root.findByProps({ testID: 'photo-grid-start-scan-button' })).toBeTruthy();
+    expect(collectRenderedTexts(renderer)).toContain(
+      appPreferencesState.copy.screens.photoGrid.scanExhaustedTitle,
+    );
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-start-scan-button' })).toHaveLength(1);
+  });
+
+  it('auto-starts scanning after the landing page grants permission', async () => {
+    mockGetPermissionsAsync.mockResolvedValueOnce({ granted: true });
+
+    const renderer = await renderScreen({ autoStartScan: true });
+
+    expect(mockScanMediaLibrary).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({
+        onProgress: expect.any(Function),
+      }),
+    );
+    expect(collectRenderedTexts(renderer)).toContain(
+      appPreferencesState.copy.screens.photoGrid.scanExhaustedTitle,
+    );
+  });
+
+  it('does not show an extra permission-granted state before starting a scan', async () => {
+    mockGetPermissionsAsync.mockResolvedValueOnce({ granted: true });
+
+    const renderer = await renderScreen();
+    const texts = collectRenderedTexts(renderer);
+
+    expect(texts).toContain('识别重复、模糊与相似内容，结果留在当前页面继续判断。');
+    expect(texts).toContain('开始扫描');
+    expect(texts).not.toContain('准备开始扫描');
+    expect(texts).not.toContain('授权已完成');
+    expect(texts).not.toContain('可开始扫描相册');
+  });
+
+  it('left-aligns ready-state support icons in one vertical column', async () => {
+    mockGetPermissionsAsync.mockResolvedValueOnce({ granted: true });
+
+    const renderer = await renderScreen();
+    const supportListStyle = flattenStyle(
+      renderer.root.findByProps({ testID: 'photo-grid-support-list' }).props.style,
+    );
+    const supportPromptStyle = flattenStyle(
+      renderer.root.findByProps({ testID: 'photo-grid-support-prompt' }).props.style,
+    );
+    const readySurfaceStyle = flattenStyle(
+      renderer.root.findByProps({ testID: 'photo-grid-ready-surface' }).props.style,
+    );
+    const readyStaticFileIcon = renderer.root.findByProps({
+      testID: 'photo-grid-ready-static-file-icon',
+    });
+    const supportIconTestIds = [
+      'photo-grid-ready-support-icon-hint',
+      'photo-grid-ready-support-icon-local',
+      'photo-grid-ready-support-icon-media',
+    ];
+
+    expect(readySurfaceStyle.marginTop).toBe(34);
+    expect(readyStaticFileIcon.props).toMatchObject({
+      width: 87,
+      height: 87,
+    });
+    expect(supportListStyle.alignSelf).toBe('flex-start');
+    expect(supportPromptStyle).toMatchObject({
+      alignSelf: 'flex-start',
+      justifyContent: 'flex-start',
+      maxWidth: supportListStyle.maxWidth,
+      width: supportListStyle.width,
+    });
+    for (const testID of supportIconTestIds) {
+      expect(
+        flattenStyle(renderer.root.findByProps({ testID }).props.style),
+      ).toMatchObject({
+        width: 24,
+        height: 24,
+        alignItems: 'flex-start',
+        flexShrink: 0,
+        overflow: 'visible',
+      });
+    }
   });
 
   it('starts a scan after permission is granted and keeps progress and result summary inline', async () => {
@@ -1442,20 +1674,34 @@ describe('PhotoGridScreen', () => {
 
     const renderedTexts = collectRenderedTexts(renderer);
 
-    expect(renderer.root.findAllByProps({ testID: 'photo-grid-inline-progress' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-inline-progress' })).toHaveLength(0);
     expect(renderer.root.findAllByProps({ testID: 'photo-grid-loading-overlay' })).toHaveLength(0);
     expect(renderer.root.findAllByProps({ testID: 'photo-grid-scope-breakdown' })).toHaveLength(0);
-    expect(renderedTexts).toContain('发现 1 个异常媒体');
+    expect(renderedTexts).toContain('发现 1 个待处理媒体');
     expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.scanResultFootnote);
     expect(renderedTexts).toContain('全部 3');
     expect(renderedTexts).toContain('照片 2');
     expect(renderedTexts).toContain('视频 1');
-    expect(renderedTexts).toContain('grid-count:1');
     expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-summary' })).toHaveLength(1);
-    expect(renderedTexts).toContain('误触 0');
-    expect(renderedTexts).toContain('异常 1');
-    expect(renderedTexts).toContain('重复 0');
-    expect(renderedTexts).toContain('高置信度 1');
+    const abnormalBreakdownStyle = flattenStyle(
+      renderer.root.findByProps({ testID: 'photo-grid-result-breakdown-blurry' }).props.style,
+    );
+    expect(abnormalBreakdownStyle.backgroundColor).toBe('transparent');
+    expect(abnormalBreakdownStyle.shadowOpacity).toBe(0);
+    expect(abnormalBreakdownStyle.elevation).toBe(0);
+    expect(
+      flattenStyle(
+        renderer.root.findByProps({ testID: 'photo-grid-result-breakdown-blurry-icon-shell' })
+          .props.style,
+      ),
+    ).toMatchObject({
+      flexShrink: 0,
+      alignItems: 'center',
+      overflow: 'visible',
+    });
+    expect(renderedTexts).toContain('重复照片 0');
+    expect(renderedTexts).toContain('模糊照片 1');
+    expect(renderedTexts).toContain('相似照片 0');
     expect(renderedTexts).not.toContain('IMG_001.jpg');
     expect(renderedTexts).not.toContain('IMG_002.jpg');
     expect(mockSavePhotoScanResultCache).toHaveBeenCalledTimes(1);
@@ -1468,6 +1714,43 @@ describe('PhotoGridScreen', () => {
     expect(
       mockSaveLastValidScanBaseline.mock.invocationCallOrder[0],
     ).toBeLessThan(mockReconcileReminderRuntimeInForeground.mock.invocationCallOrder[0]);
+  });
+
+  it('hides the continue scan action when completed full-scan results are still pending', async () => {
+    const now = Date.UTC(2026, 4, 4, 0, 0, 0);
+    const candidate = createCleanupCandidate('full-result-pending');
+    photoScanSessionRuntimeApi.stagePhotoScanSessionRuntimeSnapshot({
+      permissionState: 'granted',
+      phase: 'completed',
+      authorizedCandidates: [candidate],
+      visibleCandidates: [candidate],
+      scanResultsCount: 1,
+      scanProgress: {
+        current: 1,
+        total: 1,
+        currentFileName: null,
+      },
+      scanScopeSelection: {
+        total: 1,
+        photo: 1,
+        video: 0,
+      },
+      summary: {
+        scannedAt: now,
+        scannedCount: 1,
+        recycleBinCount: 0,
+      },
+      hasCompletedFullScan: true,
+      errorMessage: null,
+      updatedAt: now,
+    });
+
+    const renderer = await renderScreen();
+    const renderedTexts = collectRenderedTexts(renderer);
+
+    expect(renderedTexts).toContain('发现 1 个待处理媒体');
+    expect(renderedTexts).not.toContain(appPreferencesState.copy.screens.photoGrid.continueScan);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-start-scan-button' })).toHaveLength(0);
   });
 
   it('switches the continue scan CTA to scanning immediately and ignores duplicate taps', async () => {
@@ -1492,7 +1775,25 @@ describe('PhotoGridScreen', () => {
 
     expect(mockScanMediaLibrary).toHaveBeenCalledTimes(1);
     expect(collectRenderedTexts(renderer)).toContain('扫描中');
-    expect(renderer.root.findAllByType('Pressable')[0].props.disabled).toBe(true);
+    expect(
+      renderer.root.findAllByProps({ testID: 'photo-grid-start-scan-button' }),
+    ).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-circular-progress' }).length).toBeGreaterThan(0);
+    for (const testID of [
+      'photo-grid-scanning-support-icon-local',
+      'photo-grid-scanning-support-icon-media',
+      'photo-grid-scanning-support-icon-fast',
+    ]) {
+      expect(
+        flattenStyle(renderer.root.findByProps({ testID }).props.style),
+      ).toMatchObject({
+        width: 24,
+        height: 24,
+        alignItems: 'flex-start',
+        flexShrink: 0,
+        overflow: 'visible',
+      });
+    }
 
     await act(async () => {
       resolveScan?.({
@@ -1512,6 +1813,193 @@ describe('PhotoGridScreen', () => {
       });
       await flushPromises();
     });
+  });
+
+  it('continues scanning from the Android completed-result summary CTA', async () => {
+    setPlatformOS('android');
+    const flaggedCandidate = createCleanupCandidate('flagged-result');
+    mockEnumerateAndroidMediaStoreAssets.mockResolvedValueOnce([
+      {
+        assetId: 'older-photo',
+        uri: 'content://media/external/images/media/older-photo',
+        previewUri: 'content://media/external/images/media/older-photo',
+        mediaType: 'photo',
+        width: 1080,
+        height: 1440,
+        duration: 0,
+        fileSize: 420_000,
+        creationTime: 1_690_000_000_000,
+      },
+    ]);
+    mockExecuteAndroidNativeFirstScan.mockImplementationOnce(
+      () =>
+        new Promise(() => {
+          // Keep the scan in-flight so the test can assert the immediate UI transition.
+        }),
+    );
+    photoScanSessionRuntimeApi.stagePhotoScanSessionRuntimeSnapshot({
+      permissionState: 'granted',
+      phase: 'completed',
+      authorizedCandidates: [flaggedCandidate],
+      visibleCandidates: [flaggedCandidate],
+      scanResultsCount: 1,
+      scanProgress: {
+        current: 1,
+        total: 1,
+        currentFileName: null,
+      },
+      scanScopeSelection: {
+        total: 1,
+        photo: 1,
+        video: 0,
+      },
+      scanBatchRange: {
+        startAt: 1_700_000_000_000,
+        endAt: 1_710_000_000_000,
+      },
+      summary: {
+        scannedAt: 1_710_000_000_000,
+        scannedCount: 1,
+        recycleBinCount: 0,
+      },
+      hasCompletedFullScan: false,
+      errorMessage: null,
+      updatedAt: Date.now(),
+    });
+
+    const renderer = await renderScreen();
+
+    expect(collectRenderedTexts(renderer)).toContain('继续扫描');
+
+    await pressByTestId(renderer, 'photo-grid-start-scan-button');
+
+    expect(mockExecuteAndroidNativeFirstScan).toHaveBeenCalledTimes(1);
+    expect(collectRenderedTexts(renderer)).toContain('正在扫描照片');
+    expect(
+      renderer.root.findAllByProps({ testID: 'photo-grid-start-scan-button' }),
+    ).toHaveLength(0);
+  });
+
+  it('merges unresolved results from previous batches with the newly completed Android batch', async () => {
+    setPlatformOS('android');
+    const previousDuplicate = createDuplicateCleanupCandidate('previous-duplicate');
+    const currentBlurry = createCleanupCandidate('current-blurry');
+    const now = 1_710_000_000_000;
+
+    mockEnumerateAndroidMediaStoreAssets
+      .mockResolvedValueOnce([createAndroidMediaStoreAsset('current-blurry')])
+      .mockResolvedValueOnce([]);
+    mockExecuteAndroidNativeFirstScan.mockImplementationOnce(async () => ({
+      mode: 'native',
+      fallbackReason: null,
+      output: {
+        state: {
+          activeCandidates: [currentBlurry],
+          recycleBin: [],
+          selectedIds: [],
+        },
+        summary: {
+          scannedAt: now,
+          scannedCount: 1,
+          candidateCount: 1,
+          highConfidenceCount: 1,
+          mediumConfidenceCount: 0,
+          recycleBinCount: 0,
+        },
+      },
+    }));
+    photoScanSessionRuntimeApi.stagePhotoScanSessionRuntimeSnapshot({
+      permissionState: 'granted',
+      phase: 'completed',
+      authorizedCandidates: [previousDuplicate],
+      visibleCandidates: [previousDuplicate],
+      scanResultsCount: 1,
+      scanProgress: {
+        current: 1,
+        total: 1,
+        currentFileName: null,
+      },
+      scanScopeSelection: {
+        total: 1,
+        photo: 1,
+        video: 0,
+      },
+      scanBatchRange: {
+        startAt: now - DAY_MS,
+        endAt: now,
+      },
+      summary: {
+        scannedAt: now,
+        scannedCount: 1,
+        recycleBinCount: 0,
+      },
+      hasCompletedFullScan: false,
+      errorMessage: null,
+      updatedAt: now,
+    });
+
+    const renderer = await renderScreen();
+
+    expect(collectRenderedTexts(renderer)).toContain('重复照片 1');
+
+    await pressByTestId(renderer, 'photo-grid-start-scan-button');
+
+    const savedResult = mockSavePhotoScanResultCache.mock.calls.at(-1)?.[0];
+    const savedActiveCandidateIds = (savedResult?.activeCandidates ?? [])
+      .map((candidate: { id: string }) => candidate.id)
+      .sort();
+    expect(savedActiveCandidateIds).toEqual([
+      'current-blurry',
+      'previous-duplicate',
+    ]);
+    expect(savedResult?.summary).toEqual(
+      expect.objectContaining({
+        candidateCount: 2,
+        highConfidenceCount: 2,
+      }),
+    );
+
+    const renderedTexts = collectRenderedTexts(renderer);
+    expect(renderedTexts).toContain('发现 2 个待处理媒体');
+    expect(renderedTexts).toContain('重复照片 1');
+    expect(renderedTexts).toContain('模糊照片 1');
+    expect(renderedTexts).toContain('grid-count:2');
+  });
+
+  it('opens a dedicated filtering workspace with count and interaction guidance from the result summary', async () => {
+    photoScanSessionRuntimeApi.stagePhotoScanSessionRuntimeSnapshot({
+      permissionState: 'granted',
+      phase: 'completed',
+      authorizedCandidates: [createCleanupCandidate('flagged-1')],
+      visibleCandidates: [createCleanupCandidate('flagged-1')],
+      scanResultsCount: 1,
+      scanProgress: {
+        current: 1,
+        total: 1,
+        currentFileName: null,
+      },
+      scanScopeSelection: {
+        total: 1,
+        photo: 1,
+        video: 0,
+      },
+      summary: {
+        scannedAt: 1_710_000_000_000,
+        scannedCount: 1,
+        recycleBinCount: 0,
+      },
+      errorMessage: null,
+      updatedAt: Date.now(),
+    });
+
+    const renderer = await renderScreen();
+
+    await pressByTestId(renderer, 'photo-grid-result-breakdown-blurry');
+
+    const renderedTexts = collectRenderedTexts(renderer);
+
+    expect(renderer.root.findByProps({ testID: 'photo-grid-workspace-title' })).toBeTruthy();
+    expect(renderedTexts).toContain('模糊照片 (1)');
   });
 
   it('updates visible media and all-photo-video tab counts while normal items stream out during scanning', async () => {
@@ -1578,7 +2066,7 @@ describe('PhotoGridScreen', () => {
     renderedTexts = collectRenderedTexts(renderer);
 
     expect(renderer.root.findAllByProps({ testID: 'photo-grid-loading-overlay' })).toHaveLength(0);
-    expect(renderedTexts).toContain('扫描完成');
+    expect(renderedTexts).toContain('扫描完成，发现异常结果');
     expect(renderedTexts).toContain('全部 3');
     expect(renderedTexts).toContain('照片 2');
     expect(renderedTexts).toContain('视频 1');
@@ -2066,7 +2554,7 @@ describe('PhotoGridScreen', () => {
           createdAfter: rollingRangeStartAt,
         },
       );
-      expect(collectRenderedTexts(renderer)).toContain('本批范围：2024.04.24 - 2025.04.24');
+      expect(collectRenderedTexts(renderer)).toContain('已扫描范围：2024.04.24 - 2025.04.24');
     } finally {
       dateNowSpy.mockRestore();
     }
@@ -2463,7 +2951,7 @@ describe('PhotoGridScreen', () => {
       progressTotal: 3,
       currentFileName: null,
     });
-    expect(collectRenderedTexts(renderer)).toContain('发现 1 个异常媒体');
+    expect(collectRenderedTexts(renderer)).toContain('发现 1 个待处理媒体');
   });
 
   it('on Android only updates visible candidates after a checkpoint boundary instead of every analyzed asset', async () => {
@@ -2698,6 +3186,95 @@ describe('PhotoGridScreen', () => {
       });
       await flushPromises();
     });
+  });
+
+  it('does not let a delayed final running checkpoint overwrite the completed batch record', async () => {
+    setPlatformOS('android');
+    mockGetPermissionsAsync.mockResolvedValueOnce({ granted: true });
+    mockSyncAndroidBackgroundScanForegroundService.mockResolvedValue(true);
+
+    let resolveScan: ((value: any) => void) | undefined;
+    let onProgress: ((progress: any) => void) | undefined;
+    const finalRunningCheckpoint = createDeferred<void>();
+
+    mockSavePhotoScanJobCheckpoint.mockImplementation(
+      (async (checkpoint: any) => {
+        if (
+          checkpoint.phase === 'running' &&
+          checkpoint.progressCurrent === 3 &&
+          checkpoint.progressTotal === 3
+        ) {
+          await finalRunningCheckpoint.promise;
+        }
+      }) as any,
+    );
+
+    mockExecuteAndroidNativeFirstScan.mockImplementationOnce(async (options: any) => ({
+      mode: 'native',
+      fallbackReason: null,
+      output: await new Promise((resolve) => {
+        resolveScan = resolve;
+        onProgress = options.legacyOptions.onProgress;
+      }),
+    }));
+
+    const renderer = await renderScreen();
+
+    await pressPrimaryButton(renderer);
+
+    await act(async () => {
+      onProgress?.({
+        current: 3,
+        total: 3,
+        currentFileName: 'IMG_003.jpg',
+        isScanning: true,
+        percentage: 100,
+        analyzedAssetId: 'photo-3',
+      });
+      await flushPromises();
+    });
+
+    await act(async () => {
+      resolveScan?.({
+        state: {
+          activeCandidates: [createCleanupCandidate('photo-3')],
+          recycleBin: [],
+          selectedIds: [],
+        },
+        summary: {
+          scannedAt: 1_710_000_000_000,
+          scannedCount: 3,
+          candidateCount: 1,
+          highConfidenceCount: 1,
+          mediumConfidenceCount: 0,
+          recycleBinCount: 0,
+        },
+      });
+      await flushPromises();
+    });
+
+    expect(mockSavePhotoScanBatch.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({
+        phase: 'completed',
+        candidateCount: 1,
+        progressCurrent: 3,
+        progressTotal: 3,
+      }),
+    );
+
+    await act(async () => {
+      finalRunningCheckpoint.resolve();
+      await flushPromises();
+    });
+
+    expect(mockSavePhotoScanBatch.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({
+        phase: 'completed',
+        candidateCount: 1,
+        progressCurrent: 3,
+        progressTotal: 3,
+      }),
+    );
   });
 
   it('restores the active scan session after leaving and re-entering the tab', async () => {
@@ -3721,14 +4298,13 @@ describe('PhotoGridScreen', () => {
     expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.scanExhaustedTitle);
     expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.scanExhaustedBody);
     expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.continueScan);
-    expect(renderedTexts).not.toContain('发现 0 个异常媒体');
-    expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-summary' })).toHaveLength(1);
+    expect(renderedTexts).not.toContain('发现 0 个待处理媒体');
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-summary' })).toHaveLength(0);
     expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-exhausted-state' })).toHaveLength(1);
     expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-exhausted-title' })).toHaveLength(1);
-    expect(renderedTexts).toContain('误触 0');
-    expect(renderedTexts).toContain('异常 0');
-    expect(renderedTexts).toContain('重复 0');
-    expect(renderedTexts).toContain('高置信度 0');
+    expect(renderedTexts).toContain('重复照片 0');
+    expect(renderedTexts).toContain('模糊照片 0');
+    expect(renderedTexts).toContain('相似照片 0');
   });
 
   it('preserves the granted completed-empty state on remount when permission refresh transiently misreports denied', async () => {
@@ -3802,7 +4378,7 @@ describe('PhotoGridScreen', () => {
     const renderer = await renderScreen();
     const renderedTexts = collectRenderedTexts(renderer);
 
-    expect(renderedTexts).toContain('发现 1 个异常媒体');
+    expect(renderedTexts).toContain('发现 1 个待处理媒体');
     expect(renderedTexts).not.toContain(appPreferencesState.copy.permission.title);
   });
 
@@ -4086,7 +4662,7 @@ describe('PhotoGridScreen', () => {
 
     expect(mockLoadPhotoScanResultCache).toHaveBeenCalledTimes(1);
     expect(mockScanMediaLibrary).not.toHaveBeenCalled();
-    expect(renderedTexts).toContain('发现 1 个异常媒体');
+    expect(renderedTexts).toContain('发现 1 个待处理媒体');
     expect(renderedTexts).toContain('全部 3');
     expect(renderedTexts).toContain('照片 2');
     expect(renderedTexts).toContain('视频 1');
@@ -4289,29 +4865,9 @@ describe('PhotoGridScreen', () => {
     expect(collectRenderedTexts(renderer)).not.toContain('detail-scope:3');
   });
 
-  it('enters selection mode on long press and turns later taps into selection toggles instead of detail opens', async () => {
+  it('enters selection mode inside the active issue workspace and turns later taps into selection toggles instead of detail opens', async () => {
     mockLoadPhotoScanResultCache.mockResolvedValueOnce({
       activeCandidates: [
-        {
-          id: 'duplicate-1',
-          asset: {
-            id: 'duplicate-1',
-            uri: 'file:///duplicate-1.jpg',
-            previewUri: 'file:///duplicate-1-preview.jpg',
-            mediaType: 'photo',
-            width: 1080,
-            height: 1440,
-            duration: 0,
-            fileSize: 680_000,
-            creationTime: 1_710_000_000_000,
-          },
-          score: 91,
-          confidence: 'high',
-          kind: 'duplicate-photo',
-          primaryIssueType: 'duplicate',
-          issueTypes: ['duplicate'],
-          reasons: ['与其他媒体高度相似'],
-        },
         {
           id: 'abnormal-1',
           asset: {
@@ -4332,6 +4888,26 @@ describe('PhotoGridScreen', () => {
           issueTypes: ['abnormal'],
           reasons: ['缓存命中'],
         },
+        {
+          id: 'abnormal-2',
+          asset: {
+            id: 'abnormal-2',
+            uri: 'file:///abnormal-2.jpg',
+            previewUri: 'file:///abnormal-2-preview.jpg',
+            mediaType: 'photo',
+            width: 1160,
+            height: 1540,
+            duration: 0,
+            fileSize: 360_000,
+            creationTime: 1_710_000_300_000,
+          },
+          score: 75,
+          confidence: 'high',
+          kind: 'abnormal-photo',
+          primaryIssueType: 'abnormal',
+          issueTypes: ['abnormal'],
+          reasons: ['缓存命中'],
+        },
       ],
       summary: {
         scannedAt: 1_710_000_000_000,
@@ -4345,16 +4921,17 @@ describe('PhotoGridScreen', () => {
 
     const renderer = await renderScreen();
 
-    await longPressByTestId(renderer, 'mock-photo-grid-press-duplicate-1');
+    await pressByTestId(renderer, 'photo-grid-result-breakdown-blurry');
+    await longPressByTestId(renderer, 'mock-photo-grid-press-abnormal-1');
 
-    expect(collectRenderedTexts(renderer)).toContain('清理所选 (1)');
+    expect(collectRenderedTexts(renderer)).toContain('清理所选');
     expect(renderer.root.findAllByProps({ testID: 'mock-detail-screen' })).toHaveLength(0);
 
-    await pressByTestId(renderer, 'mock-photo-grid-press-abnormal-1');
+    await pressByTestId(renderer, 'mock-photo-grid-press-abnormal-2');
 
     const renderedTexts = collectRenderedTexts(renderer);
 
-    expect(renderedTexts).toContain('清理所选 (2)');
+    expect(renderedTexts).toContain('清理所选');
     expect(renderer.root.findAllByProps({ testID: 'mock-detail-screen' })).toHaveLength(0);
   });
 
@@ -4396,10 +4973,10 @@ describe('PhotoGridScreen', () => {
           },
           score: 70,
           confidence: 'medium',
-          kind: 'duplicate-photo',
-          primaryIssueType: 'duplicate',
-          issueTypes: ['duplicate'],
-          reasons: ['与其他媒体高度相似'],
+          kind: 'abnormal-photo',
+          primaryIssueType: 'abnormal',
+          issueTypes: ['abnormal'],
+          reasons: ['可能误报'],
         },
       ],
       summary: {
@@ -4415,9 +4992,10 @@ describe('PhotoGridScreen', () => {
 
     const renderer = await renderScreen();
 
+    await pressByTestId(renderer, 'photo-grid-result-breakdown-blurry');
     await longPressByTestId(renderer, 'mock-photo-grid-press-keep-batch-1');
 
-    expect(collectRenderedTexts(renderer)).toContain('保留 (1)');
+    expect(collectRenderedTexts(renderer)).toContain('保留');
 
     await pressByTestId(renderer, 'keep-selected-button');
 
@@ -4675,26 +5253,58 @@ describe('PhotoGridScreen', () => {
 
     const renderer = await renderScreen();
 
+    await pressByTestId(renderer, 'photo-grid-result-breakdown-blurry');
     await longPressByTestId(renderer, 'mock-photo-grid-press-select-all-1');
-    expect(collectRenderedTexts(renderer)).toContain('清理所选 (1)');
+    expect(collectRenderedTexts(renderer)).toContain('清理所选');
     expect(collectRenderedTexts(renderer)).toContain('全选');
 
     await pressByTestId(renderer, 'photo-selection-toggle-button');
 
     let renderedTexts = collectRenderedTexts(renderer);
-    expect(renderedTexts).toContain('清理所选 (3)');
-    expect(renderedTexts).toContain('保留 (3)');
-    expect(renderedTexts).toContain('取消全选');
+    expect(renderedTexts).toContain('清理所选');
+    expect(renderedTexts).toContain('保留');
+    expect(renderedTexts).toContain('全不选');
 
     await pressByTestId(renderer, 'photo-selection-toggle-button');
 
     renderedTexts = collectRenderedTexts(renderer);
-    expect(renderedTexts).not.toContain('清理所选 (3)');
-    expect(renderedTexts).not.toContain('保留 (3)');
-    expect(() => renderer.root.findByProps({ testID: 'photo-selection-toggle-button' })).toThrow();
+    expect(renderedTexts).toContain('全选');
+    expect(() => renderer.root.findByProps({ testID: 'cleanup-selected-button' })).not.toThrow();
+    expect(() => renderer.root.findByProps({ testID: 'keep-selected-button' })).not.toThrow();
+    expect(() => renderer.root.findByProps({ testID: 'photo-selection-toggle-button' })).not.toThrow();
   });
 
-  it('enters the all-complete state after cleaning the final full-batch results', async () => {
+  it('keeps swipe batch selection in selection mode and updates the workspace count', async () => {
+    mockLoadPhotoScanResultCache.mockResolvedValueOnce({
+      activeCandidates: [
+        createCleanupCandidate('swipe-select-1'),
+        createCleanupCandidate('swipe-select-2'),
+        createCleanupCandidate('swipe-select-3'),
+      ],
+      summary: {
+        scannedAt: 1_710_000_000_000,
+        scannedCount: 3,
+        candidateCount: 3,
+        highConfidenceCount: 3,
+        mediumConfidenceCount: 0,
+        recycleBinCount: 0,
+      },
+    });
+
+    const renderer = await renderScreen();
+
+    await pressByTestId(renderer, 'photo-grid-result-breakdown-blurry');
+    await pressByTestId(renderer, 'mock-photo-grid-swipe-select-first-two');
+
+    const renderedTexts = collectRenderedTexts(renderer);
+    expect(renderedTexts).toContain('已选 2 项');
+    expect(renderedTexts).toContain('全选');
+    expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selected-count' }).props.children).toBe('selected-count:2');
+    expect(() => renderer.root.findByProps({ testID: 'cleanup-selected-button' })).not.toThrow();
+    expect(() => renderer.root.findByProps({ testID: 'keep-selected-button' })).not.toThrow();
+  });
+
+  it('retains zero-count issue categories after cleaning the final full-batch results', async () => {
     const now = Date.UTC(2026, 4, 4, 0, 0, 0);
     const rollingRangeStartAt = buildScanRangeStartAt(12, now);
     mockLoadPhotoScanResultCache.mockResolvedValueOnce({
@@ -4761,15 +5371,37 @@ describe('PhotoGridScreen', () => {
 
     const renderer = await renderScreen();
 
+    await pressByTestId(renderer, 'photo-grid-result-breakdown-blurry');
     await longPressByTestId(renderer, 'mock-photo-grid-press-duplicate-final-1');
     await pressByTestId(renderer, 'photo-selection-toggle-button');
     await pressByTestId(renderer, 'cleanup-selected-button');
 
-    const renderedTexts = collectRenderedTexts(renderer);
+    let renderedTexts = collectRenderedTexts(renderer);
+    expect(renderedTexts).toContain('模糊照片 (0)');
+    expect(renderedTexts).toContain('暂无该类型媒体');
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-issue-empty-state' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-all-complete-state' })).toHaveLength(0);
+
+    await pressByTestId(renderer, 'photo-grid-back-button');
+
+    renderedTexts = collectRenderedTexts(renderer);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-result-breakdown-blurry' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-result-breakdown-duplicate' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-result-breakdown-similar' })).toHaveLength(1);
+    expect(renderedTexts).toContain('模糊照片');
+    expect(renderedTexts).toContain('重复照片');
+    expect(renderedTexts).toContain('相似照片');
+    expect(renderedTexts.filter((text: string) => text === '0 项')).toHaveLength(3);
     expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.scanAllCompleteTitle);
     expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.scanAllCompleteBody);
-    expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-all-complete-state' })).toHaveLength(1);
-    expect(renderer.root.findAllByProps({ testID: 'photo-grid-scan-all-complete-title' })).toHaveLength(1);
+    expect(renderedTexts).not.toContain(appPreferencesState.copy.screens.photoGrid.continueScan);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-start-scan-button' })).toHaveLength(0);
+
+    await pressByTestId(renderer, 'photo-grid-result-breakdown-blurry');
+
+    renderedTexts = collectRenderedTexts(renderer);
+    expect(renderedTexts).toContain('模糊照片 (0)');
+    expect(renderedTexts).toContain('暂无该类型媒体');
     expect(mockSavePhotoScanResultCache).toHaveBeenLastCalledWith(
       expect.objectContaining({
         activeCandidates: [],
@@ -4967,17 +5599,20 @@ describe('PhotoGridScreen', () => {
 
     expect(collectRenderedTexts(renderer)).toContain('grid-count:3');
 
+    await pressByTestId(renderer, 'photo-grid-result-breakdown-duplicate');
     await longPressByTestId(renderer, 'mock-photo-grid-press-duplicate-1');
-    expect(collectRenderedTexts(renderer)).toContain('清理所选 (1)');
+    expect(collectRenderedTexts(renderer)).toContain('清理所选');
 
     await pressByTestId(renderer, 'cleanup-selected-button');
 
     const renderedTexts = collectRenderedTexts(renderer);
 
-    expect(renderedTexts).toContain('grid-count:1');
-    expect(renderedTexts).toContain('abnormal-1');
+    expect(renderedTexts).toContain('重复照片 (0)');
+    expect(renderedTexts).toContain('暂无该类型媒体');
+    expect(renderedTexts).not.toContain('abnormal-1');
     expect(renderedTexts).not.toContain('duplicate-1');
     expect(renderedTexts).not.toContain('duplicate-2');
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-issue-empty-state' })).toHaveLength(1);
     expect(mockSavePhotoScanResultCache).toHaveBeenCalledWith(
       expect.objectContaining({
         activeCandidates: [
@@ -4991,5 +5626,82 @@ describe('PhotoGridScreen', () => {
         }),
       }),
     );
+  });
+
+  it('retains zero-count issue categories and offers continue scan when older batches remain', async () => {
+    const now = Date.UTC(2026, 4, 4, 0, 0, 0);
+    const duplicateGroup = {
+      groupId: 'continue-scan-group',
+      representativeId: 'continue-final-1',
+      relation: 'exact' as const,
+      size: 2,
+      similarity: 1,
+      representativeReason: 'higher-resolution' as const,
+      representativeWidth: 3024,
+      representativeHeight: 4032,
+      representativeFileSize: 280_000,
+      representativeCreationTime: 1_710_000_000_000,
+    };
+    const candidates = [
+      {
+        ...createCleanupCandidate('continue-final-1'),
+        kind: 'duplicate-photo',
+        primaryIssueType: 'duplicate',
+        issueTypes: ['duplicate'],
+        duplicateGroup,
+      },
+      {
+        ...createCleanupCandidate('continue-final-2'),
+        kind: 'duplicate-photo',
+        primaryIssueType: 'duplicate',
+        issueTypes: ['duplicate'],
+        duplicateGroup,
+      },
+    ];
+    photoScanSessionRuntimeApi.stagePhotoScanSessionRuntimeSnapshot({
+      permissionState: 'granted',
+      phase: 'completed',
+      authorizedCandidates: candidates,
+      visibleCandidates: candidates,
+      scanResultsCount: 2,
+      scanProgress: {
+        current: 2,
+        total: 2,
+        currentFileName: null,
+      },
+      scanScopeSelection: {
+        total: 2,
+        photo: 2,
+        video: 0,
+      },
+      summary: {
+        scannedAt: now,
+        scannedCount: 2,
+        recycleBinCount: 0,
+      },
+      hasCompletedFullScan: false,
+      errorMessage: null,
+      updatedAt: now,
+    });
+
+    const renderer = await renderScreen();
+
+    await pressByTestId(renderer, 'photo-grid-result-breakdown-duplicate');
+    await longPressByTestId(renderer, 'mock-photo-grid-press-continue-final-1');
+    await pressByTestId(renderer, 'cleanup-selected-button');
+
+    let renderedTexts = collectRenderedTexts(renderer);
+    expect(renderedTexts).toContain('重复照片 (0)');
+    expect(renderedTexts).toContain('暂无该类型媒体');
+
+    await pressByTestId(renderer, 'photo-grid-back-button');
+
+    renderedTexts = collectRenderedTexts(renderer);
+    expect(renderedTexts.filter((text: string) => text === '0 项')).toHaveLength(3);
+    expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.scanExhaustedTitle);
+    expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.scanExhaustedBody);
+    expect(renderedTexts).toContain(appPreferencesState.copy.screens.photoGrid.continueScan);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-start-scan-button' })).toHaveLength(1);
+    expect(renderedTexts).not.toContain(appPreferencesState.copy.screens.photoGrid.scanAllCompleteTitle);
   });
 });

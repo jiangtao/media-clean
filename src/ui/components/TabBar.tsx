@@ -1,15 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AppThemePalette } from '../../theme/app-theme';
+import { DesignIcon, type DesignIconName } from '../icons/DesignIcon';
 import { TouchSurface } from './TouchSurface';
 
 interface TabItem {
   name: string;
   label: string;
-  icon: string;
-  activeIcon?: string;
+  icon: DesignIconName;
+  activeIcon?: DesignIconName;
   badge?: number;
 }
 
@@ -39,14 +39,14 @@ export function TabBar({ tabs, activeTab, onTabPress, theme }: TabBarProps) {
               accessibilityLabel={`tab-button-${tab.name}`}
             >
               <View style={styles.iconContainer}>
-                <View style={[styles.iconSurface, isActive && styles.iconSurfaceActive]}>
-                  <Ionicons
-                    name={(isActive ? tab.activeIcon ?? tab.icon : tab.icon) as React.ComponentProps<typeof Ionicons>['name']}
-                    size={19}
-                    color={isActive ? theme.pageTextPrimary : theme.pageTextMuted}
-                    testID={`tab-icon-${tab.name}`}
-                  />
-                </View>
+                <DesignIcon
+                  name={isActive ? tab.activeIcon ?? tab.icon : tab.icon}
+                  width={24}
+                  height={24}
+                  color={isActive ? theme.buttonPrimaryBackground : theme.pageTextMuted}
+                  secondaryColor={isActive ? theme.buttonPrimaryText : theme.safeArea}
+                  testID={`tab-icon-${tab.name}`}
+                />
                 {tab.badge && tab.badge > 0 ? (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
@@ -67,16 +67,19 @@ export function TabBar({ tabs, activeTab, onTabPress, theme }: TabBarProps) {
 }
 
 function createStyles(theme: AppThemePalette, bottomInset: number) {
+  const compactBottomInset = bottomInset > 0 ? Math.min(bottomInset, 8) : 8;
+
   return StyleSheet.create({
     container: {
-      backgroundColor: theme.cardBackground,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.cardBorder,
-      paddingBottom: bottomInset > 0 ? bottomInset : 8,
+      backgroundColor: 'transparent',
+      paddingBottom: compactBottomInset,
     },
     tabBar: {
       flexDirection: 'row',
       height: 56,
+      marginHorizontal: 0,
+      paddingHorizontal: 20,
+      backgroundColor: 'transparent',
     },
     tabItem: {
       flex: 1,
@@ -87,26 +90,16 @@ function createStyles(theme: AppThemePalette, bottomInset: number) {
     },
     iconContainer: {
       position: 'relative',
-      marginBottom: 2,
-    },
-    iconSurface: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    iconSurfaceActive: {
-      backgroundColor: theme.cardMutedBackground,
+      marginBottom: 3,
     },
     label: {
       fontSize: 11,
       color: theme.pageTextMuted,
-      fontWeight: '500',
+      fontWeight: '600',
     },
     activeLabel: {
-      color: theme.pageTextPrimary,
-      fontWeight: '600',
+      color: theme.buttonPrimaryBackground,
+      fontWeight: '800',
     },
     badge: {
       position: 'absolute',
@@ -119,7 +112,7 @@ function createStyles(theme: AppThemePalette, bottomInset: number) {
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 2,
-      borderColor: theme.cardBackground,
+      borderColor: theme.safeArea,
     },
     badgeText: {
       color: '#FFFFFF',

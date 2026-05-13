@@ -10,7 +10,7 @@ import {
   formatLocalizedDuration,
   formatLocalizedSize,
   getAppCopy,
-  getCandidateTitle,
+  getCandidateDisplayTitle,
   getDuplicateRepresentativeComparison,
   getDuplicateRepresentativeReasonLabel,
   getIssueTypeLabel,
@@ -98,7 +98,7 @@ export function PreviewModal({
           <View style={styles.panel}>
             <Text style={styles.panelTitle}>{copy.preview.judgementTitle}</Text>
             <Text style={styles.panelValue}>
-              {getCandidateTitle(candidate.kind, language)} · {candidate.score}{' '}
+              {getCandidateDisplayTitle(candidate, language)} · {candidate.score}{' '}
               {copy.candidate.scoreUnit}
             </Text>
             <View style={styles.issueWrap}>

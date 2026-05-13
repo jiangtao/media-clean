@@ -1,7 +1,7 @@
-import { memo, useMemo, type ComponentProps } from 'react';
+import { memo, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
+import { AppIcon, type AppIconName } from '../icons/AppIcon';
 import { DesignIcon } from '../icons/DesignIcon';
 import { TouchSurface } from './TouchSurface';
 
@@ -11,7 +11,7 @@ const MUTED_DANGER = '#d8646a';
 const MUTED_KEEP = '#18bf63';
 
 type ActionTone = 'neutral' | 'danger' | 'keep';
-type ActionIconName = ComponentProps<typeof Ionicons>['name'];
+type ActionIconName = AppIconName;
 
 interface ActionSwitchProps {
   primaryLabel: string;
@@ -126,7 +126,7 @@ function renderActionIcon(
     return <DesignIcon name="nav-trash" width={size} height={size} color={color} testID={testID} />;
   }
 
-  return <Ionicons name={name} size={size} color={color} testID={testID} />;
+  return <AppIcon name={name} size={size} color={color} testID={testID} />;
 }
 
 function resolveActiveSegmentStyle(

@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
 import { PhotoGrid } from '../../components/PhotoGrid';
 import { TouchSurface } from '../../components/TouchSurface';
+import { AppIcon } from '../../icons/AppIcon';
 import type { CleanupCandidate } from '../../../domain/recognition/types';
 import type { AppLanguage } from '../../../i18n/app-language';
 import { formatLocalizedSize } from '../../../i18n/app-copy';
@@ -134,7 +134,7 @@ export function PhotoGridWorkspace({
                 style={styles.backButton}
                 testID="photo-grid-close-button"
               >
-                <Ionicons name="close" size={24} color={theme.pageTextPrimary} />
+                <AppIcon name="close" size={24} color={theme.pageTextPrimary} />
               </Pressable>
 
               <View style={styles.headerCopy}>
@@ -151,7 +151,7 @@ export function PhotoGridWorkspace({
                 style={styles.backButton}
                 testID="photo-grid-back-button"
               >
-                <Ionicons name="arrow-back" size={24} color={theme.pageTextPrimary} />
+                <AppIcon name="arrow-back" size={24} color={theme.pageTextPrimary} />
               </Pressable>
 
               <View style={styles.headerCopy}>

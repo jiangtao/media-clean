@@ -10,6 +10,8 @@ on:
       - ".github/workflows/page-vercel.yml"
       - ".github/workflows/android-release.yml"
       - "page/**"
+      - "docs/release/android*.md"
+      - "scripts/android/analyze-apk-size.mjs"
       - "scripts/release/verify-android-release-page-contract.mjs"
       - "scripts/release/prepare-page-android-download.mjs"
 

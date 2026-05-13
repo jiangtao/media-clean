@@ -5,10 +5,35 @@ const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '
 const workflowPath = path.join(repoRoot, '.github', 'workflows', 'android-release.yml');
 const pageWorkflowPath = path.join(repoRoot, '.github', 'workflows', 'page-vercel.yml');
 const pagePath = path.join(repoRoot, 'page', 'public', 'index.html');
+const packageJsonPath = path.join(repoRoot, 'package.json');
 const zhDocPath = path.join(repoRoot, 'docs', 'release', 'android.md');
 const enDocPath = path.join(repoRoot, 'docs', 'release', 'android.en.md');
 const vercelDocPath = path.join(repoRoot, 'docs', 'release', 'vercel.md');
 const vercelEnDocPath = path.join(repoRoot, 'docs', 'release', 'vercel.en.md');
+const sizeZhDocPath = path.join(repoRoot, 'docs', 'release', 'android-apk-size.md');
+const sizeEnDocPath = path.join(repoRoot, 'docs', 'release', 'android-apk-size.en.md');
+const sizeGovernanceReportZhPath = path.join(
+  repoRoot,
+  'docs',
+  'release',
+  'android-apk-size-governance-report.md'
+);
+const sizeGovernanceReportEnPath = path.join(
+  repoRoot,
+  'docs',
+  'release',
+  'android-apk-size-governance-report.en.md'
+);
+const apkSizeAnalyzerPath = path.join(repoRoot, 'scripts', 'android', 'analyze-apk-size.mjs');
+const apkSizeComparatorPath = path.join(repoRoot, 'scripts', 'android', 'compare-apk-size-reports.mjs');
+const dependencyFootprintAnalyzerPath = path.join(
+  repoRoot,
+  'scripts',
+  'android',
+  'analyze-dependency-footprint.mjs'
+);
+const apkSizePrecommitPath = path.join(repoRoot, 'scripts', 'android', 'verify-apk-size-precommit.mjs');
+const gitPrecommitPath = path.join(repoRoot, '.githooks', 'pre-commit');
 
 const githubLatestAssetName = 'media-clean-android-latest.apk';
 const pageLatestAssetName = 'android-latest.apk';
@@ -34,10 +59,20 @@ function main() {
   const workflow = read(workflowPath);
   const pageWorkflow = read(pageWorkflowPath);
   const page = read(pagePath);
+  const packageJson = read(packageJsonPath);
   const zhDoc = read(zhDocPath);
   const enDoc = read(enDocPath);
   const vercelDoc = read(vercelDocPath);
   const vercelEnDoc = read(vercelEnDocPath);
+  const sizeZhDoc = read(sizeZhDocPath);
+  const sizeEnDoc = read(sizeEnDocPath);
+  const sizeGovernanceReportZh = read(sizeGovernanceReportZhPath);
+  const sizeGovernanceReportEn = read(sizeGovernanceReportEnPath);
+  const apkSizeAnalyzer = read(apkSizeAnalyzerPath);
+  const apkSizeComparator = read(apkSizeComparatorPath);
+  const dependencyFootprintAnalyzer = read(dependencyFootprintAnalyzerPath);
+  const apkSizePrecommit = read(apkSizePrecommitPath);
+  const gitPrecommit = read(gitPrecommitPath);
 
   expectIncludes(workflow, 'workflow_dispatch:', workflowPath);
   expectIncludes(workflow, githubLatestAssetName, workflowPath);
@@ -46,6 +81,15 @@ function main() {
   expectIncludes(workflow, 'vercel deploy --prebuilt --prod', workflowPath);
   expectIncludes(workflow, 'softprops/action-gh-release@v2', workflowPath);
   expectIncludes(workflow, 'make_latest: true', workflowPath);
+  expectIncludes(workflow, 'ANDROID_RELEASE_ARCHITECTURES', workflowPath);
+  expectIncludes(workflow, 'armeabi-v7a,arm64-v8a', workflowPath);
+  expectIncludes(workflow, 'release_architectures', workflowPath);
+  expectIncludes(workflow, 'enable_minify', workflowPath);
+  expectIncludes(workflow, 'enable_resource_shrink', workflowPath);
+  expectIncludes(workflow, 'scripts/android/analyze-apk-size.mjs', workflowPath);
+  expectIncludes(workflow, '--fail-on-budget', workflowPath);
+  expectIncludes(workflow, 'apk-size-report.md', workflowPath);
+  expectIncludes(workflow, 'apk-size-report.json', workflowPath);
 
   expectIncludes(pageWorkflow, preparePageDownloadScript, pageWorkflowPath);
   expectIncludes(pageWorkflow, githubBackupDownloadUrl, pageWorkflowPath);
@@ -57,6 +101,38 @@ function main() {
   expectIncludes(enDoc, canonicalDownloadUrl, enDocPath);
   expectIncludes(vercelDoc, canonicalDownloadUrl, vercelDocPath);
   expectIncludes(vercelEnDoc, canonicalDownloadUrl, vercelEnDocPath);
+  expectIncludes(zhDoc, 'android-apk-size.md', zhDocPath);
+  expectIncludes(enDoc, 'android-apk-size.en.md', enDocPath);
+  expectIncludes(sizeZhDoc, 'arm64-v8a', sizeZhDocPath);
+  expectIncludes(sizeZhDoc, 'x86', sizeZhDocPath);
+  expectIncludes(sizeEnDoc, 'arm64-v8a', sizeEnDocPath);
+  expectIncludes(sizeEnDoc, 'x86', sizeEnDocPath);
+  expectIncludes(sizeZhDoc, 'android-apk-size-governance-report.md', sizeZhDocPath);
+  expectIncludes(sizeEnDoc, 'android-apk-size-governance-report.en.md', sizeEnDocPath);
+  expectIncludes(sizeGovernanceReportZh, 'Stage 1', sizeGovernanceReportZhPath);
+  expectIncludes(sizeGovernanceReportZh, '47.291 MiB', sizeGovernanceReportZhPath);
+  expectIncludes(sizeGovernanceReportZh, '35.558 MiB', sizeGovernanceReportZhPath);
+  expectIncludes(sizeGovernanceReportZh, '40.642 MiB', sizeGovernanceReportZhPath);
+  expectIncludes(sizeGovernanceReportZh, '28.909 MiB', sizeGovernanceReportZhPath);
+  expectIncludes(sizeGovernanceReportEn, 'Stage 1', sizeGovernanceReportEnPath);
+  expectIncludes(sizeGovernanceReportEn, '47.291 MiB', sizeGovernanceReportEnPath);
+  expectIncludes(sizeGovernanceReportEn, '35.558 MiB', sizeGovernanceReportEnPath);
+  expectIncludes(sizeGovernanceReportEn, '40.642 MiB', sizeGovernanceReportEnPath);
+  expectIncludes(sizeGovernanceReportEn, '28.909 MiB', sizeGovernanceReportEnPath);
+  expectIncludes(packageJson, 'verify:android:apk-size', packageJsonPath);
+  expectIncludes(packageJson, 'verify:precommit', packageJsonPath);
+  expectIncludes(packageJson, 'verify:precommit:android-size', packageJsonPath);
+  expectIncludes(packageJson, 'analyze:android:deps', packageJsonPath);
+  expectIncludes(packageJson, 'compare:android:apk-size', packageJsonPath);
+  expectIncludes(packageJson, 'build:android:release:smoke:arm64', packageJsonPath);
+  expectIncludes(packageJson, 'build:android:release:smoke:shrink', packageJsonPath);
+  expectIncludes(packageJson, 'build:android:release:smoke:arm64-shrink', packageJsonPath);
+  expectIncludes(apkSizeAnalyzer, 'user-arm-only', apkSizeAnalyzerPath);
+  expectIncludes(apkSizeComparator, 'Delta vs baseline', apkSizeComparatorPath);
+  expectIncludes(dependencyFootprintAnalyzer, 'ALLOWED_ZERO_IMPORT_DEPENDENCIES', dependencyFootprintAnalyzerPath);
+  expectIncludes(apkSizePrecommit, 'APK_CRITICAL_PATTERNS', apkSizePrecommitPath);
+  expectIncludes(apkSizePrecommit, 'SKIP_ANDROID_APK_SIZE_PRECOMMIT', apkSizePrecommitPath);
+  expectIncludes(gitPrecommit, 'npm run verify:precommit', gitPrecommitPath);
 
   console.log(
     JSON.stringify(
@@ -70,10 +146,20 @@ function main() {
           path.relative(repoRoot, workflowPath),
           path.relative(repoRoot, pageWorkflowPath),
           path.relative(repoRoot, pagePath),
+          path.relative(repoRoot, packageJsonPath),
           path.relative(repoRoot, zhDocPath),
           path.relative(repoRoot, enDocPath),
           path.relative(repoRoot, vercelDocPath),
-          path.relative(repoRoot, vercelEnDocPath)
+          path.relative(repoRoot, vercelEnDocPath),
+          path.relative(repoRoot, sizeZhDocPath),
+          path.relative(repoRoot, sizeEnDocPath),
+          path.relative(repoRoot, sizeGovernanceReportZhPath),
+          path.relative(repoRoot, sizeGovernanceReportEnPath),
+          path.relative(repoRoot, apkSizeAnalyzerPath),
+          path.relative(repoRoot, apkSizeComparatorPath),
+          path.relative(repoRoot, dependencyFootprintAnalyzerPath),
+          path.relative(repoRoot, apkSizePrecommitPath),
+          path.relative(repoRoot, gitPrecommitPath)
         ]
       },
       null,

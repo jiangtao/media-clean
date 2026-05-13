@@ -19,6 +19,9 @@ KEY_PASSWORD="${ANDROID_KEY_PASSWORD:-}"
 DNAME="${ANDROID_SIGNING_DNAME:-CN=com.jt.mistapmediacleaner,OU=Mobile,O=JT,L=Shanghai,ST=Shanghai,C=CN}"
 TEMP_KEYSTORE_DIR="${ANDROID_TEMP_KEYSTORE_DIR:-${HOME}/android-sign-demo}"
 TEMP_KEYSTORE_PASSWORD="${ANDROID_TEMP_KEYSTORE_PASSWORD:-jerret@media.clean}"
+RELEASE_ARCHITECTURES="${ANDROID_RELEASE_ARCHITECTURES:-armeabi-v7a,arm64-v8a}"
+ENABLE_RELEASE_MINIFY="${ANDROID_ENABLE_MINIFY_IN_RELEASE_BUILDS:-0}"
+ENABLE_RELEASE_RESOURCE_SHRINK="${ANDROID_ENABLE_SHRINK_RESOURCES_IN_RELEASE_BUILDS:-0}"
 
 usage() {
   cat <<'EOF'
@@ -36,6 +39,14 @@ usage() {
   3. --skip-install
      跳过 npm install。依赖已经装好时建议加这个，能省时间。
 
+  4. --architectures
+     控制 release APK 打包 ABI。默认是 armeabi-v7a,arm64-v8a，
+     面向 page 用户侧下载，不包含 x86 / x86_64 模拟器 ABI。
+     如需内部 universal 包，可传 --architectures universal。
+
+  5. --enable-minify / --enable-resource-shrink
+     显式开启 R8 / resource shrink。默认关闭，避免未覆盖真机前破坏 native bridge。
+
 环境变量也可直接使用:
   ANDROID_KEYSTORE_FILE
   ANDROID_KEYSTORE_BASE64
@@ -43,6 +54,9 @@ usage() {
   ANDROID_KEY_ALIAS
   ANDROID_KEYSTORE_PASSWORD
   ANDROID_KEY_PASSWORD
+  ANDROID_RELEASE_ARCHITECTURES
+  ANDROID_ENABLE_MINIFY_IN_RELEASE_BUILDS
+  ANDROID_ENABLE_SHRINK_RESOURCES_IN_RELEASE_BUILDS
 EOF
 }
 
@@ -157,10 +171,28 @@ run_release_pipeline() {
   ensure_android_sdk
   node scripts/android/prepare-keystore.mjs
 
+  local gradle_release_architectures="${RELEASE_ARCHITECTURES}"
+  if [[ "${gradle_release_architectures}" == "universal" ]]; then
+    gradle_release_architectures="armeabi-v7a,arm64-v8a,x86,x86_64"
+  fi
+
+  export ANDROID_RELEASE_ARCHITECTURES="${gradle_release_architectures}"
+
+  local gradle_args=(
+    assembleRelease
+    "-PreactNativeArchitectures=${gradle_release_architectures}"
+    "-Pandroid.enableMinifyInReleaseBuilds=${ENABLE_RELEASE_MINIFY}"
+    "-Pandroid.enableShrinkResourcesInReleaseBuilds=${ENABLE_RELEASE_RESOURCE_SHRINK}"
+  )
+
+  echo "Android release architectures: ${gradle_release_architectures}"
+  echo "Android release minify: ${ENABLE_RELEASE_MINIFY}"
+  echo "Android release resource shrink: ${ENABLE_RELEASE_RESOURCE_SHRINK}"
+
   (
     cd android
     chmod +x ./gradlew
-    ./gradlew assembleRelease
+    ./gradlew "${gradle_args[@]}"
   )
 
   node scripts/android/verify-release-artifact.mjs "${APK_PATH}"
@@ -226,6 +258,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-install)
       SKIP_INSTALL=1
+      shift
+      ;;
+    --architectures)
+      RELEASE_ARCHITECTURES="${2:-}"
+      shift 2
+      ;;
+    --enable-minify)
+      ENABLE_RELEASE_MINIFY=1
+      shift
+      ;;
+    --enable-resource-shrink)
+      ENABLE_RELEASE_RESOURCE_SHRINK=1
       shift
       ;;
     -h|--help)

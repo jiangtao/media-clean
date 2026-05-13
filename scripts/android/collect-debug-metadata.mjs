@@ -38,6 +38,10 @@ function main() {
     version: expoConfig.version ?? null,
     versionCode: androidConfig.versionCode ?? null,
     packageName: androidConfig.package ?? null,
+    debugArchitectures: (process.env.ANDROID_DEBUG_ARCHITECTURES ?? '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean),
     signingReportPath: path.relative(repoRoot, path.join(artifactDir, 'app-debug.signing.txt')),
     documentation: {
       zh: 'docs/release/android.md',

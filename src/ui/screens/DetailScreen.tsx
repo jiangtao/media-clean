@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
@@ -12,6 +11,7 @@ import { ActionSwitch } from '../components/ActionSwitch';
 import { DuplicateCarousel } from '../components/DuplicateCarousel';
 import { buildSizedImageSource } from '../components/image-source';
 import { TouchSurface } from '../components/TouchSurface';
+import { AppIcon } from '../icons/AppIcon';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { ZoomableImage } from '../components/ZoomableImage';
 
@@ -234,7 +234,7 @@ export function DetailScreen({
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           testID="detail-close-button"
         >
-          <Ionicons name="close" size={16} color="#ffffff" />
+          <AppIcon name="close" size={16} color="#ffffff" />
         </TouchSurface>
       </View>
 

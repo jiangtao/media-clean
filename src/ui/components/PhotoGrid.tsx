@@ -1,13 +1,13 @@
 import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { NativeScrollEvent, StyleSheet, useWindowDimensions, View, Text, FlatList } from 'react-native';
 import { Image } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
 import { GestureDetector } from 'react-native-gesture-handler';
 
 import type { CleanupCandidate } from '../../domain/recognition/types';
 import type { AppThemePalette } from '../../theme/app-theme';
 import { buildSizedImageSource } from './image-source';
 import { TouchSurface } from './TouchSurface';
+import { AppIcon } from '../icons/AppIcon';
 import { DesignIcon } from '../icons/DesignIcon';
 import {
   buildMediaGridLayout,
@@ -297,7 +297,7 @@ function PhotoGridItem({
       ) : null}
       {isSelected ? (
         <View style={styles.selectionIndicatorFilled} testID="selection-checkmark">
-          <Ionicons
+          <AppIcon
             name="checkmark"
             size={gridLayout.isSELike ? 11 : 13}
             color="#ffffff"

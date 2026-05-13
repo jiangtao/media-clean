@@ -8,14 +8,22 @@ APK_PATH="${REPO_ROOT}/android/app/build/outputs/apk/debug/app-debug.apk"
 SIGNING_REPORT_PATH="${REPO_ROOT}/artifacts/android-debug/app-debug.signing.txt"
 METADATA_PATH="${REPO_ROOT}/artifacts/android-debug/debug-metadata.json"
 SKIP_INSTALL=0
+DEBUG_ARCHITECTURES="${ANDROID_DEBUG_ARCHITECTURES:-universal}"
 
 usage() {
   cat <<'EOF'
 用法:
-  bash scripts/android/build-debug-apk.sh [--skip-install]
+  bash scripts/android/build-debug-apk.sh [--skip-install] [--architectures universal|arm64-v8a|armeabi-v7a,arm64-v8a]
 
 说明:
   生成 debug APK，并自动产出签名报告、SHA256 与 metadata。
+
+  --architectures
+     控制 debug APK 打包 ABI。默认 universal，保留给模拟器和内部兼容验证。
+     真机本地验证可传 arm64-v8a，避免把 x86 / x86_64 模拟器 ABI 打进 APK。
+
+环境变量:
+  ANDROID_DEBUG_ARCHITECTURES
 EOF
 }
 
@@ -65,6 +73,20 @@ run_debug_pipeline() {
   npx expo prebuild --platform android --clean
   ensure_android_sdk
 
+  local gradle_debug_architectures="${DEBUG_ARCHITECTURES}"
+  if [[ "${gradle_debug_architectures}" == "universal" ]]; then
+    gradle_debug_architectures="armeabi-v7a,arm64-v8a,x86,x86_64"
+  fi
+
+  export ANDROID_DEBUG_ARCHITECTURES="${gradle_debug_architectures}"
+
+  local gradle_args=(
+    assembleDebug
+    "-PreactNativeArchitectures=${gradle_debug_architectures}"
+  )
+
+  echo "Android debug architectures: ${gradle_debug_architectures}"
+
   local gradle_attempt=1
   local gradle_max_attempts=2
   local gradle_log=""
@@ -75,7 +97,7 @@ run_debug_pipeline() {
     cd android
     chmod +x ./gradlew
     while true; do
-      if ./gradlew assembleDebug 2>&1 | tee "${gradle_log}"; then
+      if ./gradlew "${gradle_args[@]}" 2>&1 | tee "${gradle_log}"; then
         break
       fi
 
@@ -105,6 +127,10 @@ while [[ $# -gt 0 ]]; do
     --skip-install)
       SKIP_INSTALL=1
       shift
+      ;;
+    --architectures)
+      DEBUG_ARCHITECTURES="${2:-}"
+      shift 2
       ;;
     -h|--help)
       usage

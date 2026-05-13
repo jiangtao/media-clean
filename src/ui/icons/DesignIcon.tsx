@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import * as ReactNative from 'react-native';
 import { StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import * as ReactNativeSvg from 'react-native-svg';
+
+import { AppIcon, type AppIconName } from './AppIcon';
 
 export type DesignIconName =
   | 'blurry-drop'
@@ -444,39 +445,39 @@ function FallbackDesignIcon({
       ]}
       testID={testID}
     >
-      <Ionicons name={fallbackName} size={iconSize} color={color} />
+      <AppIcon name={fallbackName} size={iconSize} color={color} />
     </View>
   );
 }
 
-function resolveFallbackIoniconName(name: DesignIconName): React.ComponentProps<typeof Ionicons>['name'] {
+function resolveFallbackIoniconName(name: DesignIconName): AppIconName {
   switch (name) {
     case 'blurry-drop':
-      return 'water';
+      return 'image-outline';
     case 'check':
-      return 'shield-checkmark';
+      return 'checkmark-circle-outline';
     case 'duplicate-camera':
-      return 'camera';
+      return 'image-outline';
     case 'local-analysis':
-      return 'pie-chart';
+      return 'apps-outline';
     case 'media-play':
-      return 'play-circle-outline';
+      return 'videocam-outline';
     case 'nav-photo':
-      return 'image';
+      return 'image-outline';
     case 'nav-setting':
-      return 'settings-outline';
+      return 'apps-outline';
     case 'nav-trash':
       return 'trash-outline';
     case 'scan':
-      return 'scan-outline';
+      return 'apps-outline';
     case 'shield-check-outline':
-      return 'shield-checkmark-outline';
+      return 'checkmark-circle-outline';
     case 'similar-people':
-      return 'people';
+      return 'apps-outline';
     case 'stack':
-      return 'albums-outline';
+      return 'apps-outline';
     case 'video':
-      return 'videocam';
+      return 'videocam-outline';
   }
 }
 

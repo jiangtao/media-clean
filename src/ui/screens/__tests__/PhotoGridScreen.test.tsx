@@ -419,7 +419,7 @@ vi.mock('../../components/PhotoGrid', () => ({
     );
   },
 }));
-vi.mock('/Users/jt/places/personal/app-cleaner/src/ui/screens/DetailScreen', () => {
+vi.mock('../DetailScreen', () => {
   function MockDetailScreen({
     candidate,
     duplicateCandidates,

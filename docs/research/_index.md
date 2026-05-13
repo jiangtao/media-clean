@@ -28,6 +28,10 @@
 5. [主题 Token 与 Tailwind 复用方案](./theme-token-tailwind-strategy.md)
    - 当前主题决策：Token-first + Tailwind-compatible + NativeWind optional。
    - RN 继续使用 typed `StyleSheet.create()`，Electron 使用 generated Tailwind CSS `@theme`，NativeWind 只作为新组件 / 低风险组件的 utility layer。
+6. [Android APK 包体积分析与最佳实践](./android-apk-size-analysis/_index.md)
+   - 当前结论：接近 100MB 的主要原因是用户侧 APK 仍是四 ABI universal APK，`lib/` native `.so` 占 APK entry 压缩体积约 79.9%。
+   - 优先方向：先做可重复 size report，再把 page 用户侧 APK 收敛到 arm-only / arm64，并把 ABI、R8、resource shrink、native dependency intake 纳入 pre-commit 和 release gate。
+   - 阶段总结报告：[Android APK 体积阶段治理总结](../release/android-apk-size-governance-report.md)。
 
 ## 执行提醒
 
@@ -40,3 +44,5 @@
 7. 主题系统先做 token source of truth，不全量改 NativeWind；Tailwind / NativeWind / Electron CSS 都从同一 token 输出。
 8. P0 执行顺序为 Rust Core -> CLI；P2 v0.5.1 治理可并行，P1 Desktop 后置产品化。
 9. 已被新决策替代的 RN macOS / TypeScript fixture 旧调研不再保留为执行入口。
+10. Android APK 体积治理先从 ABI 与 native runtime 入手；i18n / theme token 治理只作为 bundle hygiene 和资源预算支撑，不作为主要瘦身手段。
+11. 依赖、Android native、release workflow 和签名插件变更必须在 pre-commit 前完成 APK size 分析；CI 只做兜底，不做第一次发现问题的地方。

@@ -1,5 +1,4 @@
 import * as MediaLibrary from 'expo-media-library';
-import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +8,7 @@ import { PhotoGrid } from '../components/PhotoGrid';
 import type { SwipeSelectionReason } from '../hooks/useSwipeSelection';
 import { DetailScreen } from './DetailScreen';
 import { TouchSurface } from '../components/TouchSurface';
+import { AppIcon } from '../icons/AppIcon';
 import { DesignIcon } from '../icons/DesignIcon';
 import { useAppPreferences } from '../../application/AppPreferencesContext';
 import type { CleanupCandidate } from '../../domain/recognition/types';
@@ -519,7 +519,7 @@ export function RecycleBinScreen({
               preset="pill"
               testID="recycle-back-button"
             >
-              <Ionicons
+              <AppIcon
                 name={isSelectionMode ? 'close' : 'arrow-back'}
                 size={24}
                 color={theme.pageTextPrimary}

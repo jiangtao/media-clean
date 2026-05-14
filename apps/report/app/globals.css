@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.5rem;
+  --background: 220 43% 97%;
+  --foreground: 224 43% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 224 43% 16%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 224 43% 16%;
+  --primary: 216 100% 59%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 218 39% 95%;
+  --secondary-foreground: 224 43% 16%;
+  --muted: 218 39% 95%;
+  --muted-foreground: 221 16% 50%;
+  --accent: 218 50% 94%;
+  --accent-foreground: 224 43% 16%;
+  --destructive: 357 100% 59%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 216 35% 88%;
+  --input: 216 35% 88%;
+  --ring: 216 100% 59%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 12% -10%, #e9f0ff 0, transparent 32%),
+    linear-gradient(180deg, #f5f7fb 0%, #eef3fb 100%);
+  color: hsl(var(--foreground));
+  font-family:
+    Inter, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
+    sans-serif;
+  letter-spacing: 0;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.mc-scrollbar {
+  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-width: thin;
+}
+
+.mc-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.mc-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}

@@ -82,6 +82,30 @@ The official workflow supports four manual inputs for reproducing candidate buil
 3. `enable_resource_shrink`: defaults to `false`.
 4. `enable_legacy_packaging`: defaults to `false`.
 
+## Formally Signed Candidate Without Publishing
+
+If the goal is only to create a formally signed APK for phone acceptance, do not run the `Android Release APK` workflow. It creates a tag, publishes a GitHub Release, and updates `https://mc.jerret.me/download/android-latest.apk`.
+
+Run the `Android Release Candidate APK` workflow instead. It uses the same GitHub Secrets signing chain, but only uploads a GitHub Actions artifact:
+
+```bash
+gh workflow run android-release-candidate.yml \
+  --repo jiangtao/media-clean \
+  -f candidate_label=legacy-shrink-0.0.4 \
+  -f release_architectures=armeabi-v7a,arm64-v8a \
+  -f enable_legacy_packaging=true \
+  -f enable_minify=true \
+  -f enable_resource_shrink=true
+```
+
+The candidate workflow explicitly does not:
+
+1. create a git tag.
+2. publish a GitHub Release.
+3. deploy the page download.
+
+After acceptance passes, decide whether to run the formal release workflow.
+
 ## Analysis Commands
 
 Analyze any APK:

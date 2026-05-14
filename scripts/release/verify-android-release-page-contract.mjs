@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const workflowPath = path.join(repoRoot, '.github', 'workflows', 'android-release.yml');
+const candidateWorkflowPath = path.join(repoRoot, '.github', 'workflows', 'android-release-candidate.yml');
 const pageWorkflowPath = path.join(repoRoot, '.github', 'workflows', 'page-vercel.yml');
 const pagePath = path.join(repoRoot, 'page', 'public', 'index.html');
 const packageJsonPath = path.join(repoRoot, 'package.json');
@@ -56,8 +57,15 @@ function expectIncludes(haystack, needle, filePath) {
   }
 }
 
+function expectNotIncludes(haystack, needle, filePath) {
+  if (haystack.includes(needle)) {
+    throw new Error(`${path.relative(repoRoot, filePath)} 不应包含内容: ${needle}`);
+  }
+}
+
 function main() {
   const workflow = read(workflowPath);
+  const candidateWorkflow = read(candidateWorkflowPath);
   const pageWorkflow = read(pageWorkflowPath);
   const page = read(pagePath);
   const packageJson = read(packageJsonPath);
@@ -94,6 +102,17 @@ function main() {
   expectIncludes(workflow, '--fail-on-budget', workflowPath);
   expectIncludes(workflow, 'apk-size-report.md', workflowPath);
   expectIncludes(workflow, 'apk-size-report.json', workflowPath);
+
+  expectIncludes(candidateWorkflow, 'Android Release Candidate APK', candidateWorkflowPath);
+  expectIncludes(candidateWorkflow, 'workflow_dispatch:', candidateWorkflowPath);
+  expectIncludes(candidateWorkflow, 'ANDROID_KEYSTORE_BASE64', candidateWorkflowPath);
+  expectIncludes(candidateWorkflow, 'ANDROID_USE_LEGACY_PACKAGING', candidateWorkflowPath);
+  expectIncludes(candidateWorkflow, 'bash scripts/android/build-release-apk.sh --skip-install', candidateWorkflowPath);
+  expectIncludes(candidateWorkflow, 'scripts/android/analyze-apk-size.mjs', candidateWorkflowPath);
+  expectIncludes(candidateWorkflow, 'actions/upload-artifact@v7', candidateWorkflowPath);
+  expectNotIncludes(candidateWorkflow, 'Create release tag', candidateWorkflowPath);
+  expectNotIncludes(candidateWorkflow, 'softprops/action-gh-release', candidateWorkflowPath);
+  expectNotIncludes(candidateWorkflow, 'vercel deploy --prebuilt --prod', candidateWorkflowPath);
 
   expectIncludes(pageWorkflow, preparePageDownloadScript, pageWorkflowPath);
   expectIncludes(pageWorkflow, githubBackupDownloadUrl, pageWorkflowPath);
@@ -158,6 +177,7 @@ function main() {
         pageLatestAssetName,
         checkedFiles: [
           path.relative(repoRoot, workflowPath),
+          path.relative(repoRoot, candidateWorkflowPath),
           path.relative(repoRoot, pageWorkflowPath),
           path.relative(repoRoot, pagePath),
           path.relative(repoRoot, packageJsonPath),

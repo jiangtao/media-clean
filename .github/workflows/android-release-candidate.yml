@@ -1,0 +1,164 @@
+name: Android Release Candidate APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_label:
+        description: "候选包标签，仅用于 artifact 命名，例如 legacy-shrink-0.0.4"
+        required: false
+        default: "manual"
+        type: string
+      release_architectures:
+        description: "Release APK ABI，用户侧默认 armeabi-v7a,arm64-v8a；确认设备矩阵后可用 arm64-v8a"
+        required: false
+        default: "armeabi-v7a,arm64-v8a"
+        type: string
+      enable_minify:
+        description: "启用 R8 minify。默认关闭，需完成真机回归后再用于正式发布"
+        required: false
+        default: false
+        type: boolean
+      enable_resource_shrink:
+        description: "启用 Android resource shrink。默认关闭，需与 R8 一起完成真机回归"
+        required: false
+        default: false
+        type: boolean
+      enable_legacy_packaging:
+        description: "启用 legacy native .so packaging。默认关闭，需完成安装和启动回归后再用于正式发布"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release-candidate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-release-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_FILENAME: ${{ vars.ANDROID_KEYSTORE_FILENAME || 'release.jks' }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_RELEASE_ARCHITECTURES: ${{ inputs.release_architectures || vars.ANDROID_RELEASE_ARCHITECTURES || 'armeabi-v7a,arm64-v8a' }}
+      ANDROID_ENABLE_MINIFY_IN_RELEASE_BUILDS: ${{ inputs.enable_minify && '1' || '0' }}
+      ANDROID_ENABLE_SHRINK_RESOURCES_IN_RELEASE_BUILDS: ${{ inputs.enable_resource_shrink && '1' || '0' }}
+      ANDROID_USE_LEGACY_PACKAGING: ${{ inputs.enable_legacy_packaging && '1' || '0' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.11.0
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android build tooling
+        run: sdkmanager "platform-tools" "build-tools;36.0.0" "ndk;27.1.12297006"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck
+        run: npm run typecheck -- --pretty false
+
+      - name: Verify release-page contract
+        run: node scripts/release/verify-android-release-page-contract.mjs
+
+      - name: Build signed candidate APK
+        run: bash scripts/android/build-release-apk.sh --skip-install
+
+      - name: Analyze candidate APK size
+        run: |
+          APK_SIZE_PROFILE="user-arm-only"
+          EXPECTED_ABIS="${ANDROID_RELEASE_ARCHITECTURES}"
+          case "${ANDROID_RELEASE_ARCHITECTURES}" in
+            arm64-v8a)
+              APK_SIZE_PROFILE="user-arm64"
+              ;;
+            universal)
+              APK_SIZE_PROFILE="internal-universal"
+              EXPECTED_ABIS="armeabi-v7a,arm64-v8a,x86,x86_64"
+              ;;
+          esac
+
+          node scripts/android/analyze-apk-size.mjs \
+            android/app/build/outputs/apk/release/app-release.apk \
+            --out-dir artifacts/android-release-candidate \
+            --profile "${APK_SIZE_PROFILE}" \
+            --expected-abis "${EXPECTED_ABIS}" \
+            --fail-on-budget
+          node scripts/android/collect-release-metadata.mjs \
+            android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Prepare candidate artifacts
+        env:
+          CANDIDATE_LABEL: ${{ inputs.candidate_label || 'manual' }}
+        run: |
+          mkdir -p artifacts/android-release-candidate
+          SAFE_LABEL="$(printf '%s' "${CANDIDATE_LABEL}" | tr -c 'A-Za-z0-9._-' '-')"
+          PREFIX="artifacts/android-release-candidate/media-clean-android-candidate-${SAFE_LABEL}"
+
+          cp android/app/build/outputs/apk/release/app-release.apk "${PREFIX}.apk"
+          shasum -a 256 "${PREFIX}.apk" > "${PREFIX}.sha256"
+          cp artifacts/android-release/app-release.signing.txt "${PREFIX}.signing.txt"
+          cp artifacts/android-release/release-metadata.json "${PREFIX}.metadata.json"
+          cp artifacts/android-release-candidate/apk-size-report.md "${PREFIX}.size-report.md"
+          cp artifacts/android-release-candidate/apk-size-report.json "${PREFIX}.size-report.json"
+
+      - name: Upload candidate artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-release-candidate
+          if-no-files-found: error
+          path: |
+            android/app/build/outputs/apk/release/app-release.apk
+            artifacts/android-release/app-release.signing.txt
+            artifacts/android-release/app-release.sha256
+            artifacts/android-release/release-metadata.json
+            artifacts/android-release-candidate/*.apk
+            artifacts/android-release-candidate/*.sha256
+            artifacts/android-release-candidate/*.signing.txt
+            artifacts/android-release-candidate/*.metadata.json
+            artifacts/android-release-candidate/*.size-report.md
+            artifacts/android-release-candidate/*.size-report.json
+            artifacts/android-release-candidate/apk-size-report.md
+            artifacts/android-release-candidate/apk-size-report.json
+
+      - name: Publish candidate summary
+        run: |
+          {
+            echo "## Android release candidate 已生成"
+            echo
+            echo "- 这是正式签名候选包，只上传 GitHub Actions artifact。"
+            echo "- 不创建 git tag。"
+            echo "- 不发布 GitHub Release。"
+            echo "- 不部署 page 下载。"
+            echo "- Release architectures: \`${ANDROID_RELEASE_ARCHITECTURES}\`"
+            echo "- R8 minify: \`${ANDROID_ENABLE_MINIFY_IN_RELEASE_BUILDS}\`"
+            echo "- Resource shrink: \`${ANDROID_ENABLE_SHRINK_RESOURCES_IN_RELEASE_BUILDS}\`"
+            echo "- Legacy native packaging: \`${ANDROID_USE_LEGACY_PACKAGING}\`"
+            echo
+            cat artifacts/android-release-candidate/apk-size-report.md
+          } >> "${GITHUB_STEP_SUMMARY}"

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { BackHandler, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PhotoGridEntryCard } from './photo-grid/PhotoGridEntryCard';
@@ -522,6 +523,39 @@ export function PhotoGridScreen({
   const handleCloseSelection = useCallback(() => {
     exitSelectionMode();
   }, [exitSelectionMode]);
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (previewCandidate) {
+          handleClosePreview();
+          return true;
+        }
+
+        if (isSelectionMode) {
+          exitSelectionMode();
+          return true;
+        }
+
+        if (showIssueWorkspace) {
+          handleBackToSummary();
+          return true;
+        }
+
+        return false;
+      });
+
+      return () => {
+        subscription.remove();
+      };
+    }, [
+      exitSelectionMode,
+      handleBackToSummary,
+      handleClosePreview,
+      isSelectionMode,
+      previewCandidate,
+      showIssueWorkspace,
+    ]),
+  );
   const handleToggleIssueSelectAll = useCallback(() => {
     setSelectedIds((current) => {
       const nextIds = issueWorkspaceCandidates.map((candidate) => candidate.id);

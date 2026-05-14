@@ -29,16 +29,25 @@ If the device matrix later confirms that 32-bit ARM support is no longer needed,
 arm64-v8a
 ```
 
-Current `0.0.4` local smoke measurements:
+The `0.0.5` formal release policy after the APK size optimization project:
+
+1. Keep dual ARM ABIs: `armeabi-v7a,arm64-v8a`, preserving 32-bit ARM support while excluding emulator ABIs by default.
+2. Enable R8 minify and Android resource shrinking by default so unused dex and resources are removed from the release APK.
+3. Enable legacy native `.so` packaging by default so native libraries are compressed inside the APK, materially reducing the page-hosted single APK.
+4. Keep manual workflow off switches for rollback and diagnosis if startup, native bridge, low-end-device, or resource-shrink regressions appear.
+
+The `0.0.4` local smoke measurements are the evidence base for this `0.0.5` default policy:
 
 | Candidate | APK MiB | Notes |
 | --- | ---: | --- |
 | Default user-facing ARM APK | 51.829 | `armeabi-v7a,arm64-v8a`, current accepted release candidate |
 | arm64 single ABI | 37.875 | Static estimate; rebuild after confirming 32-bit ARM can be dropped |
 | ARM APK + R8/resource shrink | 45.283 | Requires full real-device regression |
-| ARM APK + legacy packaging | 30.229 | Highest-impact single switch; requires install and launch acceptance |
-| ARM APK + legacy packaging + shrink | 23.690 | Smallest current page single-APK candidate |
+| ARM APK + legacy packaging | 30.229 | Highest-impact single switch; combined validation package passed install / launch smoke |
+| ARM APK + legacy packaging + shrink | 23.690 | `0.0.5` formal release default policy |
 | AAB connected-device splits | 22.549 | Connected-device split set, not a page single-APK replacement |
+
+The `0.0.5` local temp-signed release smoke has reproduced the online default policy: `app-release.apk` is 24,840,624 bytes / 23.690 MiB, SHA256 `eae36d4c1e22833dc797787620b43b9b5cd964e721668ac1cda6a59e52137419`, `versionName=0.0.5`, `versionCode=5`, and ABIs `arm64-v8a,armeabi-v7a`. The formal online signed artifact is still defined by the GitHub Actions release workflow checksum and page-download verification.
 
 ## Build Policy
 
@@ -75,12 +84,12 @@ bash scripts/android/build-release-apk.sh \
 
 Do not use a universal APK as the default `media-clean-android-latest.apk` user-facing artifact.
 
-The official workflow supports four manual inputs for reproducing candidate builds:
+The official workflow supports four manual inputs; starting with `0.0.5`, the validated optimization bundle is enabled by default:
 
 1. `release_architectures`: defaults to `armeabi-v7a,arm64-v8a`; may be set to `arm64-v8a`.
-2. `enable_minify`: defaults to `false`.
-3. `enable_resource_shrink`: defaults to `false`.
-4. `enable_legacy_packaging`: defaults to `false`.
+2. `enable_minify`: defaults to `true`; may be disabled for rollback.
+3. `enable_resource_shrink`: defaults to `true`; normally used with R8.
+4. `enable_legacy_packaging`: defaults to `true`; may be disabled to diagnose native loading or startup issues.
 
 ## Local Builds And Production Isolation
 

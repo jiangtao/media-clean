@@ -13,19 +13,19 @@ on:
         default: "armeabi-v7a,arm64-v8a"
         type: string
       enable_minify:
-        description: "启用 R8 minify。默认关闭，需完成真机回归后再用于正式发布"
+        description: "启用 R8 minify。包体积优化专项验证后默认开启；如遇 native 回归可手动关闭"
         required: false
-        default: false
+        default: true
         type: boolean
       enable_resource_shrink:
-        description: "启用 Android resource shrink。默认关闭，需与 R8 一起完成真机回归"
+        description: "启用 Android resource shrink。包体积优化专项验证后默认开启；需与 R8 一起使用"
         required: false
-        default: false
+        default: true
         type: boolean
       enable_legacy_packaging:
-        description: "启用 legacy native .so packaging。默认关闭，需完成安装和启动回归后再用于正式发布"
+        description: "启用 legacy native .so packaging。包体积优化专项验证后默认开启；如遇启动或低端机回归可手动关闭"
         required: false
-        default: false
+        default: true
         type: boolean
 
 permissions:
@@ -185,6 +185,17 @@ jobs:
           tag_name: ${{ steps.release_tag.outputs.value }}
           name: Media Clean Android ${{ steps.release_tag.outputs.version }}
           generate_release_notes: true
+          body: |
+            ## 包体积优化专项
+
+            本次 Android release 默认启用已验证的体积优化组合：
+
+            - 双 ARM ABI：保留 `armeabi-v7a,arm64-v8a`，排除 `x86/x86_64` 模拟器 ABI，兼顾用户覆盖和下载体积。
+            - R8 minify：裁剪未使用 Java/Kotlin/React Native bridge 代码，降低 dex 体积；风险是反射、原生桥接或 keep rule 缺失导致运行时回归。
+            - Android resource shrink：裁剪未使用资源；风险是动态资源引用被误裁，需要真机回归覆盖图片、视频、通知和启动资源。
+            - Legacy native `.so` packaging：压缩 native libraries，显著降低 page 单 APK 下载体积；风险是安装、启动时间和低端机 native 装载行为变化。
+
+            本地 release-like smoke 的参考结果为 23.690 MiB；正式签名产物以本 workflow 的 size report、checksum 和 page 下载验证为准。
           make_latest: true
           files: |
             ${{ steps.release_assets.outputs.versioned_apk }}
@@ -272,6 +283,15 @@ jobs:
             echo "- R8 minify: \`${ANDROID_ENABLE_MINIFY_IN_RELEASE_BUILDS}\`"
             echo "- Resource shrink: \`${ANDROID_ENABLE_SHRINK_RESOURCES_IN_RELEASE_BUILDS}\`"
             echo "- Legacy native packaging: \`${ANDROID_USE_LEGACY_PACKAGING}\`"
+            echo
+            echo "### 包体积优化专项"
+            echo
+            echo "| 手段 | 收益 | 风险 / 取舍 |"
+            echo "| --- | --- | --- |"
+            echo "| 双 ARM ABI | 排除 x86/x86_64 模拟器 ABI，减少用户下载体积 | 仍保留 32-bit ARM；若未来只发 arm64 可继续下降 |"
+            echo "| R8 minify | 降低 dex 体积 | 需要 keep rule 和 native bridge 回归 |"
+            echo "| Resource shrink | 裁剪未使用资源 | 需要覆盖动态资源、图片、视频、通知和启动资源 |"
+            echo "| Legacy native packaging | 压缩 native .so，显著降低 page 单 APK | 需要关注安装、启动时间和低端机 native 装载 |"
             echo
             cat artifacts/android-release/apk-size-report.md
           } >> "${GITHUB_STEP_SUMMARY}"

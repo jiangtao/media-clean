@@ -61,6 +61,7 @@ bash scripts/android/build-release-apk.sh --temp-keystore --skip-install
   6. 部署 Vercel production，使 page 下载按钮固定指向 `https://mc.jerret.me/download/android-latest.apk`
   7. workflow 内置 `verify:release:page-contract`，确保 release 资产名、page hydrate 源、page 下载入口和体积治理约定保持一致
   8. 用户侧 APK 默认只包含 `armeabi-v7a,arm64-v8a`，不包含 `x86` / `x86_64`
+  9. 包体积优化专项后，正式 release 默认开启 R8 minify、Android resource shrink 与 legacy native `.so` packaging；workflow_dispatch 仍保留手动关闭开关，用于回滚定位 native bridge、启动性能或资源裁剪回归。
 
 正式 debug workflow:
 
@@ -123,3 +124,4 @@ Debug:
 8. 用户侧 release APK 不允许包含 `x86` / `x86_64`，除非显式切到内部 universal 产物
 9. release workflow 必须产出并上传 APK size report
 10. 用户侧 ARM APK 超过 70MiB 时必须失败，超过 60MiB 时至少 warning
+11. 默认正式 release 必须开启已验证的体积优化组合：R8 minify、resource shrink、legacy native packaging；若临时关闭，PR / release summary 必须说明原因和回滚计划。

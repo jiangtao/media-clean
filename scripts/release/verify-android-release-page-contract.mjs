@@ -57,6 +57,19 @@ function expectIncludes(haystack, needle, filePath) {
   }
 }
 
+function expectWorkflowInputDefault(workflow, inputName, expectedDefault) {
+  const inputPattern = new RegExp(
+    `${inputName}:\\n(?:[ \\t]+[^\\n]+\\n)*?[ \\t]+default: ${expectedDefault}\\n`,
+    'm'
+  );
+
+  if (!inputPattern.test(workflow)) {
+    throw new Error(
+      `${path.relative(repoRoot, workflowPath)} 的 ${inputName} 默认值必须是 ${expectedDefault}`
+    );
+  }
+}
+
 function main() {
   const workflow = read(workflowPath);
   const pageWorkflow = read(pageWorkflowPath);
@@ -91,7 +104,11 @@ function main() {
   expectIncludes(workflow, 'enable_minify', workflowPath);
   expectIncludes(workflow, 'enable_resource_shrink', workflowPath);
   expectIncludes(workflow, 'enable_legacy_packaging', workflowPath);
+  expectIncludes(workflow, '包体积优化专项验证后默认开启', workflowPath);
   expectIncludes(workflow, 'ANDROID_USE_LEGACY_PACKAGING', workflowPath);
+  expectWorkflowInputDefault(workflow, 'enable_minify', true);
+  expectWorkflowInputDefault(workflow, 'enable_resource_shrink', true);
+  expectWorkflowInputDefault(workflow, 'enable_legacy_packaging', true);
   expectIncludes(workflow, 'scripts/android/analyze-apk-size.mjs', workflowPath);
   expectIncludes(workflow, '--fail-on-budget', workflowPath);
   expectIncludes(workflow, 'apk-size-report.md', workflowPath);

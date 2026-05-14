@@ -61,6 +61,7 @@ Official release workflow:
   6. deploy Vercel production so page download buttons stay pinned to `https://mc.jerret.me/download/android-latest.apk`
   7. includes `verify:release:page-contract` so the release asset name, page hydration source, page download entry, and size governance contract cannot drift apart
   8. user-facing APKs include `armeabi-v7a,arm64-v8a` by default and exclude `x86` / `x86_64`
+  9. after the APK size optimization project, formal releases enable R8 minify, Android resource shrinking, and legacy native `.so` packaging by default; workflow_dispatch still keeps manual off switches for rollback and native bridge, startup, or resource-shrink regression diagnosis.
 
 Official debug workflow:
 
@@ -123,3 +124,4 @@ Debug:
 8. A user-facing release APK must not contain `x86` / `x86_64` unless the workflow explicitly switches to an internal universal artifact
 9. The release workflow must generate and upload an APK size report
 10. A user-facing ARM APK fails above 70MiB and warns above 60MiB
+11. Formal releases must keep the validated size-optimization bundle enabled by default: R8 minify, resource shrinking, and legacy native packaging. If it is temporarily disabled, the PR / release summary must explain why and how it will be restored.

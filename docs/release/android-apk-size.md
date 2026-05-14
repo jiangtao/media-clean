@@ -29,16 +29,25 @@ armeabi-v7a,arm64-v8a
 arm64-v8a
 ```
 
-当前 `0.0.4` 本地 smoke 实测：
+包体积优化专项后的 `0.0.5` 正式发布策略：
+
+1. 保留双 ARM ABI：`armeabi-v7a,arm64-v8a`，继续覆盖 32-bit ARM 用户，不默认下发模拟器 ABI。
+2. 默认开启 R8 minify 与 Android resource shrink，把 dex 和无用资源从 release APK 中裁掉。
+3. 默认开启 legacy native `.so` packaging，把 native library 压缩进 APK，显著降低 page 单 APK 下载体积。
+4. 保留 workflow 手动关闭开关；若出现启动、native bridge、低端机或资源裁剪回归，可以单独关闭定位。
+
+`0.0.4` 本地 smoke 实测为本次 `0.0.5` 默认策略的依据：
 
 | 候选 | APK MiB | 说明 |
 | --- | ---: | --- |
 | 默认用户侧 ARM APK | 51.829 | `armeabi-v7a,arm64-v8a`，当前已验收 release candidate |
 | arm64 单 ABI | 37.875 | 静态估算，需要确认不再支持 32-bit ARM 后重建 |
 | ARM APK + R8/resource shrink | 45.283 | 需要完整真机回归 |
-| ARM APK + legacy packaging | 30.229 | 当前最高效单开关，需安装和启动验收 |
-| ARM APK + legacy packaging + shrink | 23.690 | 当前最小 page 单 APK 候选 |
+| ARM APK + legacy packaging | 30.229 | 当前最高效单开关，已通过组合 validation 安装 / 启动 smoke |
+| ARM APK + legacy packaging + shrink | 23.690 | `0.0.5` 线上 release 默认策略 |
 | AAB connected-device splits | 22.549 | 当前真机 split set，不是 page 单 APK 替代物 |
+
+`0.0.5` 本地临时签名 release smoke 已按线上默认策略复现：`app-release.apk` 为 24,840,624 bytes / 23.690 MiB，SHA256 `eae36d4c1e22833dc797787620b43b9b5cd964e721668ac1cda6a59e52137419`，`versionName=0.0.5`，`versionCode=5`，ABI 为 `arm64-v8a,armeabi-v7a`。正式线上签名产物以 GitHub Actions release workflow 产出的 checksum 和 page 下载验证为准。
 
 ## 构建策略
 
@@ -75,12 +84,12 @@ bash scripts/android/build-release-apk.sh \
 
 不要把 universal APK 作为 `media-clean-android-latest.apk` 的默认用户侧产物。
 
-正式 workflow 支持四个手动输入用于复现实验候选：
+正式 workflow 支持四个手动输入；`0.0.5` 起默认启用已验证的优化组合：
 
 1. `release_architectures`：默认 `armeabi-v7a,arm64-v8a`，可显式传 `arm64-v8a`。
-2. `enable_minify`：默认 `false`。
-3. `enable_resource_shrink`：默认 `false`。
-4. `enable_legacy_packaging`：默认 `false`。
+2. `enable_minify`：默认 `true`，异常时可手动关闭。
+3. `enable_resource_shrink`：默认 `true`，通常与 R8 一起使用。
+4. `enable_legacy_packaging`：默认 `true`，异常时可手动关闭定位 native 装载或启动问题。
 
 ## 本地构建与线上隔离
 

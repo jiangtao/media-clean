@@ -82,6 +82,32 @@ The official workflow supports four manual inputs for reproducing candidate buil
 3. `enable_resource_shrink`: defaults to `false`.
 4. `enable_legacy_packaging`: defaults to `false`.
 
+## Local Builds And Production Isolation
+
+When optimizing the final production APK, build a local release-like APK for size decisions:
+
+```bash
+npm run build:android:release:smoke:legacy-shrink
+npm run analyze:android:apk -- android/app/build/outputs/apk/release/app-release.apk \
+  --out-dir artifacts/android-release \
+  --profile user-arm-only \
+  --fail-on-budget
+```
+
+This APK uses a temporary keystore and does not publish anything. Its size, ABI list, native `.so` packaging, and R8/resource-shrink behavior are suitable for evaluating optimization impact. Its package name is still `com.jt.mistapmediacleaner`, so do not install it directly on a user's phone that already has the formal app.
+
+For phone install, launch, and core-flow validation, use the validation APK:
+
+```bash
+npm run build:android:validation:legacy-shrink
+adb install -r android/app/build/outputs/apk/validation/app-validation.apk
+adb shell monkey -p com.jt.mistapmediacleaner.debug 1
+```
+
+The validation APK is release-like, debug-signed, and uses the `.debug` package suffix. It validates packaging and compression behavior without replacing the production app or updating the page download.
+
+The true production-signed APK should still be produced by the GitHub Actions release workflow by default. Do not generate a formally signed local APK unless the release keystore is intentionally allowed on the local machine.
+
 ## Analysis Commands
 
 Analyze any APK:

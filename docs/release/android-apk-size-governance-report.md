@@ -217,6 +217,6 @@ npm run compare:android:apk-size -- \
 
 1. 默认正式 release 仍先采用 Stage 1：`armeabi-v7a,arm64-v8a`，当前 0.0.4 本地结果为 51.829 MiB，且本地手机人工可用性验收已通过；CI 正式 release 后继续复核正式签名链。
 2. 若产品确认可以放弃 32-bit ARM，下一版可切 Stage 4：`arm64-v8a` 单 ABI；0.0.4 当前估算约 37.875 MiB，需要重新构建确认。
-3. 下一步最高收益路径是先用正式 release workflow 打一个 `enable_legacy_packaging=true` 候选包；若手机安装、启动和核心功能正常，再把 legacy packaging 设为默认 release 策略。
+3. 下一步最高收益路径是先本地构建 release-like 包确认体积，再用 validation `.debug` 包安装到手机验证 `enable_legacy_packaging=true`；若安装、启动和核心功能正常，再把 legacy packaging 设为默认 release 策略。
 4. R8 / resource shrink 作为第二阶段叠加；23.690 MiB 候选必须完成权限、通知、后台扫描、SQLite、图片 / 视频预览和 native scan 回归后才能发布。
 5. AAB / split delivery 暂不替代当前 page 单 APK；只有决定接入 Play Store 或自建 split 安装链路时，才进入 Stage 8。

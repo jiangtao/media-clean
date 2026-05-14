@@ -217,6 +217,6 @@ Track at least:
 
 1. Keep the default official release on Stage 1 first: `armeabi-v7a,arm64-v8a`; the current 0.0.4 local result is 51.829 MiB and manual local-phone usability acceptance has passed. After the CI release, re-check the formal signing chain.
 2. If product/device support confirms 32-bit ARM can be dropped, move the next release candidate to Stage 4: `arm64-v8a`; the current 0.0.4 estimate is about 37.875 MiB and needs a rebuild to confirm.
-3. The highest-impact next path is to use the formal release workflow to build an `enable_legacy_packaging=true` candidate. If phone install, launch, and core flows pass, make legacy packaging the default release policy.
+3. The highest-impact next path is to build a local release-like APK for size confirmation, then install a validation `.debug` APK on the phone to verify `enable_legacy_packaging=true`. If install, launch, and core flows pass, make legacy packaging the default release policy.
 4. R8 / resource shrinking should be layered in as the second phase. The 23.690 MiB candidate must pass permissions, notifications, background scan, SQLite, image/video preview, and native-scan regression before release.
 5. AAB / split delivery should not replace the current page-hosted single APK unless the product chooses Play Store distribution or a custom split installation flow.

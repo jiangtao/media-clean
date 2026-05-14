@@ -82,6 +82,32 @@ bash scripts/android/build-release-apk.sh \
 3. `enable_resource_shrink`：默认 `false`。
 4. `enable_legacy_packaging`：默认 `false`。
 
+## 本地构建与线上隔离
+
+优化最终线上正式包时，可以在本地构建 release-like APK 做体积决策：
+
+```bash
+npm run build:android:release:smoke:legacy-shrink
+npm run analyze:android:apk -- android/app/build/outputs/apk/release/app-release.apk \
+  --out-dir artifacts/android-release \
+  --profile user-arm-only \
+  --fail-on-budget
+```
+
+这个包使用临时 keystore，不会自动上线；体积、ABI、native `.so` packaging、R8/resource shrink 结果可用于判断优化收益。它的包名仍是 `com.jt.mistapmediacleaner`，不要直接安装到已有正式包的用户手机上。
+
+需要在手机上验证安装、启动和核心功能时，使用 validation APK：
+
+```bash
+npm run build:android:validation:legacy-shrink
+adb install -r android/app/build/outputs/apk/validation/app-validation.apk
+adb shell monkey -p com.jt.mistapmediacleaner.debug 1
+```
+
+validation APK 是 release-like 打包、debug 签名、包名后缀 `.debug`。它用于验证打包和压缩逻辑，不覆盖线上正式 app，也不更新 page 下载。
+
+真正线上正式签名包默认仍由 GitHub Actions release workflow 产出。除非明确决定把 release keystore 下放到本机，否则本地不生成正式签名 APK。
+
 ## 分析命令
 
 分析任意 APK：

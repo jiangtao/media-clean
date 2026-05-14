@@ -5,6 +5,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 const DEFAULT_APK_PATH = 'android/app/build/outputs/apk/release/app-release.apk';
+const DEFAULT_FALLBACK_APK_PATHS = ['android/app/build/outputs/apk/validation/app-validation.apk'];
 const DEFAULT_OUT_DIR = 'artifacts/android-precommit';
 
 const APK_CRITICAL_PATTERNS = [
@@ -13,7 +14,7 @@ const APK_CRITICAL_PATTERNS = [
   /^app\.config\.[cm]?[jt]s$/,
   /^android\//,
   /^plugins\/withAndroid/,
-  /^scripts\/android\/(?:analyze-apk-size|build-release-apk|collect-release-metadata|prepare-keystore|verify-apk-size-precommit|verify-release-artifact)\.(?:mjs|sh)$/,
+  /^scripts\/android\/(?:analyze-apk-size|build-release-apk|build-validation-apk|collect-release-metadata|collect-debug-metadata|prepare-keystore|verify-apk-size-precommit|verify-release-artifact|verify-debug-artifact)\.(?:mjs|sh)$/,
   /^scripts\/release\/verify-android-release-page-contract\.mjs$/,
   /^\.github\/workflows\/android-release\.yml$/,
   /^assets\/(?:icon|adaptive-icon|splash-brand)/,
@@ -155,7 +156,29 @@ function printMissingApkFailure({ apkPath, criticalFiles, requireApk }) {
   console.error(`\nBuild and analyze a local release smoke APK first:`);
   console.error(`  npm run build:android:release:smoke`);
   console.error(`  npm run verify:precommit:android-size`);
+  console.error(`\nIf you need phone-safe validation without replacing the production package, build a validation APK:`);
+  console.error(`  npm run build:android:validation:legacy-shrink`);
+  console.error(`  ANDROID_APK_SIZE_PRECOMMIT_APK=android/app/build/outputs/apk/validation/app-validation.apk npm run verify:precommit:android-size`);
   console.error(`\nFor doc-only or emergency commits, set SKIP_ANDROID_APK_SIZE_PRECOMMIT=1 and record why.`);
+}
+
+function resolveApkPath(repoRoot, requestedApkPath) {
+  const primary = path.resolve(repoRoot, requestedApkPath);
+  if (existsSync(primary) || requestedApkPath !== DEFAULT_APK_PATH) {
+    return primary;
+  }
+
+  for (const fallbackPath of DEFAULT_FALLBACK_APK_PATHS) {
+    const candidate = path.resolve(repoRoot, fallbackPath);
+    if (existsSync(candidate)) {
+      console.log(
+        `Android APK size pre-commit gate: ${requestedApkPath} is missing; using release-like validation APK ${fallbackPath}.`,
+      );
+      return candidate;
+    }
+  }
+
+  return primary;
 }
 
 const options = parseArgs(process.argv.slice(2));
@@ -168,7 +191,7 @@ if (process.env.SKIP_ANDROID_APK_SIZE_PRECOMMIT === '1') {
 const repoRoot = resolveRepoRoot();
 const stagedFiles = getStagedFiles();
 const criticalFiles = stagedFiles.filter(isApkCriticalFile);
-const apkPath = path.resolve(repoRoot, options.apkPath);
+const apkPath = resolveApkPath(repoRoot, options.apkPath);
 const outDir = path.resolve(repoRoot, options.outDir);
 
 runNodeCheck(repoRoot);

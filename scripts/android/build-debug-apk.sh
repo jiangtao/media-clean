@@ -9,6 +9,7 @@ SIGNING_REPORT_PATH="${REPO_ROOT}/artifacts/android-debug/app-debug.signing.txt"
 METADATA_PATH="${REPO_ROOT}/artifacts/android-debug/debug-metadata.json"
 SKIP_INSTALL=0
 DEBUG_ARCHITECTURES="${ANDROID_DEBUG_ARCHITECTURES:-universal}"
+DEBUG_APPLICATION_ID_SUFFIX="${ANDROID_DEBUG_APPLICATION_ID_SUFFIX:-.debug}"
 
 usage() {
   cat <<'EOF'
@@ -22,8 +23,12 @@ usage() {
      控制 debug APK 打包 ABI。默认 universal，保留给模拟器和内部兼容验证。
      真机本地验证可传 arm64-v8a，避免把 x86 / x86_64 模拟器 ABI 打进 APK。
 
+  --application-id-suffix
+     控制 debug APK 包名后缀，默认 .debug，避免覆盖正式包。
+
 环境变量:
   ANDROID_DEBUG_ARCHITECTURES
+  ANDROID_DEBUG_APPLICATION_ID_SUFFIX
 EOF
 }
 
@@ -83,9 +88,11 @@ run_debug_pipeline() {
   local gradle_args=(
     assembleDebug
     "-PreactNativeArchitectures=${gradle_debug_architectures}"
+    "-Pandroid.debugApplicationIdSuffix=${DEBUG_APPLICATION_ID_SUFFIX}"
   )
 
   echo "Android debug architectures: ${gradle_debug_architectures}"
+  echo "Android debug applicationId suffix: ${DEBUG_APPLICATION_ID_SUFFIX}"
 
   local gradle_attempt=1
   local gradle_max_attempts=2
@@ -119,7 +126,8 @@ run_debug_pipeline() {
   rm -f "${gradle_log}"
 
   node scripts/android/verify-debug-artifact.mjs "${APK_PATH}"
-  node scripts/android/collect-debug-metadata.mjs "${APK_PATH}"
+  ANDROID_DEBUG_APPLICATION_ID_SUFFIX="${DEBUG_APPLICATION_ID_SUFFIX}" \
+    node scripts/android/collect-debug-metadata.mjs "${APK_PATH}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -130,6 +138,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --architectures)
       DEBUG_ARCHITECTURES="${2:-}"
+      shift 2
+      ;;
+    --application-id-suffix)
+      DEBUG_APPLICATION_ID_SUFFIX="${2:-}"
       shift 2
       ;;
     -h|--help)

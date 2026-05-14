@@ -27,6 +27,7 @@ const sizeGovernanceReportEnPath = path.join(
 const apkSizeAnalyzerPath = path.join(repoRoot, 'scripts', 'android', 'analyze-apk-size.mjs');
 const apkSizeComparatorPath = path.join(repoRoot, 'scripts', 'android', 'compare-apk-size-reports.mjs');
 const buildReleaseApkPath = path.join(repoRoot, 'scripts', 'android', 'build-release-apk.sh');
+const buildValidationApkPath = path.join(repoRoot, 'scripts', 'android', 'build-validation-apk.sh');
 const dependencyFootprintAnalyzerPath = path.join(
   repoRoot,
   'scripts',
@@ -72,6 +73,7 @@ function main() {
   const apkSizeAnalyzer = read(apkSizeAnalyzerPath);
   const apkSizeComparator = read(apkSizeComparatorPath);
   const buildReleaseApkScript = read(buildReleaseApkPath);
+  const buildValidationApkScript = read(buildValidationApkPath);
   const dependencyFootprintAnalyzer = read(dependencyFootprintAnalyzerPath);
   const apkSizePrecommit = read(apkSizePrecommitPath);
   const gitPrecommit = read(gitPrecommitPath);
@@ -139,8 +141,13 @@ function main() {
   expectIncludes(packageJson, 'build:android:release:smoke:arm64-shrink', packageJsonPath);
   expectIncludes(packageJson, 'build:android:release:smoke:legacy', packageJsonPath);
   expectIncludes(packageJson, 'build:android:release:smoke:legacy-shrink', packageJsonPath);
+  expectIncludes(packageJson, 'build:android:validation', packageJsonPath);
+  expectIncludes(packageJson, 'build:android:validation:legacy-shrink', packageJsonPath);
   expectIncludes(buildReleaseApkScript, 'ANDROID_USE_LEGACY_PACKAGING', buildReleaseApkPath);
   expectIncludes(buildReleaseApkScript, '--enable-legacy-packaging', buildReleaseApkPath);
+  expectIncludes(buildValidationApkScript, 'assembleValidation', buildValidationApkPath);
+  expectIncludes(buildValidationApkScript, 'ANDROID_USE_LEGACY_PACKAGING', buildValidationApkPath);
+  expectIncludes(buildValidationApkScript, 'android.validationApplicationIdSuffix', buildValidationApkPath);
   expectIncludes(apkSizeAnalyzer, 'user-arm-only', apkSizeAnalyzerPath);
   expectIncludes(apkSizeComparator, 'Delta vs baseline', apkSizeComparatorPath);
   expectIncludes(dependencyFootprintAnalyzer, 'ALLOWED_ZERO_IMPORT_DEPENDENCIES', dependencyFootprintAnalyzerPath);
@@ -172,6 +179,7 @@ function main() {
           path.relative(repoRoot, apkSizeAnalyzerPath),
           path.relative(repoRoot, apkSizeComparatorPath),
           path.relative(repoRoot, buildReleaseApkPath),
+          path.relative(repoRoot, buildValidationApkPath),
           path.relative(repoRoot, dependencyFootprintAnalyzerPath),
           path.relative(repoRoot, apkSizePrecommitPath),
           path.relative(repoRoot, gitPrecommitPath)

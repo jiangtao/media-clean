@@ -52,3 +52,4 @@ docs/archive/tmp/
 
 # local agent worktrees
 .claude/
+EXECUTION_SUMMARY.md

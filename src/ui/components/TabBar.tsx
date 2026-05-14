@@ -22,10 +22,10 @@ interface TabBarProps {
 
 export function TabBar({ tabs, activeTab, onTabPress, theme }: TabBarProps) {
   const insets = useSafeAreaInsets();
-  const styles = createStyles(theme, insets.bottom);
+  const styles = createStyles(theme, Math.max(insets.bottom, 8));
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="main-tab-bar-safe-area">
       <View style={styles.tabBar}>
         {tabs.map((tab) => {
           const isActive = activeTab === tab.name;
@@ -66,13 +66,11 @@ export function TabBar({ tabs, activeTab, onTabPress, theme }: TabBarProps) {
   );
 }
 
-function createStyles(theme: AppThemePalette, bottomInset: number) {
-  const compactBottomInset = bottomInset > 0 ? Math.min(bottomInset, 8) : 8;
-
+function createStyles(theme: AppThemePalette, bottomPadding: number) {
   return StyleSheet.create({
     container: {
       backgroundColor: 'transparent',
-      paddingBottom: compactBottomInset,
+      paddingBottom: bottomPadding,
     },
     tabBar: {
       flexDirection: 'row',

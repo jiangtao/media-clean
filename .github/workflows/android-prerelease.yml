@@ -1,6 +1,7 @@
 name: Android Prerelease APK
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -21,6 +22,8 @@ on:
       # 构建脚本和插件
       - 'scripts/android/**'
       - 'plugins/**'
+      # 预发布 workflow 自身变更
+      - '.github/workflows/android-prerelease.yml'
       # 排除文档和 page 目录的变更
       - '!docs/**'
       - '!page/**'

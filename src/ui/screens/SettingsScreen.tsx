@@ -1,5 +1,4 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -52,6 +51,7 @@ import {
   type SettingsScreenLayout,
 } from './screen-layout';
 import { formatLocalizedSize } from '../../i18n/app-copy';
+import { AppIcon } from '../icons/AppIcon';
 import { DesignIcon } from '../icons/DesignIcon';
 
 const LIGHT_THEME_PREVIEW = getAppTheme('light');
@@ -126,7 +126,7 @@ function SettingsRow({ label, value, onPress, showArrow = false, children, theme
       <View style={styles.rightContent}>
         {value ? <Text style={styles.value}>{value}</Text> : null}
         {children}
-        {showArrow ? <Ionicons name="chevron-forward" size={16} color={theme.pageTextMuted} /> : null}
+        {showArrow ? <AppIcon name="chevron-forward" size={16} color={theme.pageTextMuted} /> : null}
       </View>
     </View>
   );

@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
@@ -6,6 +5,7 @@ import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 import type { CleanupCandidate } from '../../domain/recognition/types';
 import type { AppLanguage } from '../../i18n/app-language';
 import type { AppThemePalette } from '../../theme/app-theme';
+import { AppIcon } from '../icons/AppIcon';
 import { buildSizedImageSource } from './image-source';
 import { TouchSurface } from './TouchSurface';
 import { VideoPlayer } from './VideoPlayer';
@@ -234,7 +234,7 @@ export function DuplicateCarousel({
                 preset="icon"
                 testID="duplicate-nav-prev"
               >
-                <Ionicons name="chevron-back" size={18} color="#ffffff" />
+                <AppIcon name="chevron-back" size={18} color="#ffffff" />
               </TouchSurface>
             ) : null}
             {currentIndex < viewerItems.length - 1 ? (
@@ -245,7 +245,7 @@ export function DuplicateCarousel({
                 preset="icon"
                 testID="duplicate-nav-next"
               >
-                <Ionicons name="chevron-forward" size={18} color="#ffffff" />
+                <AppIcon name="chevron-forward" size={18} color="#ffffff" />
               </TouchSurface>
             ) : null}
           </>

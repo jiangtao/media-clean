@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
+import { AppIcon } from '../../icons/AppIcon';
 import { DesignIcon, SvgProcessRing, type DesignIconName } from '../../icons/DesignIcon';
 import type { AppThemePalette } from '../../../theme/app-theme';
 import type { AppLanguage } from '../../../i18n/app-language';
@@ -138,7 +138,7 @@ export function PhotoGridEntryCard({
                     <Text style={styles.breakdownLabel}>{item.label}</Text>
                     <Text style={styles.breakdownCount}>{`${item.count} ${copy.unit}`}</Text>
                   </View>
-                  <Ionicons
+                  <AppIcon
                     name="chevron-forward"
                     size={metrics.chevronIcon}
                     color={theme?.pageTextMuted ?? '#94a3b8'}

@@ -22,6 +22,11 @@ on:
         required: false
         default: false
         type: boolean
+      enable_legacy_packaging:
+        description: "启用 legacy native .so packaging。默认关闭，需完成安装和启动回归后再用于正式发布"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -49,6 +54,7 @@ jobs:
       ANDROID_RELEASE_ARCHITECTURES: ${{ inputs.release_architectures || vars.ANDROID_RELEASE_ARCHITECTURES || 'armeabi-v7a,arm64-v8a' }}
       ANDROID_ENABLE_MINIFY_IN_RELEASE_BUILDS: ${{ inputs.enable_minify && '1' || '0' }}
       ANDROID_ENABLE_SHRINK_RESOURCES_IN_RELEASE_BUILDS: ${{ inputs.enable_resource_shrink && '1' || '0' }}
+      ANDROID_USE_LEGACY_PACKAGING: ${{ inputs.enable_legacy_packaging && '1' || '0' }}
 
     steps:
       - name: Checkout
@@ -265,6 +271,7 @@ jobs:
             echo "- Release architectures: \`${ANDROID_RELEASE_ARCHITECTURES}\`"
             echo "- R8 minify: \`${ANDROID_ENABLE_MINIFY_IN_RELEASE_BUILDS}\`"
             echo "- Resource shrink: \`${ANDROID_ENABLE_SHRINK_RESOURCES_IN_RELEASE_BUILDS}\`"
+            echo "- Legacy native packaging: \`${ANDROID_USE_LEGACY_PACKAGING}\`"
             echo
             cat artifacts/android-release/apk-size-report.md
           } >> "${GITHUB_STEP_SUMMARY}"

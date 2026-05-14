@@ -22,6 +22,7 @@ TEMP_KEYSTORE_PASSWORD="${ANDROID_TEMP_KEYSTORE_PASSWORD:-jerret@media.clean}"
 RELEASE_ARCHITECTURES="${ANDROID_RELEASE_ARCHITECTURES:-armeabi-v7a,arm64-v8a}"
 ENABLE_RELEASE_MINIFY="${ANDROID_ENABLE_MINIFY_IN_RELEASE_BUILDS:-0}"
 ENABLE_RELEASE_RESOURCE_SHRINK="${ANDROID_ENABLE_SHRINK_RESOURCES_IN_RELEASE_BUILDS:-0}"
+ENABLE_LEGACY_PACKAGING="${ANDROID_USE_LEGACY_PACKAGING:-0}"
 
 usage() {
   cat <<'EOF'
@@ -47,6 +48,10 @@ usage() {
   5. --enable-minify / --enable-resource-shrink
      显式开启 R8 / resource shrink。默认关闭，避免未覆盖真机前破坏 native bridge。
 
+  6. --enable-legacy-packaging
+     显式开启 expo.useLegacyPackaging，验证 native .so 压缩打包收益。
+     默认关闭，避免未覆盖安装和启动性能前改变 native lib 装载行为。
+
 环境变量也可直接使用:
   ANDROID_KEYSTORE_FILE
   ANDROID_KEYSTORE_BASE64
@@ -57,6 +62,7 @@ usage() {
   ANDROID_RELEASE_ARCHITECTURES
   ANDROID_ENABLE_MINIFY_IN_RELEASE_BUILDS
   ANDROID_ENABLE_SHRINK_RESOURCES_IN_RELEASE_BUILDS
+  ANDROID_USE_LEGACY_PACKAGING
 EOF
 }
 
@@ -183,11 +189,13 @@ run_release_pipeline() {
     "-PreactNativeArchitectures=${gradle_release_architectures}"
     "-Pandroid.enableMinifyInReleaseBuilds=${ENABLE_RELEASE_MINIFY}"
     "-Pandroid.enableShrinkResourcesInReleaseBuilds=${ENABLE_RELEASE_RESOURCE_SHRINK}"
+    "-Pexpo.useLegacyPackaging=${ENABLE_LEGACY_PACKAGING}"
   )
 
   echo "Android release architectures: ${gradle_release_architectures}"
   echo "Android release minify: ${ENABLE_RELEASE_MINIFY}"
   echo "Android release resource shrink: ${ENABLE_RELEASE_RESOURCE_SHRINK}"
+  echo "Android legacy packaging: ${ENABLE_LEGACY_PACKAGING}"
 
   (
     cd android
@@ -270,6 +278,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --enable-resource-shrink)
       ENABLE_RELEASE_RESOURCE_SHRINK=1
+      shift
+      ;;
+    --enable-legacy-packaging)
+      ENABLE_LEGACY_PACKAGING=1
       shift
       ;;
     -h|--help)

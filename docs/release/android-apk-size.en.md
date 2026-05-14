@@ -29,14 +29,16 @@ If the device matrix later confirms that 32-bit ARM support is no longer needed,
 arm64-v8a
 ```
 
-Current local smoke measurements:
+Current `0.0.4` local smoke measurements:
 
 | Candidate | APK MiB | Notes |
 | --- | ---: | --- |
-| Default user-facing ARM APK | 47.291 | `armeabi-v7a,arm64-v8a`, current recommended official release default |
-| arm64 single ABI | 35.558 | Requires confirmation that 32-bit ARM is no longer supported |
-| ARM APK + R8/resource shrink | 40.642 | Requires full real-device regression |
-| arm64 + R8/resource shrink | 28.909 | Smallest measured candidate; requires both device-matrix and R8 acceptance |
+| Default user-facing ARM APK | 51.829 | `armeabi-v7a,arm64-v8a`, current accepted release candidate |
+| arm64 single ABI | 37.875 | Static estimate; rebuild after confirming 32-bit ARM can be dropped |
+| ARM APK + R8/resource shrink | 45.283 | Requires full real-device regression |
+| ARM APK + legacy packaging | 30.229 | Highest-impact single switch; requires install and launch acceptance |
+| ARM APK + legacy packaging + shrink | 23.690 | Smallest current page single-APK candidate |
+| AAB connected-device splits | 22.549 | Connected-device split set, not a page single-APK replacement |
 
 ## Build Policy
 
@@ -58,6 +60,8 @@ Common candidate smoke commands:
 npm run build:android:release:smoke:arm64
 npm run build:android:release:smoke:shrink
 npm run build:android:release:smoke:arm64-shrink
+npm run build:android:release:smoke:legacy
+npm run build:android:release:smoke:legacy-shrink
 ```
 
 For an internal universal APK, pass the architecture explicitly:
@@ -71,11 +75,12 @@ bash scripts/android/build-release-apk.sh \
 
 Do not use a universal APK as the default `media-clean-android-latest.apk` user-facing artifact.
 
-The official workflow supports three manual inputs for reproducing candidate builds:
+The official workflow supports four manual inputs for reproducing candidate builds:
 
 1. `release_architectures`: defaults to `armeabi-v7a,arm64-v8a`; may be set to `arm64-v8a`.
 2. `enable_minify`: defaults to `false`.
 3. `enable_resource_shrink`: defaults to `false`.
+4. `enable_legacy_packaging`: defaults to `false`.
 
 ## Analysis Commands
 
@@ -157,7 +162,7 @@ SKIP_ANDROID_APK_SIZE_PRECOMMIT=1
 
 The release workflow runs with `--fail-on-budget`, so a user-facing APK that contains `x86` / `x86_64` or exceeds the budget fails the workflow.
 
-The current Stage 1 local release smoke APK measures 47.291 MiB with `armeabi-v7a,arm64-v8a`, already below the user-facing ARM APK warning budget. The `arm64-v8a` single-ABI smoke APK measures 35.558 MiB, below the user-facing arm64 warning budget.
+The current `0.0.4` Stage 1 local release smoke APK measures 51.829 MiB with `armeabi-v7a,arm64-v8a`, below the user-facing ARM APK warning budget. The current `arm64-v8a` single-ABI static estimate is 37.875 MiB, below the user-facing arm64 warning budget, but 32-bit ARM support must be confirmed first.
 
 ## R8 And Resource Shrinking
 
@@ -173,7 +178,7 @@ bash scripts/android/build-release-apk.sh \
   --enable-resource-shrink
 ```
 
-The current dual-ABI smoke measurement is 40.642 MiB. Compared with Stage 1, it saves 6.649 MiB, mainly by reducing dex from 10.817 MiB to 4.452 MiB. Combined with `arm64-v8a` single ABI, the measured APK is 28.909 MiB.
+The current `0.0.4` dual-ABI smoke measurement is 45.283 MiB. Compared with Stage 1, it saves 6.546 MiB, mainly by reducing dex from 10.905 MiB to 4.616 MiB. Combined with legacy packaging, the measured APK is 23.690 MiB.
 
 Before enabling them by default, verification must cover:
 
@@ -184,6 +189,38 @@ Before enabling them by default, verification must cover:
 5. expo-image / expo-video preview.
 6. Android native scan modules.
 7. signing, installation, and real-device launch for the page download APK.
+
+## Legacy Native Packaging
+
+`expo.useLegacyPackaging=true` stores native `.so` files compressed inside the APK. It has the highest impact for the page-hosted direct APK, but it can change native library extraction and startup behavior, so it remains gated by real-device acceptance before becoming the default.
+
+Local validation commands:
+
+```bash
+npm run build:android:release:smoke:legacy
+npm run build:android:release:smoke:legacy-shrink
+```
+
+Current `0.0.4` measurements:
+
+| Candidate | APK MiB | Native lib MiB | Notes |
+| --- | ---: | ---: | --- |
+| legacy packaging | 30.229 | 12.851 | 21.600 MiB smaller than Stage 1 |
+| legacy packaging + shrink | 23.690 | 12.851 | Smallest current page single-APK candidate |
+
+Installing the 23.690 MiB candidate on the local MIUI device currently returns `INSTALL_FAILED_USER_RESTRICTED`. The next step is to build a formally signed candidate through the release workflow, then make it the default only after device-side install and core-flow acceptance.
+
+## AAB / Split Delivery
+
+AAB is a distribution input, not a direct replacement for the current page-hosted APK. Current `0.0.4` measurements:
+
+| Artifact | MiB | Notes |
+| --- | ---: | --- |
+| `app-release.aab` | 35.677 | Includes debug symbols / Proguard map upload metadata |
+| Connected-device `.apks` split set | 22.549 | Delivers only the ABI / density / language splits needed by the connected device |
+| AAB universal generated APK | 23.824 | Close to the direct legacy + shrink APK |
+
+AAB / split delivery should become the default only if the product moves to Play Store distribution or implements a bundletool / split-installer flow.
 
 ## Release Artifacts
 

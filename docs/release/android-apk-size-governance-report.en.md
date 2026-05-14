@@ -123,26 +123,36 @@ The current local release smoke APK is now `0.0.4` / `versionCode=4`, but it is 
 
 Final acceptance: on 2026-05-14, after the device-side install restriction was handled, the user confirmed that local phone installation and core functionality are normal. The 0.0.4 release candidate passes manual usability acceptance.
 
-## Follow-up Candidate Measurements
+## 0.0.4 Follow-up Candidate Measurements
 
-After Stage 1, three additional candidates were measured with local release smoke builds:
+Starting from the `0.0.4` release candidate at 51.829 MiB, we remeasured R8 / resource shrinking, native `.so` legacy packaging, and AAB / split delivery:
 
-Note: the candidate values below were measured on the pre-main-merge feature baseline and are kept to show optimization priority. After merging `main`, the current Stage 1 dual-ABI build is 54.130 MiB, the static arm64-only estimate is 40.176 MiB, and the R8 / resource-shrink combinations must be rebuilt before becoming formal candidate numbers.
+| Candidate | Artifact | MiB | Delta vs 0.0.4 | Delta vs baseline | ABI / delivery | Native lib MiB | Dex MiB | JS bundle MiB | Status |
+| --- | --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | --- |
+| 0.0.4 Stage 1 | APK | 51.829 | 0.000 | -45.935 | `arm64-v8a`, `armeabi-v7a` | 34.140 | 10.905 | 2.817 | Manual usability accepted |
+| R8 / resource shrink | APK | 45.283 | -6.546 | -52.481 | `arm64-v8a`, `armeabi-v7a` | 34.140 | 4.616 | 2.811 | Built and passed the size gate; needs formally signed real-device regression |
+| legacy packaging | APK | 30.229 | -21.600 | -67.535 | `arm64-v8a`, `armeabi-v7a` | 12.851 | 10.905 | 2.811 | Built and passed the size gate; needs install / launch acceptance |
+| legacy packaging + shrink | APK | 23.690 | -28.139 | -74.074 | `arm64-v8a`, `armeabi-v7a` | 12.851 | 4.616 | 2.811 | Smallest current single-APK candidate; needs full regression |
+| AAB upload artifact | AAB | 35.677 | -16.152 | -62.087 | bundle input, not a user install artifact | 12.851 | 4.616 | 2.813 | Builds successfully; includes debug symbols / Proguard map metadata |
+| AAB connected-device splits | `.apks` | 22.549 | -29.280 | -75.215 | Current device `arm64_v8a` + `xxhdpi` + `zh` splits | target ABI only | split scoped | split scoped | Smallest download path, but requires Play / bundletool / a split installer |
+| AAB universal generated APK | APK | 23.824 | -28.005 | -73.940 | `arm64-v8a`, `armeabi-v7a` | 12.851 | 4.616 | 2.811 | Close to direct legacy + shrink |
 
-| Stage | APK MiB | Delta vs baseline | Delta % | ABI | Native lib MiB | Dex MiB | JS bundle MiB | Fonts MiB |
-| --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |
-| baseline | 97.764 | 0.000 | 0.0% | `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64` | 77.373 | 10.907 | 3.164 | 1.945 |
-| stage-1-arm-only | 47.291 | -50.473 | -51.6% | `arm64-v8a`, `armeabi-v7a` | 28.271 | 10.817 | 2.207 | 1.945 |
-| stage-4-arm64-only | 35.558 | -62.206 | -63.6% | `arm64-v8a` | 16.688 | 10.817 | 2.207 | 1.945 |
-| stage-6-r8-resource-shrink | 40.642 | -57.122 | -58.4% | `arm64-v8a`, `armeabi-v7a` | 28.271 | 4.452 | 2.207 | 1.945 |
-| stage-7-arm64-r8-resource-shrink | 28.909 | -68.855 | -70.4% | `arm64-v8a` | 16.688 | 4.452 | 2.207 | 1.945 |
+AAB connected-device split details:
+
+| Split | bytes |
+| --- | ---: |
+| `base-master.apk` | 16,012,942 |
+| `base-arm64_v8a.apk` | 7,215,159 |
+| `base-xxhdpi.apk` | 373,742 |
+| `base-zh.apk` | 41,306 |
 
 Findings:
 
-1. `arm64-v8a` single ABI is the highest-impact next reduction after Stage 1, saving another 11.733 MiB, but it is a device-compatibility decision rather than a pure technical switch.
-2. R8 / resource shrinking saves another 6.649 MiB on the dual-ABI APK, mainly by reducing dex from 10.817 MiB to 4.452 MiB. It needs full real-device regression before becoming the default.
-3. Combining both reaches 28.909 MiB, down 68.855 MiB / 70.4% from baseline. This is the smallest measured candidate, not a release default until it passes acceptance.
-4. The dependency scan found no new unused direct dependencies. Further lazy loading mostly helps startup/runtime behavior and will not materially reduce APK download size.
+1. `expo.useLegacyPackaging=true` is the highest-impact single switch right now: without changing product code, native lib compressed size drops from 34.140 MiB to 12.851 MiB, and the dual-ABI APK drops from 51.829 MiB to 30.229 MiB.
+2. R8 / resource shrinking is useful but less impactful than legacy packaging: the dual-ABI APK drops from 51.829 MiB to 45.283 MiB, mainly because dex drops from 10.905 MiB to 4.616 MiB.
+3. legacy packaging + R8 / resource shrinking reaches 23.690 MiB, the smallest measured single-APK / page-download candidate.
+4. AAB / split delivery can reach 22.549 MiB for the connected device, but it is not a direct replacement for the current page-hosted APK. It requires Play Store distribution or a custom bundletool / split-installer flow.
+5. Installing the 23.690 MiB candidate on the local MIUI device currently fails with `INSTALL_FAILED_USER_RESTRICTED: Install canceled by user`. Therefore legacy packaging and shrinking must not become defaults until a formally signed candidate passes install, launch, and core-flow acceptance.
 
 ## Stage Priorities
 
@@ -153,10 +163,11 @@ Findings:
 | Stage 2 | P0 | Add pre-commit size gate | Done | Guardrail, not direct size reduction | Dependency, Android native, release workflow, and signing plugin changes trigger size gate before commit |
 | Stage 3 | P1 | Remove unused direct dependencies | Done and re-scanned | 0.0.4 removes direct `@expo/vector-icons`; APK is 2.301 MiB smaller than main-merged 0.0.3 | `analyze:android:deps` passes and unused dependencies stay out of the install surface |
 | Stage 4 | P1 | Evaluate `arm64-v8a` single ABI | Pre-main-merge local release smoke measured; main-merged result is currently a static estimate and needs a rebuild | Pre-merge 35.558 MiB actual; main-merged estimate 40.176 MiB | 32-bit ARM support is no longer required; real-device install and launch pass |
-| Stage 5 | P1 | Validate native `.so` packaging / legacy packaging | Pending spike | Pending measurement | Install, startup time, low-end devices, signing, and page download all pass |
-| Stage 6 | P2 | Validate R8 / resource shrink | Pre-main-merge local release smoke measured; main-merged build and full real-device regression pending | Pre-merge 40.642 MiB actual, -57.122 MiB / -58.4% vs baseline | Media permissions, notifications, foreground service, SQLite, image/video preview, and native scan are covered |
-| Stage 7 | P2 | `arm64-v8a` + R8 / resource shrink combined candidate | Pre-main-merge local release smoke measured; main-merged device-matrix and real-device regression pending | Pre-merge 28.909 MiB actual, -68.855 MiB / -70.4% vs baseline | Must satisfy both Stage 4 and Stage 6 acceptance |
-| Stage 8 | P3 | JS lazy loading / i18n / token bundle hygiene | Pending performance evidence | Mainly improves startup path, not primary APK size | JS bundle warning stays under 5 MiB and mobile entry does not import desktop/generated artifacts |
+| Stage 5 | P1 | Validate native `.so` packaging / legacy packaging | 0.0.4 measured; CI workflow now has a manual switch; formally signed device acceptance pending | 30.229 MiB alone; 23.690 MiB combined with shrink | Install, startup time, low-end devices, signing, and page download all pass |
+| Stage 6 | P2 | Validate R8 / resource shrink | 0.0.4 measured; full real-device regression pending | 45.283 MiB alone; 23.690 MiB combined with legacy packaging | Media permissions, notifications, foreground service, SQLite, image/video preview, and native scan are covered |
+| Stage 7 | P2 | `arm64-v8a` + shrink / legacy combined candidate | Rebuild after product confirms the 32-bit ARM support policy | Current static estimates: arm64 + shrink 31.329 MiB; arm64 + legacy + shrink 17.707 MiB | Must satisfy Stage 4, Stage 5, and Stage 6 acceptance |
+| Stage 8 | P3 | AAB / split delivery | AAB built; connected-device `.apks` measured | AAB 35.677 MiB; connected-device split set 22.549 MiB; universal generated APK 23.824 MiB | Requires Play Store or a custom split installer; not a direct replacement for the page single APK |
+| Stage 9 | P3 | JS lazy loading / i18n / token bundle hygiene | Pending performance evidence | Mainly improves startup path, not primary APK size | JS bundle warning stays under 5 MiB and mobile entry does not import desktop/generated artifacts |
 
 ## Delivered Artifacts
 
@@ -166,8 +177,8 @@ Findings:
 4. Pre-commit gate: `.githooks/pre-commit` and `scripts/android/verify-apk-size-precommit.mjs`.
 5. Release workflow ABI default: `ANDROID_RELEASE_ARCHITECTURES=armeabi-v7a,arm64-v8a`.
 6. Dependency cleanup: removed `@shopify/flash-list`, `form-data`, `gopd`, and `react-native-polyfill-globals`; kept and allowlisted `expo-system-ui` because `userInterfaceStyle: automatic` requires it; kept and allowlisted `react-native-worklets` as the Reanimated 4 native runtime peer.
-7. Local smoke variants: `build:android:release:smoke:arm64`, `build:android:release:smoke:shrink`, and `build:android:release:smoke:arm64-shrink`.
-8. Release workflow inputs: `release_architectures`, `enable_minify`, and `enable_resource_shrink`, used to reproduce candidate builds before making them defaults.
+7. Local smoke variants: `build:android:release:smoke:arm64`, `build:android:release:smoke:shrink`, `build:android:release:smoke:arm64-shrink`, `build:android:release:smoke:legacy`, and `build:android:release:smoke:legacy-shrink`.
+8. Release workflow inputs: `release_architectures`, `enable_minify`, `enable_resource_shrink`, and `enable_legacy_packaging`, used to reproduce candidate builds before making them defaults.
 
 ## Comparison Method
 
@@ -206,5 +217,6 @@ Track at least:
 
 1. Keep the default official release on Stage 1 first: `armeabi-v7a,arm64-v8a`; the current 0.0.4 local result is 51.829 MiB and manual local-phone usability acceptance has passed. After the CI release, re-check the formal signing chain.
 2. If product/device support confirms 32-bit ARM can be dropped, move the next release candidate to Stage 4: `arm64-v8a`; the current 0.0.4 estimate is about 37.875 MiB and needs a rebuild to confirm.
-3. Before enabling R8 / resource shrinking by default, rebuild from the main-merged baseline and validate permissions, notifications, background scan, SQLite, image/video preview, and native scan with a formally signed APK.
-4. Stage 7 at 28.909 MiB is the smallest pre-merge candidate; the main-merged version must be remeasured and cannot be released just because the historical candidate was smallest.
+3. The highest-impact next path is to use the formal release workflow to build an `enable_legacy_packaging=true` candidate. If phone install, launch, and core flows pass, make legacy packaging the default release policy.
+4. R8 / resource shrinking should be layered in as the second phase. The 23.690 MiB candidate must pass permissions, notifications, background scan, SQLite, image/video preview, and native-scan regression before release.
+5. AAB / split delivery should not replace the current page-hosted single APK unless the product chooses Play Store distribution or a custom split installation flow.

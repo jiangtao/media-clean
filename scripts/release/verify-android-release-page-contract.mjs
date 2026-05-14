@@ -26,6 +26,7 @@ const sizeGovernanceReportEnPath = path.join(
 );
 const apkSizeAnalyzerPath = path.join(repoRoot, 'scripts', 'android', 'analyze-apk-size.mjs');
 const apkSizeComparatorPath = path.join(repoRoot, 'scripts', 'android', 'compare-apk-size-reports.mjs');
+const buildReleaseApkPath = path.join(repoRoot, 'scripts', 'android', 'build-release-apk.sh');
 const dependencyFootprintAnalyzerPath = path.join(
   repoRoot,
   'scripts',
@@ -70,6 +71,7 @@ function main() {
   const sizeGovernanceReportEn = read(sizeGovernanceReportEnPath);
   const apkSizeAnalyzer = read(apkSizeAnalyzerPath);
   const apkSizeComparator = read(apkSizeComparatorPath);
+  const buildReleaseApkScript = read(buildReleaseApkPath);
   const dependencyFootprintAnalyzer = read(dependencyFootprintAnalyzerPath);
   const apkSizePrecommit = read(apkSizePrecommitPath);
   const gitPrecommit = read(gitPrecommitPath);
@@ -86,6 +88,8 @@ function main() {
   expectIncludes(workflow, 'release_architectures', workflowPath);
   expectIncludes(workflow, 'enable_minify', workflowPath);
   expectIncludes(workflow, 'enable_resource_shrink', workflowPath);
+  expectIncludes(workflow, 'enable_legacy_packaging', workflowPath);
+  expectIncludes(workflow, 'ANDROID_USE_LEGACY_PACKAGING', workflowPath);
   expectIncludes(workflow, 'scripts/android/analyze-apk-size.mjs', workflowPath);
   expectIncludes(workflow, '--fail-on-budget', workflowPath);
   expectIncludes(workflow, 'apk-size-report.md', workflowPath);
@@ -112,13 +116,19 @@ function main() {
   expectIncludes(sizeGovernanceReportZh, 'Stage 1', sizeGovernanceReportZhPath);
   expectIncludes(sizeGovernanceReportZh, '47.291 MiB', sizeGovernanceReportZhPath);
   expectIncludes(sizeGovernanceReportZh, '35.558 MiB', sizeGovernanceReportZhPath);
-  expectIncludes(sizeGovernanceReportZh, '40.642 MiB', sizeGovernanceReportZhPath);
-  expectIncludes(sizeGovernanceReportZh, '28.909 MiB', sizeGovernanceReportZhPath);
+  expectIncludes(sizeGovernanceReportZh, '51.829 MiB', sizeGovernanceReportZhPath);
+  expectIncludes(sizeGovernanceReportZh, '45.283 MiB', sizeGovernanceReportZhPath);
+  expectIncludes(sizeGovernanceReportZh, '30.229 MiB', sizeGovernanceReportZhPath);
+  expectIncludes(sizeGovernanceReportZh, '23.690 MiB', sizeGovernanceReportZhPath);
+  expectIncludes(sizeGovernanceReportZh, '22.549 MiB', sizeGovernanceReportZhPath);
   expectIncludes(sizeGovernanceReportEn, 'Stage 1', sizeGovernanceReportEnPath);
   expectIncludes(sizeGovernanceReportEn, '47.291 MiB', sizeGovernanceReportEnPath);
   expectIncludes(sizeGovernanceReportEn, '35.558 MiB', sizeGovernanceReportEnPath);
-  expectIncludes(sizeGovernanceReportEn, '40.642 MiB', sizeGovernanceReportEnPath);
-  expectIncludes(sizeGovernanceReportEn, '28.909 MiB', sizeGovernanceReportEnPath);
+  expectIncludes(sizeGovernanceReportEn, '51.829 MiB', sizeGovernanceReportEnPath);
+  expectIncludes(sizeGovernanceReportEn, '45.283 MiB', sizeGovernanceReportEnPath);
+  expectIncludes(sizeGovernanceReportEn, '30.229 MiB', sizeGovernanceReportEnPath);
+  expectIncludes(sizeGovernanceReportEn, '23.690 MiB', sizeGovernanceReportEnPath);
+  expectIncludes(sizeGovernanceReportEn, '22.549 MiB', sizeGovernanceReportEnPath);
   expectIncludes(packageJson, 'verify:android:apk-size', packageJsonPath);
   expectIncludes(packageJson, 'verify:precommit', packageJsonPath);
   expectIncludes(packageJson, 'verify:precommit:android-size', packageJsonPath);
@@ -127,6 +137,10 @@ function main() {
   expectIncludes(packageJson, 'build:android:release:smoke:arm64', packageJsonPath);
   expectIncludes(packageJson, 'build:android:release:smoke:shrink', packageJsonPath);
   expectIncludes(packageJson, 'build:android:release:smoke:arm64-shrink', packageJsonPath);
+  expectIncludes(packageJson, 'build:android:release:smoke:legacy', packageJsonPath);
+  expectIncludes(packageJson, 'build:android:release:smoke:legacy-shrink', packageJsonPath);
+  expectIncludes(buildReleaseApkScript, 'ANDROID_USE_LEGACY_PACKAGING', buildReleaseApkPath);
+  expectIncludes(buildReleaseApkScript, '--enable-legacy-packaging', buildReleaseApkPath);
   expectIncludes(apkSizeAnalyzer, 'user-arm-only', apkSizeAnalyzerPath);
   expectIncludes(apkSizeComparator, 'Delta vs baseline', apkSizeComparatorPath);
   expectIncludes(dependencyFootprintAnalyzer, 'ALLOWED_ZERO_IMPORT_DEPENDENCIES', dependencyFootprintAnalyzerPath);
@@ -157,6 +171,7 @@ function main() {
           path.relative(repoRoot, sizeGovernanceReportEnPath),
           path.relative(repoRoot, apkSizeAnalyzerPath),
           path.relative(repoRoot, apkSizeComparatorPath),
+          path.relative(repoRoot, buildReleaseApkPath),
           path.relative(repoRoot, dependencyFootprintAnalyzerPath),
           path.relative(repoRoot, apkSizePrecommitPath),
           path.relative(repoRoot, gitPrecommitPath)

@@ -29,14 +29,16 @@ armeabi-v7a,arm64-v8a
 arm64-v8a
 ```
 
-当前本地 smoke 实测：
+当前 `0.0.4` 本地 smoke 实测：
 
 | 候选 | APK MiB | 说明 |
 | --- | ---: | --- |
-| 默认用户侧 ARM APK | 47.291 | `armeabi-v7a,arm64-v8a`，当前推荐正式 release 默认值 |
-| arm64 单 ABI | 35.558 | 需要确认不再支持 32-bit ARM |
-| ARM APK + R8/resource shrink | 40.642 | 需要完整真机回归 |
-| arm64 + R8/resource shrink | 28.909 | 当前最小候选，需要同时满足设备矩阵和 R8 回归 |
+| 默认用户侧 ARM APK | 51.829 | `armeabi-v7a,arm64-v8a`，当前已验收 release candidate |
+| arm64 单 ABI | 37.875 | 静态估算，需要确认不再支持 32-bit ARM 后重建 |
+| ARM APK + R8/resource shrink | 45.283 | 需要完整真机回归 |
+| ARM APK + legacy packaging | 30.229 | 当前最高效单开关，需安装和启动验收 |
+| ARM APK + legacy packaging + shrink | 23.690 | 当前最小 page 单 APK 候选 |
+| AAB connected-device splits | 22.549 | 当前真机 split set，不是 page 单 APK 替代物 |
 
 ## 构建策略
 
@@ -58,6 +60,8 @@ bash scripts/android/build-release-apk.sh --temp-keystore --skip-install
 npm run build:android:release:smoke:arm64
 npm run build:android:release:smoke:shrink
 npm run build:android:release:smoke:arm64-shrink
+npm run build:android:release:smoke:legacy
+npm run build:android:release:smoke:legacy-shrink
 ```
 
 如需内部 universal APK，可显式传入：
@@ -71,11 +75,12 @@ bash scripts/android/build-release-apk.sh \
 
 不要把 universal APK 作为 `media-clean-android-latest.apk` 的默认用户侧产物。
 
-正式 workflow 支持三个手动输入用于复现实验候选：
+正式 workflow 支持四个手动输入用于复现实验候选：
 
 1. `release_architectures`：默认 `armeabi-v7a,arm64-v8a`，可显式传 `arm64-v8a`。
 2. `enable_minify`：默认 `false`。
 3. `enable_resource_shrink`：默认 `false`。
+4. `enable_legacy_packaging`：默认 `false`。
 
 ## 分析命令
 
@@ -157,7 +162,7 @@ SKIP_ANDROID_APK_SIZE_PRECOMMIT=1
 
 Release workflow 使用 `--fail-on-budget`，因此用户侧 APK 如果包含 `x86` / `x86_64` 或超过预算，会直接失败。
 
-当前 Stage 1 本地 release smoke 实测为 47.291 MiB，ABI 为 `armeabi-v7a,arm64-v8a`，已经低于用户侧 ARM APK 的 warning 预算。`arm64-v8a` 单 ABI 实测为 35.558 MiB，低于用户侧 arm64 APK 的 warning 预算。
+当前 `0.0.4` Stage 1 本地 release smoke 实测为 51.829 MiB，ABI 为 `armeabi-v7a,arm64-v8a`，低于用户侧 ARM APK 的 warning 预算。`arm64-v8a` 单 ABI 当前静态估算为 37.875 MiB，低于用户侧 arm64 APK 的 warning 预算，但必须先确认不再支持 32-bit ARM。
 
 ## R8 与 resource shrink
 
@@ -173,7 +178,7 @@ bash scripts/android/build-release-apk.sh \
   --enable-resource-shrink
 ```
 
-当前双 ABI smoke 实测为 40.642 MiB；与默认 Stage 1 相比减少 6.649 MiB，主要来自 dex 从 10.817 MiB 降到 4.452 MiB。组合 `arm64-v8a` 单 ABI 后实测为 28.909 MiB。
+当前 `0.0.4` 双 ABI smoke 实测为 45.283 MiB；与默认 Stage 1 相比减少 6.546 MiB，主要来自 dex 从 10.905 MiB 降到 4.616 MiB。与 legacy packaging 叠加后实测为 23.690 MiB。
 
 开启前必须覆盖：
 
@@ -184,6 +189,38 @@ bash scripts/android/build-release-apk.sh \
 5. expo-image / expo-video preview。
 6. Android native scan modules。
 7. page 下载 APK 的签名、安装和真机启动。
+
+## Legacy native packaging
+
+`expo.useLegacyPackaging=true` 会让 native `.so` 在 APK 内压缩存放。它对 page 直下载 APK 的收益最高，但可能改变安装后 native lib 解包和启动路径，因此默认仍需真机验收后再启用。
+
+本地验证命令：
+
+```bash
+npm run build:android:release:smoke:legacy
+npm run build:android:release:smoke:legacy-shrink
+```
+
+当前 `0.0.4` 实测：
+
+| 候选 | APK MiB | Native lib MiB | 说明 |
+| --- | ---: | ---: | --- |
+| legacy packaging | 30.229 | 12.851 | 较 Stage 1 减少 21.600 MiB |
+| legacy packaging + shrink | 23.690 | 12.851 | 当前最小 page 单 APK 候选 |
+
+本轮真机安装 23.690 MiB 候选时，MIUI 返回 `INSTALL_FAILED_USER_RESTRICTED`。因此下一步应先通过 release workflow 打正式签名候选包，手机侧安装和核心功能确认后再改默认值。
+
+## AAB / split delivery
+
+AAB 是分发输入，不是当前 page 直下载 APK 的直接替代。当前 `0.0.4` AAB 实测：
+
+| 产物 | MiB | 说明 |
+| --- | ---: | --- |
+| `app-release.aab` | 35.677 | 包含 debug symbols / Proguard map 等上传 metadata |
+| 当前真机 `.apks` split set | 22.549 | 只下发当前设备需要的 ABI / density / language split |
+| AAB universal generated APK | 23.824 | 与直接 legacy + shrink APK 接近 |
+
+AAB / split delivery 只有在接入 Play Store，或自建 bundletool / split installer 安装链路时才进入默认发布策略。
 
 ## Release 产物
 

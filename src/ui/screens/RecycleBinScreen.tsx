@@ -1,6 +1,6 @@
 import * as MediaLibrary from 'expo-media-library';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, View, Text, StyleSheet, useWindowDimensions } from 'react-native';
+import { Alert, BackHandler, View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -477,6 +477,39 @@ export function RecycleBinScreen({
   const handleClosePreview = useCallback(() => {
     setPreviewCandidate(null);
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (previewCandidate) {
+          handleClosePreview();
+          return true;
+        }
+
+        if (isSelectionMode) {
+          exitSelectionMode();
+          return true;
+        }
+
+        if (onBackToPhotos) {
+          onBackToPhotos();
+          return true;
+        }
+
+        return false;
+      });
+
+      return () => {
+        subscription.remove();
+      };
+    }, [
+      exitSelectionMode,
+      handleClosePreview,
+      isSelectionMode,
+      onBackToPhotos,
+      previewCandidate,
+    ]),
+  );
 
   const DetailScreenCompat = DetailScreen as unknown as React.ComponentType<
     React.ComponentProps<typeof DetailScreen> & {

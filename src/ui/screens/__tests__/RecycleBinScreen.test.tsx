@@ -24,6 +24,34 @@ const scanMediaLibraryMock = vi.hoisted(() => vi.fn());
 const deleteAssetsAsyncMock = vi.hoisted(() => vi.fn());
 const ensureMediaLibraryDeletePermissionsAsyncMock = vi.hoisted(() => vi.fn());
 const alertMock = vi.hoisted(() => vi.fn());
+const hardwareBackApi = vi.hoisted(() => {
+  let listeners: Array<() => boolean> = [];
+
+  return {
+    addEventListener: vi.fn((_eventType: string, listener: () => boolean) => {
+      listeners.push(listener);
+
+      return {
+        remove: vi.fn(() => {
+          listeners = listeners.filter((current) => current !== listener);
+        }),
+      };
+    }),
+    emit() {
+      for (const listener of [...listeners].reverse()) {
+        if (listener()) {
+          return true;
+        }
+      }
+
+      return false;
+    },
+    reset() {
+      listeners = [];
+      this.addEventListener.mockClear();
+    },
+  };
+});
 
 vi.mock('react-native', () => {
   const ReactModule = require('react') as typeof import('react');
@@ -42,6 +70,7 @@ vi.mock('react-native', () => {
     Alert: {
       alert: alertMock,
     },
+    BackHandler: hardwareBackApi,
     View: 'View',
     Text: 'Text',
     Pressable,
@@ -371,6 +400,7 @@ describe('RecycleBinScreen', () => {
     deleteAssetsAsyncMock.mockResolvedValue(undefined);
     ensureMediaLibraryDeletePermissionsAsyncMock.mockResolvedValue({ granted: true });
     alertMock.mockReset();
+    hardwareBackApi.reset();
   });
 
   it('uses English recycle-bin copy from the shared app copy', () => {
@@ -922,5 +952,74 @@ describe('RecycleBinScreen', () => {
 
     expect(renderer.root.findByProps({ testID: 'mock-photo-grid' })).toBeTruthy();
     expect(renderer.root.findAllByProps({ testID: 'mock-detail-screen' })).toHaveLength(0);
+  });
+
+  it('closes recycle-bin detail when Android hardware back is pressed', async () => {
+    const trashedCandidate = createCandidate('recycle-1');
+    loadRecycleBinIdsMock.mockResolvedValueOnce(['recycle-1']);
+    scanMediaLibraryMock.mockResolvedValueOnce(createScanResult([trashedCandidate]));
+
+    const renderer = await renderRecycleBinScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'candidate-press-recycle-1' }).props.onPress();
+    });
+
+    expect(renderer.root.findByProps({ testID: 'mock-detail-screen' })).toBeTruthy();
+
+    let consumed = false;
+    await act(async () => {
+      consumed = hardwareBackApi.emit();
+      await flushEffects();
+    });
+
+    expect(consumed).toBe(true);
+    expect(renderer.root.findByProps({ testID: 'mock-photo-grid' })).toBeTruthy();
+    expect(renderer.root.findAllByProps({ testID: 'mock-detail-screen' })).toHaveLength(0);
+  });
+
+  it('uses Android hardware back like the recycle-bin header back button', async () => {
+    const onBackToPhotos = vi.fn();
+    const trashedCandidate = createCandidate('recycle-1');
+    loadRecycleBinIdsMock.mockResolvedValueOnce(['recycle-1']);
+    scanMediaLibraryMock.mockResolvedValueOnce(createScanResult([trashedCandidate]));
+
+    const renderer = await renderRecycleBinScreen({ onBackToPhotos });
+
+    let consumed = false;
+    await act(async () => {
+      consumed = hardwareBackApi.emit();
+      await flushEffects();
+    });
+
+    expect(consumed).toBe(true);
+    expect(onBackToPhotos).toHaveBeenCalledTimes(1);
+    expect(renderer.root.findByProps({ testID: 'mock-photo-grid' })).toBeTruthy();
+  });
+
+  it('exits recycle-bin selection mode before leaving on Android hardware back', async () => {
+    const onBackToPhotos = vi.fn();
+    const first = createCandidate('recycle-1');
+    const second = createCandidate('recycle-2');
+    loadRecycleBinIdsMock.mockResolvedValueOnce(['recycle-1', 'recycle-2']);
+    scanMediaLibraryMock.mockResolvedValueOnce(createScanResult([first, second]));
+
+    const renderer = await renderRecycleBinScreen({ onBackToPhotos });
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'candidate-press-recycle-1' }).props.onLongPress();
+    });
+
+    expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selection-mode' }).props.children).toBe('true');
+
+    let consumed = false;
+    await act(async () => {
+      consumed = hardwareBackApi.emit();
+      await flushEffects();
+    });
+
+    expect(consumed).toBe(true);
+    expect(onBackToPhotos).not.toHaveBeenCalled();
+    expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selection-mode' }).props.children).toBe('false');
   });
 });

@@ -38,6 +38,35 @@ const appStateApi = vi.hoisted(() => {
   };
 });
 
+const hardwareBackApi = vi.hoisted(() => {
+  let listeners: Array<() => boolean> = [];
+
+  return {
+    addEventListener: vi.fn((_eventType: string, listener: () => boolean) => {
+      listeners.push(listener);
+
+      return {
+        remove: vi.fn(() => {
+          listeners = listeners.filter((current) => current !== listener);
+        }),
+      };
+    }),
+    emit() {
+      for (const listener of [...listeners].reverse()) {
+        if (listener()) {
+          return true;
+        }
+      }
+
+      return false;
+    },
+    reset() {
+      listeners = [];
+      this.addEventListener.mockClear();
+    },
+  };
+});
+
 vi.mock('react-native', () => {
   class AnimatedValue {
     constructor(private value: number) {}
@@ -69,6 +98,7 @@ vi.mock('react-native', () => {
         options[platformState.os] ?? options.default,
     },
     NativeModules: {},
+    BackHandler: hardwareBackApi,
     StyleSheet: {
       create: (styles: Record<string, unknown>) => styles,
       hairlineWidth: 1,
@@ -1124,6 +1154,7 @@ describe('PhotoGridScreen', () => {
       },
     });
     appStateApi.reset();
+    hardwareBackApi.reset();
     photoScanSessionRuntimeApi.reset();
   });
 
@@ -4756,6 +4787,68 @@ describe('PhotoGridScreen', () => {
     expect(renderer.root.findByProps({ testID: 'mock-detail-screen' })).toBeTruthy();
     expect(collectRenderedTexts(renderer)).toContain('detail:photo-1');
     expect(collectRenderedTexts(renderer)).toContain('detail-scope:1');
+  });
+
+  it('closes the open detail view when Android hardware back is pressed', async () => {
+    setPlatformOS('android');
+    const renderer = await renderScreen();
+
+    await pressByTestId(renderer, 'mock-photo-grid-press-photo-1');
+    expect(renderer.root.findByProps({ testID: 'mock-detail-screen' })).toBeTruthy();
+
+    let consumed = false;
+    await act(async () => {
+      consumed = hardwareBackApi.emit();
+      await flushPromises();
+    });
+
+    expect(consumed).toBe(true);
+    expect(renderer.root.findAllByProps({ testID: 'mock-detail-screen' })).toHaveLength(0);
+    expect(renderer.root.findByProps({ testID: 'mock-photo-grid' })).toBeTruthy();
+  });
+
+  it('uses Android hardware back like the issue workspace header back button', async () => {
+    setPlatformOS('android');
+    photoScanSessionRuntimeApi.stagePhotoScanSessionRuntimeSnapshot({
+      permissionState: 'granted',
+      phase: 'completed',
+      authorizedCandidates: [createCleanupCandidate('flagged-1')],
+      visibleCandidates: [createCleanupCandidate('flagged-1')],
+      scanResultsCount: 1,
+      scanProgress: {
+        current: 1,
+        total: 1,
+        currentFileName: null,
+      },
+      scanScopeSelection: {
+        total: 1,
+        photo: 1,
+        video: 0,
+      },
+      summary: {
+        scannedAt: 1_710_000_000_000,
+        scannedCount: 1,
+        recycleBinCount: 0,
+      },
+      errorMessage: null,
+      updatedAt: Date.now(),
+    });
+
+    const renderer = await renderScreen();
+
+    await pressByTestId(renderer, 'photo-grid-result-breakdown-blurry');
+    expect(renderer.root.findByProps({ testID: 'photo-grid-workspace-title' })).toBeTruthy();
+
+    let consumed = false;
+    await act(async () => {
+      consumed = hardwareBackApi.emit();
+      await flushPromises();
+    });
+
+    const renderedTexts = collectRenderedTexts(renderer);
+    expect(consumed).toBe(true);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-workspace-title' })).toHaveLength(0);
+    expect(renderedTexts).toContain('发现 1 个待处理媒体');
   });
 
   it('opens duplicate detail with only the current related group instead of the whole result list', async () => {

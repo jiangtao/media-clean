@@ -82,30 +82,6 @@ bash scripts/android/build-release-apk.sh \
 3. `enable_resource_shrink`：默认 `false`。
 4. `enable_legacy_packaging`：默认 `false`。
 
-## 正式签名候选包，不上线
-
-如果只需要“正式签名 APK 给手机验收”，不要运行 `Android Release APK` workflow。它会创建 tag、发布 GitHub Release，并更新 `https://mc.jerret.me/download/android-latest.apk`。
-
-应运行 `Android Release Candidate APK` workflow。它使用同一套 GitHub Secrets 正式签名，但只上传 GitHub Actions artifact：
-
-```bash
-gh workflow run android-release-candidate.yml \
-  --repo jiangtao/media-clean \
-  -f candidate_label=legacy-shrink-0.0.4 \
-  -f release_architectures=armeabi-v7a,arm64-v8a \
-  -f enable_legacy_packaging=true \
-  -f enable_minify=true \
-  -f enable_resource_shrink=true
-```
-
-该候选 workflow 明确不做三件事：
-
-1. 不创建 git tag。
-2. 不发布 GitHub Release。
-3. 不部署 page 下载。
-
-验收通过后，再决定是否运行正式 release workflow。
-
 ## 分析命令
 
 分析任意 APK：

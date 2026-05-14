@@ -1,0 +1,149 @@
+name: Android Prerelease APK
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      # 应用源码
+      - 'src/**'
+      - 'App.tsx'
+      - 'index.ts'
+      # Android 原生项目
+      - 'android/**'
+      # Expo / RN 配置
+      - 'app.json'
+      - 'metro.config.js'
+      - 'babel.config.js'
+      # 依赖变更
+      - 'package.json'
+      - 'package-lock.json'
+      # 构建脚本和插件
+      - 'scripts/android/**'
+      - 'plugins/**'
+      # 排除文档和 page 目录的变更
+      - '!docs/**'
+      - '!page/**'
+      - '!**.md'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-prerelease-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-prerelease-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_FILENAME: ${{ vars.ANDROID_KEYSTORE_FILENAME || 'release.jks' }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      # 预发布版本只构建 arm64-v8a，节省时间和体积
+      ANDROID_RELEASE_ARCHITECTURES: "arm64-v8a"
+      ANDROID_ENABLE_MINIFY_IN_RELEASE_BUILDS: "1"
+      ANDROID_ENABLE_SHRINK_RESOURCES_IN_RELEASE_BUILDS: "1"
+      ANDROID_USE_LEGACY_PACKAGING: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.11.0
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android build tooling
+        run: sdkmanager "platform-tools" "build-tools;36.0.0" "ndk;27.1.12297006"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck
+        run: npm run typecheck -- --pretty false
+
+      - name: Build signed APK (prerelease)
+        run: bash scripts/android/build-release-apk.sh --skip-install
+
+      - name: Analyze APK size
+        run: |
+          node scripts/android/analyze-apk-size.mjs \
+            android/app/build/outputs/apk/release/app-release.apk \
+            --out-dir artifacts/android-prerelease \
+            --profile "prerelease-arm64" \
+            --expected-abis "arm64-v8a"
+
+      - name: Generate prerelease tag
+        id: prerelease_tag
+        run: |
+          # 格式: android-v{version}-alpha.{timestamp}+{short_sha}
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          TAG="android-v${CURRENT_VERSION}-alpha.${TIMESTAMP}+${SHORT_SHA}"
+          echo "value=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${CURRENT_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "short_sha=${SHORT_SHA}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload prerelease artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-prerelease-apk
+          path: |
+            android/app/build/outputs/apk/release/app-release.apk
+            artifacts/android-prerelease/apk-size-report.md
+
+      - name: Publish GitHub prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.prerelease_tag.outputs.value }}
+          name: "Media Clean Android ${{ steps.prerelease_tag.outputs.version }} (Alpha)"
+          prerelease: true
+          make_latest: false
+          body: |
+            ## 预发布版本 (Alpha)
+
+            此版本为自动构建的预发布版本，**仅供测试使用**。
+
+            ### 构建信息
+            - 基于 commit: `${{ steps.prerelease_tag.outputs.short_sha }}`
+            - 触发事件: `${{ github.event_name }}`
+            - 仅包含 `arm64-v8a` 架构
+
+            ### 使用建议
+            - 用于快速验证功能是否正常
+            - 用于真机测试新特性
+            - 不推荐分发给普通用户
+
+            > **注意**: 此版本未经过完整测试，可能存在稳定性问题。
+          files: |
+            android/app/build/outputs/apk/release/app-release.apk
+          overwrite_files: true
+
+      - name: Summary
+        run: |
+          echo "## Android 预发布版本已创建" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Tag: ${{ steps.prerelease_tag.outputs.value }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 版本: ${{ steps.prerelease_tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: ${{ steps.prerelease_tag.outputs.short_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 架构: arm64-v8a only" >> $GITHUB_STEP_SUMMARY

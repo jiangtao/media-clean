@@ -94,7 +94,7 @@ GitHub Variables:
 Release:
 
 1. APK：`android/app/build/outputs/apk/release/app-release.apk`
-2. 验签报告：`artifacts/android-release/app-release.signing.txt`
+2. CI 内部验签报告：`artifacts/android-release/app-release.signing.txt`
 3. SHA256：`artifacts/android-release/app-release.sha256`
 4. 元数据：`artifacts/android-release/release-metadata.json`
 5. GitHub Release 版本化资产：`artifacts/android-release/media-clean-android-v<version>.apk`
@@ -104,6 +104,8 @@ Release:
 9. 体积报告 JSON：`artifacts/android-release/apk-size-report.json`
 10. GitHub Release 版本化体积报告：`artifacts/android-release/media-clean-android-v<version>.size-report.md`
 11. GitHub Release 版本化体积报告 JSON：`artifacts/android-release/media-clean-android-v<version>.size-report.json`
+
+验签报告仅作为 CI artifact 保存，用于排查签名链路；不作为公开 GitHub Release asset 上传。
 
 Debug:
 

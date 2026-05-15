@@ -613,6 +613,93 @@ describe('RecycleBinScreen', () => {
     expect(renderer.root.findByProps({ testID: 'candidate-label-recycle-1' })).toBeTruthy();
   });
 
+  it('does not shrink persisted recycle-bin ids when hydrate cannot rehydrate every stored item', async () => {
+    const recoveredCandidate = createCandidate('recycle-1');
+    loadRecycleBinIdsMock.mockResolvedValueOnce(['recycle-1', 'recycle-2']);
+    scanMediaLibraryMock.mockResolvedValueOnce(createScanResult([recoveredCandidate]));
+
+    const onRecycleBinIdsChange = vi.fn();
+    const renderer = await renderRecycleBinScreen({ onRecycleBinIdsChange });
+
+    expect(scanMediaLibraryMock.mock.calls[0]?.[0]).toEqual(['recycle-1', 'recycle-2']);
+    expect(renderer.root.findByProps({ testID: 'recycle-bin-summary-title' }).props.children).toBe(
+      '清理 2 项',
+    );
+    expect(saveRecycleBinIdsMock).not.toHaveBeenCalledWith(['recycle-1']);
+    expect(onRecycleBinIdsChange).not.toHaveBeenCalledWith(['recycle-1']);
+    expect(renderer.root.findByProps({ testID: 'candidate-label-recycle-1' })).toBeTruthy();
+  });
+
+  it('refreshes all persisted recycle-bin ids after apk update and keeps the tapped-in list at the same count', async () => {
+    const cachedCandidates = Array.from({ length: 9 }, (_, index) =>
+      createCandidate(`recycle-${index + 1}`),
+    );
+    const persistedIds = cachedCandidates.map((candidate) => candidate.id);
+    loadRecycleBinIdsMock.mockResolvedValueOnce(persistedIds);
+    loadRecycleBinSnapshotCacheMock.mockResolvedValueOnce({
+      ids: persistedIds,
+      candidates: cachedCandidates,
+      updatedAt: new Date('2026-04-19T08:00:00+08:00').getTime(),
+      source: 'manual',
+    });
+    scanMediaLibraryMock.mockResolvedValueOnce(createScanResult(cachedCandidates));
+
+    const renderer = await renderRecycleBinScreen();
+
+    expect(scanMediaLibraryMock.mock.calls[0]?.[0]).toEqual(persistedIds);
+    expect(renderer.root.findByProps({ testID: 'recycle-bin-summary-title' }).props.children).toBe(
+      '清理 9 项',
+    );
+    for (const id of persistedIds) {
+      expect(renderer.root.findByProps({ testID: `candidate-label-${id}` })).toBeTruthy();
+    }
+  });
+
+  it('does not let an abnormal partial refresh shrink the tapped-in recycle-bin list', async () => {
+    const first = createCandidate('recycle-1');
+    const second = createCandidate('recycle-2');
+    loadRecycleBinIdsMock.mockResolvedValueOnce(['recycle-1', 'recycle-2']);
+    loadRecycleBinSnapshotCacheMock.mockResolvedValueOnce({
+      ids: ['recycle-1', 'recycle-2'],
+      candidates: [first, second],
+      updatedAt: new Date('2026-04-19T08:00:00+08:00').getTime(),
+      source: 'manual',
+    });
+    scanMediaLibraryMock.mockResolvedValueOnce(createScanResult([first]));
+
+    const renderer = await renderRecycleBinScreen();
+
+    expect(renderer.root.findByProps({ testID: 'recycle-bin-summary-title' }).props.children).toBe(
+      '清理 2 项',
+    );
+    expect(renderer.root.findByProps({ testID: 'candidate-label-recycle-1' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'candidate-label-recycle-2' })).toBeTruthy();
+  });
+
+  it('does not let an abnormal partial refresh shrink nine persisted recycle-bin photos', async () => {
+    const cachedCandidates = Array.from({ length: 9 }, (_, index) =>
+      createCandidate(`recycle-${index + 1}`),
+    );
+    const persistedIds = cachedCandidates.map((candidate) => candidate.id);
+    loadRecycleBinIdsMock.mockResolvedValueOnce(persistedIds);
+    loadRecycleBinSnapshotCacheMock.mockResolvedValueOnce({
+      ids: persistedIds,
+      candidates: cachedCandidates,
+      updatedAt: new Date('2026-04-19T08:00:00+08:00').getTime(),
+      source: 'manual',
+    });
+    scanMediaLibraryMock.mockResolvedValueOnce(createScanResult(cachedCandidates.slice(0, 7)));
+
+    const renderer = await renderRecycleBinScreen();
+
+    expect(renderer.root.findByProps({ testID: 'recycle-bin-summary-title' }).props.children).toBe(
+      '清理 9 项',
+    );
+    for (const id of persistedIds) {
+      expect(renderer.root.findByProps({ testID: `candidate-label-${id}` })).toBeTruthy();
+    }
+  });
+
   it('updates the recycle-bin list after selection keep and clean actions', async () => {
     const first = createCandidate('recycle-1');
     const second = createCandidate('recycle-2');

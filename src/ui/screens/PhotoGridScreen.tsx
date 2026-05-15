@@ -260,6 +260,7 @@ export function PhotoGridScreen({
     isSelectionMode,
     exitSelectionMode,
     previewCandidate,
+    previewBrowseCandidates,
     previewDuplicateCandidates,
     errorMessage,
     resumeMessage,
@@ -613,6 +614,9 @@ export function PhotoGridScreen({
     return (
       <PhotoGridDetailFlow
         candidate={previewCandidate}
+        browseCandidates={
+          previewBrowseCandidates.length > 0 ? previewBrowseCandidates : undefined
+        }
         duplicateCandidates={previewDuplicateCandidates}
         language={language}
         theme={theme}
@@ -846,7 +850,7 @@ export function PhotoGridScreen({
               isSelectionMode={isSelectionMode}
               onSelect={handleSelect}
               onSelectionChange={handleSelectionChange}
-              onItemPress={handleItemPress}
+              onItemPress={(candidate) => handleItemPress(candidate, issueWorkspaceCandidates)}
               theme={theme}
               gridTestID="scan-result-grid"
               itemTestID="scan-result-grid-item"

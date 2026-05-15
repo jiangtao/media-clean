@@ -30,8 +30,19 @@ interface DetailScreenProps {
 
 function buildDetailCandidates(
   candidate: CleanupCandidate,
+  browseCandidates: CleanupCandidate[] | undefined,
   duplicateCandidates: CleanupCandidate[] | undefined,
 ) {
+  if (browseCandidates?.length) {
+    const entries = [...browseCandidates];
+
+    if (!entries.some((entry) => entry.id === candidate.id)) {
+      entries.unshift(candidate);
+    }
+
+    return Array.from(new Map(entries.map((entry) => [entry.id, entry])).values());
+  }
+
   if (!candidate.duplicateGroup) {
     return [candidate];
   }
@@ -115,6 +126,7 @@ function resolveDetailActionSelection(
 
 export function DetailScreen({
   candidate,
+  browseCandidates,
   duplicateCandidates,
   language,
   theme,
@@ -134,8 +146,11 @@ export function DetailScreen({
     320,
   );
   const detailCandidates = useMemo(
-    () => (candidate ? buildDetailCandidates(candidate, duplicateCandidates) : []),
-    [candidate, duplicateCandidates],
+    () =>
+      candidate
+        ? buildDetailCandidates(candidate, browseCandidates, duplicateCandidates)
+        : [],
+    [browseCandidates, candidate, duplicateCandidates],
   );
   const [activeCandidateId, setActiveCandidateId] = useState<string | null>(candidate?.id ?? null);
   const [stageSize, setStageSize] = useState({

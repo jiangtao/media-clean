@@ -391,7 +391,7 @@ describe('DetailScreen', () => {
     expect(onPrimaryAction).toHaveBeenCalledWith(['duplicate-item-2']);
   });
 
-  it('keeps non-duplicate media scoped to the current item even if a browse list is passed in', () => {
+  it('lets non-duplicate media browse the supplied result list', () => {
     const { renderer, onKeep } = renderDetailScreen(abnormalCandidate, 'suggestions', [
       abnormalCandidate,
       duplicateSiblingCandidate,
@@ -399,8 +399,8 @@ describe('DetailScreen', () => {
 
     expect(
       flattenText(renderer.root.findByProps({ testID: 'detail-viewer-index' }).props.children),
-    ).toBe('1 / 1');
-    expect(renderer.root.findAllByProps({ testID: 'duplicate-nav-next' })).toHaveLength(0);
+    ).toBe('1 / 2');
+    expect(renderer.root.findByProps({ testID: 'duplicate-nav-next' })).toBeTruthy();
     expect(renderer.root.findAllByProps({ testID: 'duplicate-nav-prev' })).toHaveLength(0);
 
     act(() => {

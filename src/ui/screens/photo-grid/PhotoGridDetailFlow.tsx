@@ -7,6 +7,7 @@ import { DetailScreen } from '../DetailScreen';
 
 interface PhotoGridDetailFlowProps {
   candidate: CleanupCandidate;
+  browseCandidates?: CleanupCandidate[];
   duplicateCandidates: CleanupCandidate[];
   language: AppLanguage;
   theme: AppThemePalette;
@@ -24,6 +25,7 @@ const DetailScreenCompat = DetailScreen as unknown as React.ComponentType<
 
 export function PhotoGridDetailFlow({
   candidate,
+  browseCandidates,
   duplicateCandidates,
   language,
   theme,
@@ -35,6 +37,7 @@ export function PhotoGridDetailFlow({
   return (
     <DetailScreenCompat
       candidate={candidate}
+      browseCandidates={browseCandidates}
       duplicateCandidates={duplicateCandidates}
       language={language}
       theme={theme}

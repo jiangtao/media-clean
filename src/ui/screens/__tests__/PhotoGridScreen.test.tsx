@@ -5327,6 +5327,46 @@ describe('PhotoGridScreen', () => {
     );
   });
 
+  it('appends newly cleaned scan results to an existing recycle bin without replacing the prior items', async () => {
+    const existingRecycleBin = Array.from({ length: 9 }, (_, index) =>
+      createCleanupCandidate(`recycle-${index + 1}`),
+    );
+    const newFirst = createCleanupCandidate('new-cleanup-1');
+    const newSecond = createCleanupCandidate('new-cleanup-2');
+    const existingRecycleBinIds = existingRecycleBin.map((candidate) => candidate.id);
+    const onRecycleBinIdsChange = vi.fn();
+
+    mockLoadRecycleBinCandidateCache.mockResolvedValueOnce(existingRecycleBin);
+    mockLoadPhotoScanResultCache.mockResolvedValueOnce({
+      activeCandidates: [newFirst, newSecond],
+      summary: {
+        scannedAt: 1_710_000_000_000,
+        scannedCount: 11,
+        candidateCount: 2,
+        highConfidenceCount: 2,
+        mediumConfidenceCount: 0,
+        recycleBinCount: existingRecycleBin.length,
+      },
+    });
+
+    const renderer = await renderScreen({
+      recycleBinIds: existingRecycleBinIds,
+      onRecycleBinIdsChange,
+    });
+
+    await longPressByTestId(renderer, 'mock-photo-grid-press-new-cleanup-1');
+    await pressByTestId(renderer, 'mock-photo-grid-press-new-cleanup-2');
+    await pressByTestId(renderer, 'cleanup-selected-button');
+
+    const expectedRecycleBinIds = [...existingRecycleBinIds, newFirst.id, newSecond.id];
+
+    expect(mockSaveRecycleBinIds).toHaveBeenCalledWith(expectedRecycleBinIds);
+    expect(onRecycleBinIdsChange).toHaveBeenCalledWith(expectedRecycleBinIds);
+    expect(mockSaveRecycleBinCandidateCache).toHaveBeenCalledWith(
+      expectedRecycleBinIds.map((id) => expect.objectContaining({ id })),
+    );
+  });
+
   it('toggles select all and deselect all for the current visible photo-grid selection mode', async () => {
     mockLoadPhotoScanResultCache.mockResolvedValueOnce({
       activeCandidates: [

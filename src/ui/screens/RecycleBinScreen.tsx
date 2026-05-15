@@ -113,6 +113,26 @@ function filterRecycleBinCandidateCache(
   return candidates.filter((candidate) => recycleBinIdSet.has(candidate.id));
 }
 
+function mergeHydratedRecycleBinCandidates(
+  recycleBinIds: readonly string[],
+  cachedCandidates: readonly CleanupCandidate[],
+  hydratedCandidates: readonly CleanupCandidate[],
+) {
+  const merged = new Map<string, CleanupCandidate>();
+
+  for (const candidate of cachedCandidates) {
+    merged.set(candidate.id, candidate);
+  }
+
+  for (const candidate of hydratedCandidates) {
+    merged.set(candidate.id, candidate);
+  }
+
+  return recycleBinIds
+    .map((id) => merged.get(id))
+    .filter((candidate): candidate is CleanupCandidate => Boolean(candidate));
+}
+
 function sumCandidateBytes(candidates: readonly CleanupCandidate[]) {
   return candidates.reduce((total, candidate) => total + (candidate.asset.fileSize ?? 0), 0);
 }
@@ -165,7 +185,11 @@ export function RecycleBinScreen({
   const [isSelectionModeActive, setIsSelectionModeActive] = useState(false);
   const [cleanupReport, setCleanupReport] =
     useState<CleanupReportSnapshot>(EMPTY_CLEANUP_REPORT);
+  const [persistedRecycleBinCount, setPersistedRecycleBinCount] = useState(
+    recycleBinIds?.length ?? 0,
+  );
   const hasRecycleBinItems = state.recycleBin.length > 0;
+  const visibleRecycleBinCount = Math.max(state.recycleBin.length, persistedRecycleBinCount);
   const selectionCount = state.selectedIds.length;
   const isSelectionMode = hasRecycleBinItems && isSelectionModeActive;
   const contentPadding = useMemo(
@@ -191,20 +215,24 @@ export function RecycleBinScreen({
   const cleanupHistoryPrefix = `${recycleBinCopy.cleanupHistoryTitle}${
     language === 'zh-CN' ? '： ' : ': '
   }${recycleBinCopy.cleanupHistoryReleased('')}`;
-  const summaryTitle = recycleBinCopy.pendingSummary(state.recycleBin.length);
+  const summaryTitle = recycleBinCopy.pendingSummary(visibleRecycleBinCount);
   const isCompact = gridLayout.isSELike;
   const summaryIconSize = gridLayout.isSELike ? 26 : 34;
   const headerTitle = isSelectionMode
     ? buildSelectionHeaderTitle(language, selectionCount)
     : recycleBinTexts.title;
   const selectionToggleLabel = buildSelectionToggleLabel(language, isAllRecycleBinSelected);
-  const shouldShowCleanupHistoryLine = hasHydrated && !hasRecycleBinItems;
+  const shouldShowCleanupHistoryLine = hasHydrated && visibleRecycleBinCount === 0;
 
   useEffect(() => {
     if (!hasRecycleBinItems && isSelectionModeActive) {
       setIsSelectionModeActive(false);
     }
   }, [hasRecycleBinItems, isSelectionModeActive]);
+
+  useEffect(() => {
+    setPersistedRecycleBinCount(recycleBinIds?.length ?? 0);
+  }, [recycleBinIds]);
 
   useFocusEffect(
     useCallback(() => {
@@ -247,6 +275,7 @@ export function RecycleBinScreen({
 
           const recycleBinSourceIds = await recycleBinSourceIdsPromise;
           const persistedRecycleBinIds = normalizeIds(recycleBinSourceIds);
+          setPersistedRecycleBinCount(persistedRecycleBinIds.length);
           const cachedRecycleBinForRefresh = filterRecycleBinCandidateCache(
             cachedRecycleBin,
             persistedRecycleBinIds,
@@ -275,7 +304,11 @@ export function RecycleBinScreen({
 
           const nextState = buildHydratedRecycleBinState(
             result.state.activeCandidates,
-            result.state.recycleBin,
+            mergeHydratedRecycleBinCandidates(
+              persistedRecycleBinIds,
+              cachedRecycleBinForRefresh,
+              result.state.recycleBin,
+            ),
           );
           const hydratedRecycleBinIds = normalizeIds(nextState.recycleBin.map((candidate) => candidate.id));
 
@@ -290,10 +323,9 @@ export function RecycleBinScreen({
             updatedAt: result.summary.scannedAt,
             source: 'hydrated',
           });
-
-          if (!areSameIds(persistedRecycleBinIds, hydratedRecycleBinIds)) {
-            await saveRecycleBinIds(hydratedRecycleBinIds);
-            onRecycleBinIdsChange?.(hydratedRecycleBinIds);
+          const currentNavigatorRecycleBinIds = normalizeIds(recycleBinIds ?? []);
+          if (!areSameIds(currentNavigatorRecycleBinIds, persistedRecycleBinIds)) {
+            onRecycleBinIdsChange?.(persistedRecycleBinIds);
           }
         } catch (error) {
           if (!isActive) {
@@ -369,6 +401,7 @@ export function RecycleBinScreen({
       },
     ) => {
       const nextRecycleBinIds = normalizeIds(nextState.recycleBin.map((candidate) => candidate.id));
+      setPersistedRecycleBinCount(nextRecycleBinIds.length);
       await Promise.all([
         saveRecycleBinIds(nextRecycleBinIds),
         saveRecycleBinSnapshotCache({

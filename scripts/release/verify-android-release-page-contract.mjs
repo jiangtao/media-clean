@@ -57,6 +57,12 @@ function expectIncludes(haystack, needle, filePath) {
   }
 }
 
+function expectExcludes(haystack, needle, filePath) {
+  if (haystack.includes(needle)) {
+    throw new Error(`${path.relative(repoRoot, filePath)} 不应包含公开签名报告内容: ${needle}`);
+  }
+}
+
 function expectWorkflowInputDefault(workflow, inputName, expectedDefault) {
   const inputPattern = new RegExp(
     `${inputName}:\\n(?:[ \\t]+[^\\n]+\\n)*?[ \\t]+default: ${expectedDefault}\\n`,
@@ -113,6 +119,9 @@ function main() {
   expectIncludes(workflow, '--fail-on-budget', workflowPath);
   expectIncludes(workflow, 'apk-size-report.md', workflowPath);
   expectIncludes(workflow, 'apk-size-report.json', workflowPath);
+  expectIncludes(workflow, 'artifacts/android-release/app-release.signing.txt', workflowPath);
+  expectExcludes(workflow, 'versioned_signing', workflowPath);
+  expectExcludes(workflow, 'media-clean-android-v*.signing.txt', workflowPath);
 
   expectIncludes(pageWorkflow, preparePageDownloadScript, pageWorkflowPath);
   expectIncludes(pageWorkflow, githubBackupDownloadUrl, pageWorkflowPath);
@@ -122,6 +131,16 @@ function main() {
   expectIncludes(page, canonicalDownloadUrl, pagePath);
   expectIncludes(zhDoc, canonicalDownloadUrl, zhDocPath);
   expectIncludes(enDoc, canonicalDownloadUrl, enDocPath);
+  expectIncludes(
+    zhDoc,
+    '验签报告仅作为 CI artifact 保存，用于排查签名链路；不作为公开 GitHub Release asset 上传。',
+    zhDocPath
+  );
+  expectIncludes(
+    enDoc,
+    'The signing report is retained only as a CI artifact for signing-chain diagnostics; it is not uploaded as a public GitHub Release asset.',
+    enDocPath
+  );
   expectIncludes(vercelDoc, canonicalDownloadUrl, vercelDocPath);
   expectIncludes(vercelEnDoc, canonicalDownloadUrl, vercelEnDocPath);
   expectIncludes(zhDoc, 'android-apk-size.md', zhDocPath);

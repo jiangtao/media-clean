@@ -94,7 +94,7 @@ For `PKCS12`, `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD` are usually
 Release:
 
 1. APK: `android/app/build/outputs/apk/release/app-release.apk`
-2. Signing report: `artifacts/android-release/app-release.signing.txt`
+2. CI-internal signing report: `artifacts/android-release/app-release.signing.txt`
 3. SHA256: `artifacts/android-release/app-release.sha256`
 4. Metadata: `artifacts/android-release/release-metadata.json`
 5. Versioned GitHub Release asset: `artifacts/android-release/media-clean-android-v<version>.apk`
@@ -104,6 +104,8 @@ Release:
 9. Size report JSON: `artifacts/android-release/apk-size-report.json`
 10. Versioned GitHub Release size report: `artifacts/android-release/media-clean-android-v<version>.size-report.md`
 11. Versioned GitHub Release size report JSON: `artifacts/android-release/media-clean-android-v<version>.size-report.json`
+
+The signing report is retained only as a CI artifact for signing-chain diagnostics; it is not uploaded as a public GitHub Release asset.
 
 Debug:
 

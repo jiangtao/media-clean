@@ -139,7 +139,6 @@ jobs:
           LATEST_APK="artifacts/android-release/media-clean-android-latest.apk"
           VERSIONED_SHA="artifacts/android-release/media-clean-android-v${RELEASE_VERSION}.sha256"
           VERSIONED_METADATA="artifacts/android-release/media-clean-android-v${RELEASE_VERSION}.metadata.json"
-          VERSIONED_SIGNING="artifacts/android-release/media-clean-android-v${RELEASE_VERSION}.signing.txt"
           VERSIONED_SIZE_REPORT_MD="artifacts/android-release/media-clean-android-v${RELEASE_VERSION}.size-report.md"
           VERSIONED_SIZE_REPORT_JSON="artifacts/android-release/media-clean-android-v${RELEASE_VERSION}.size-report.json"
 
@@ -147,7 +146,6 @@ jobs:
           cp "android/app/build/outputs/apk/release/app-release.apk" "${LATEST_APK}"
           cp "artifacts/android-release/app-release.sha256" "${VERSIONED_SHA}"
           cp "artifacts/android-release/release-metadata.json" "${VERSIONED_METADATA}"
-          cp "artifacts/android-release/app-release.signing.txt" "${VERSIONED_SIGNING}"
           cp "artifacts/android-release/apk-size-report.md" "${VERSIONED_SIZE_REPORT_MD}"
           cp "artifacts/android-release/apk-size-report.json" "${VERSIONED_SIZE_REPORT_JSON}"
 
@@ -157,7 +155,6 @@ jobs:
             echo "latest_apk=${LATEST_APK}"
             echo "versioned_sha=${VERSIONED_SHA}"
             echo "versioned_metadata=${VERSIONED_METADATA}"
-            echo "versioned_signing=${VERSIONED_SIGNING}"
             echo "versioned_size_report_md=${VERSIONED_SIZE_REPORT_MD}"
             echo "versioned_size_report_json=${VERSIONED_SIZE_REPORT_JSON}"
             echo "download_url=${ANDROID_LATEST_APK_URL}"
@@ -202,7 +199,6 @@ jobs:
             ${{ steps.release_assets.outputs.latest_apk }}
             ${{ steps.release_assets.outputs.versioned_sha }}
             ${{ steps.release_assets.outputs.versioned_metadata }}
-            ${{ steps.release_assets.outputs.versioned_signing }}
             ${{ steps.release_assets.outputs.versioned_size_report_md }}
             ${{ steps.release_assets.outputs.versioned_size_report_json }}
           overwrite_files: true
@@ -221,7 +217,6 @@ jobs:
             artifacts/android-release/media-clean-android-latest.apk
             artifacts/android-release/media-clean-android-v*.sha256
             artifacts/android-release/media-clean-android-v*.metadata.json
-            artifacts/android-release/media-clean-android-v*.signing.txt
             artifacts/android-release/apk-size-report.md
             artifacts/android-release/apk-size-report.json
             artifacts/android-release/media-clean-android-v*.size-report.md

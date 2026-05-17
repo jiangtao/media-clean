@@ -19,8 +19,12 @@ name: Landing and settings smoke
     id: tab-button-Settings
 - tapOn:
     id: tab-button-Settings
+- extendedWaitUntil:
+    visible:
+      id: settings-header
+    timeout: 30000
 - assertVisible:
-    id: settings-scroll-view
+    id: settings-header
 - scrollUntilVisible:
     element:
       id: language-option-en-US

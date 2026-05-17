@@ -17,6 +17,8 @@ name: Landing and settings smoke
     id: landing-primary-action
 - assertVisible:
     id: tab-button-Settings
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: tab-button-Settings
 - extendedWaitUntil:

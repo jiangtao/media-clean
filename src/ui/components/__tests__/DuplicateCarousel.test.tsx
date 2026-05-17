@@ -6,6 +6,17 @@ import type { CleanupCandidate } from '../../../domain/recognition/types';
 import { getAppTheme } from '../../../theme/app-theme';
 import { DuplicateCarousel } from '../DuplicateCarousel';
 
+const imageLifecycle = vi.hoisted(() => ({
+  mounts: new Map<string, number>(),
+  unmounts: new Map<string, number>(),
+  nextInstanceId: 0,
+}));
+const videoLifecycle = vi.hoisted(() => ({
+  mounts: new Map<string, number>(),
+  unmounts: new Map<string, number>(),
+  nextInstanceId: 0,
+}));
+
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
@@ -22,7 +33,30 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('expo-image', () => ({
-  Image: 'Image',
+  Image: ({ source, ...props }: { source?: { uri?: string }; [key: string]: unknown }) => {
+    const ReactModule = require('react') as typeof import('react');
+    const uri = source?.uri ?? 'unknown';
+    const instanceIdRef = ReactModule.useRef<number | null>(null);
+
+    if (instanceIdRef.current === null) {
+      imageLifecycle.nextInstanceId += 1;
+      instanceIdRef.current = imageLifecycle.nextInstanceId;
+    }
+
+    ReactModule.useEffect(() => {
+      imageLifecycle.mounts.set(uri, (imageLifecycle.mounts.get(uri) ?? 0) + 1);
+
+      return () => {
+        imageLifecycle.unmounts.set(uri, (imageLifecycle.unmounts.get(uri) ?? 0) + 1);
+      };
+    }, []);
+
+    return ReactModule.createElement('Image', {
+      ...props,
+      source,
+      mockInstanceId: instanceIdRef.current,
+    });
+  },
 }));
 
 vi.mock('@expo/vector-icons', () => ({
@@ -30,7 +64,30 @@ vi.mock('@expo/vector-icons', () => ({
 }));
 
 vi.mock('../VideoPlayer', () => ({
-  VideoPlayer: () => React.createElement('View', { testID: 'mock-video-player' }),
+  VideoPlayer: ({ uri, isActive }: { uri: string; isActive?: boolean }) => {
+    const ReactModule = require('react') as typeof import('react');
+    const instanceIdRef = ReactModule.useRef<number | null>(null);
+
+    if (instanceIdRef.current === null) {
+      videoLifecycle.nextInstanceId += 1;
+      instanceIdRef.current = videoLifecycle.nextInstanceId;
+    }
+
+    ReactModule.useEffect(() => {
+      videoLifecycle.mounts.set(uri, (videoLifecycle.mounts.get(uri) ?? 0) + 1);
+
+      return () => {
+        videoLifecycle.unmounts.set(uri, (videoLifecycle.unmounts.get(uri) ?? 0) + 1);
+      };
+    }, []);
+
+    return ReactModule.createElement('View', {
+      testID: 'mock-video-player',
+      uri,
+      isActive,
+      mockInstanceId: instanceIdRef.current,
+    });
+  },
 }));
 
 const theme = getAppTheme('light');
@@ -83,6 +140,21 @@ const duplicateSiblingCandidate: CleanupCandidate = {
   },
   issueTypes: ['duplicate'],
 };
+
+function createCarouselCandidate(id: string, mediaType: CleanupCandidate['asset']['mediaType'] = 'photo'): CleanupCandidate {
+  return {
+    ...duplicateCandidate,
+    id,
+    asset: {
+      ...duplicateCandidate.asset,
+      id,
+      uri: `file:///${id}.${mediaType === 'video' ? 'mp4' : 'jpg'}`,
+      previewUri: `file:///${id}-preview.jpg`,
+      mediaType,
+      duration: mediaType === 'video' ? 12 : 0,
+    },
+  };
+}
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -145,9 +217,37 @@ function flattenStyle(style: unknown): Record<string, unknown> {
   return {};
 }
 
+function findImageInstanceId(
+  renderer: ReturnType<typeof TestRenderer.create>,
+  uri: string,
+) {
+  const imageNode = renderer.root.find(
+    (node: { type: unknown; props: { source?: { uri?: string }; mockInstanceId?: number } }) =>
+      node.type === 'Image' && node.props.source?.uri === uri,
+  );
+
+  return imageNode.props.mockInstanceId;
+}
+
+function findVideoPlayerNode(
+  renderer: ReturnType<typeof TestRenderer.create>,
+  uri: string,
+) {
+  return renderer.root.find(
+    (node: { props: { testID?: unknown; uri?: string } }) =>
+      node.props.testID === 'mock-video-player' && node.props.uri === uri,
+  );
+}
+
 describe('DuplicateCarousel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    imageLifecycle.mounts.clear();
+    imageLifecycle.unmounts.clear();
+    imageLifecycle.nextInstanceId = 0;
+    videoLifecycle.mounts.clear();
+    videoLifecycle.unmounts.clear();
+    videoLifecycle.nextInstanceId = 0;
   });
 
   it('renders a full-stage high-fidelity image viewer for duplicate items', () => {
@@ -207,5 +307,106 @@ describe('DuplicateCarousel', () => {
     });
 
     expect(onActiveIdChange).toHaveBeenCalledWith('duplicate-item');
+  });
+
+  it('renders only the active sliding window instead of mounting every media item', () => {
+    const duplicateCandidates = Array.from({ length: 100 }, (_, index) =>
+      createCarouselCandidate(`window-item-${index}`, index % 7 === 0 ? 'video' : 'photo'),
+    );
+    const activeCandidate = duplicateCandidates[50]!;
+    const { renderer } = renderCarousel({
+      candidate: activeCandidate,
+      duplicateCandidates,
+      activeId: activeCandidate.id,
+    });
+
+    const renderedSlides = renderer.root.findAll(
+      (node: { props: { testID?: unknown } }) =>
+        typeof node.props.testID === 'string' &&
+        node.props.testID.startsWith('duplicate-stage-slide-'),
+    );
+
+    expect(renderedSlides).toHaveLength(3);
+    expect(renderer.root.findByProps({ testID: 'duplicate-stage-slide-window-item-49' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'duplicate-stage-slide-window-item-50' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'duplicate-stage-slide-window-item-51' })).toBeTruthy();
+    expect(renderer.root.findAllByProps({ testID: 'duplicate-stage-slide-window-item-0' })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ testID: 'duplicate-stage-slide-window-item-99' })).toHaveLength(0);
+  });
+
+  it('keeps overlapping image views attached to the same native image slot when the active window advances', () => {
+    const duplicateCandidates = Array.from({ length: 100 }, (_, index) =>
+      createCarouselCandidate(`window-item-${index}`, 'photo'),
+    );
+    const firstActiveCandidate = duplicateCandidates[50]!;
+    const nextActiveCandidate = duplicateCandidates[51]!;
+    const { renderer } = renderCarousel({
+      candidate: firstActiveCandidate,
+      duplicateCandidates,
+      activeId: firstActiveCandidate.id,
+    });
+    const beforeFocusedNextInstanceId = findImageInstanceId(
+      renderer,
+      'file:///window-item-51.jpg',
+    );
+
+    act(() => {
+      renderer.update(
+        <DuplicateCarousel
+          candidate={nextActiveCandidate}
+          duplicateCandidates={duplicateCandidates}
+          language="zh-CN"
+          theme={theme}
+          selectedIds={[]}
+          onSelectionChange={vi.fn()}
+          activeId={nextActiveCandidate.id}
+          onActiveIdChange={vi.fn()}
+        />,
+      );
+    });
+
+    expect(findImageInstanceId(renderer, 'file:///window-item-51.jpg')).toBe(beforeFocusedNextInstanceId);
+    expect(renderer.root.findAllByType('Image')).toHaveLength(3);
+    expect(renderer.root.findByProps({ testID: 'duplicate-stage-media-window-item-52' })).toBeTruthy();
+  });
+
+  it('keeps a swiped-away video mounted but inactive so playback pauses without recreating the player', () => {
+    const previousPhoto = createCarouselCandidate('video-before', 'photo');
+    const activeVideo = createCarouselCandidate('video-current', 'video');
+    const nextPhoto = createCarouselCandidate('video-after', 'photo');
+    const duplicateCandidates = [previousPhoto, activeVideo, nextPhoto];
+    const { renderer } = renderCarousel({
+      candidate: activeVideo,
+      duplicateCandidates,
+      activeId: activeVideo.id,
+    });
+    const activeVideoUri = 'file:///video-current.mp4';
+    const initialVideoNode = findVideoPlayerNode(renderer, activeVideoUri);
+    const initialInstanceId = initialVideoNode.props.mockInstanceId;
+
+    expect(initialVideoNode.props.isActive).toBe(true);
+    expect(videoLifecycle.mounts.get(activeVideoUri)).toBe(1);
+
+    act(() => {
+      renderer.update(
+        <DuplicateCarousel
+          candidate={nextPhoto}
+          duplicateCandidates={duplicateCandidates}
+          language="zh-CN"
+          theme={theme}
+          selectedIds={[]}
+          onSelectionChange={vi.fn()}
+          activeId={nextPhoto.id}
+          onActiveIdChange={vi.fn()}
+        />,
+      );
+    });
+
+    const inactiveVideoNode = findVideoPlayerNode(renderer, activeVideoUri);
+
+    expect(inactiveVideoNode.props.isActive).toBe(false);
+    expect(inactiveVideoNode.props.mockInstanceId).toBe(initialInstanceId);
+    expect(videoLifecycle.mounts.get(activeVideoUri)).toBe(1);
+    expect(videoLifecycle.unmounts.get(activeVideoUri) ?? 0).toBe(0);
   });
 });

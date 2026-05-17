@@ -30,8 +30,19 @@ interface DetailScreenProps {
 
 function buildDetailCandidates(
   candidate: CleanupCandidate,
+  browseCandidates: CleanupCandidate[] | undefined,
   duplicateCandidates: CleanupCandidate[] | undefined,
 ) {
+  if (browseCandidates?.length) {
+    const entries = [...browseCandidates];
+
+    if (!entries.some((entry) => entry.id === candidate.id)) {
+      entries.unshift(candidate);
+    }
+
+    return Array.from(new Map(entries.map((entry) => [entry.id, entry])).values());
+  }
+
   if (!candidate.duplicateGroup) {
     return [candidate];
   }
@@ -115,6 +126,7 @@ function resolveDetailActionSelection(
 
 export function DetailScreen({
   candidate,
+  browseCandidates,
   duplicateCandidates,
   language,
   theme,
@@ -134,8 +146,11 @@ export function DetailScreen({
     320,
   );
   const detailCandidates = useMemo(
-    () => (candidate ? buildDetailCandidates(candidate, duplicateCandidates) : []),
-    [candidate, duplicateCandidates],
+    () =>
+      candidate
+        ? buildDetailCandidates(candidate, browseCandidates, duplicateCandidates)
+        : [],
+    [browseCandidates, candidate, duplicateCandidates],
   );
   const [activeCandidateId, setActiveCandidateId] = useState<string | null>(candidate?.id ?? null);
   const [stageSize, setStageSize] = useState({
@@ -262,6 +277,7 @@ export function DetailScreen({
         ) : activeDetailCandidate.asset.mediaType === 'video' ? (
           <View style={styles.singleStage} testID="detail-photo-preview">
             <VideoPlayer
+              key={activeDetailCandidate.id}
               uri={activeDetailCandidate.asset.uri}
               width={activeDetailCandidate.asset.width}
               height={activeDetailCandidate.asset.height}
@@ -323,25 +339,6 @@ export function DetailScreen({
               />
             </View>
           </View>
-
-          {viewerCandidates.length > 1 ? (
-            <View style={styles.paginationRow} testID="detail-pagination">
-              {viewerCandidates.map((item, index) => (
-                <View
-                  key={item.id}
-                  style={[
-                    styles.paginationDot,
-                    index === activeCandidateIndex && styles.paginationDotActive,
-                  ]}
-                  testID={
-                    index === activeCandidateIndex
-                      ? `detail-pagination-dot-active-${item.id}`
-                      : `detail-pagination-dot-${item.id}`
-                  }
-                />
-              ))}
-            </View>
-          ) : null}
         </View>
       </View>
     </View>
@@ -449,24 +446,6 @@ function createStyles(insets: { top: number; bottom: number; left: number; right
     },
     actionGroup: {
       justifyContent: 'flex-end',
-    },
-    paginationRow: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: 8,
-      minHeight: 14,
-    },
-    paginationDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: 'rgba(255, 255, 255, 0.24)',
-    },
-    paginationDotActive: {
-      width: 24,
-      borderRadius: 6,
-      backgroundColor: 'rgba(255, 255, 255, 0.92)',
     },
   });
 }

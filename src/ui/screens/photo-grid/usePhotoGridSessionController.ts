@@ -419,8 +419,13 @@ function buildNextDetailViewState(
     };
   }
 
-  const scopedCandidates = getDuplicateGroupCandidates(snapshotCandidates, seedCandidate);
-  const detailCandidates = scopedCandidates.length > 0 ? scopedCandidates : [seedCandidate];
+  const activeCandidate =
+    snapshotCandidates.find((candidate) => candidate.id === activeId) ?? seedCandidate;
+  const scopedCandidates =
+    snapshotCandidates.length > 0
+      ? snapshotCandidates
+      : getDuplicateGroupCandidates(snapshotCandidates, activeCandidate);
+  const detailCandidates = scopedCandidates.length > 0 ? scopedCandidates : [activeCandidate];
   const currentIndex = Math.max(
     0,
     detailCandidates.findIndex((candidate) => candidate.id === activeId),
@@ -1243,6 +1248,10 @@ export function usePhotoGridSessionController({
     () => getDuplicateGroupCandidates(previewSnapshotCandidates ?? [], previewCandidate),
     [previewCandidate, previewSnapshotCandidates],
   );
+  const previewBrowseCandidates = useMemo(
+    () => (hasCompletedScan ? [...(previewSnapshotCandidates ?? [])] : []),
+    [hasCompletedScan, previewSnapshotCandidates],
+  );
   const selectableCandidates = useMemo(
     () =>
       filter === 'all'
@@ -2004,10 +2013,10 @@ export function usePhotoGridSessionController({
   );
 
   const handleItemPress = useCallback(
-    (candidate: CleanupCandidate) => {
+    (candidate: CleanupCandidate, browseCandidates?: readonly CleanupCandidate[]) => {
       isPreviewOpenRef.current = true;
       setPreviewCandidate(candidate);
-      setPreviewSnapshotCandidates(displayedCandidates);
+      setPreviewSnapshotCandidates([...(browseCandidates ?? displayedCandidates)]);
     },
     [displayedCandidates],
   );
@@ -2971,6 +2980,7 @@ export function usePhotoGridSessionController({
                   recycleBinIds: recycleBinIdsValue,
                   sourceCandidates,
                   language,
+                  displayProgressCurrent,
                   displayProgressTotal,
                   displayProgressCompletedOffset,
                   attachToRunningIfPresent: nativeRuntimeStatus?.phase === 'running',
@@ -3555,6 +3565,7 @@ export function usePhotoGridSessionController({
     }, []),
     isAllSelectableSelected,
     previewCandidate,
+    previewBrowseCandidates,
     previewDuplicateCandidates,
     errorMessage,
     resumeMessage,

@@ -84,6 +84,7 @@ vi.mock('react-native', () => {
   };
 
   return {
+    ActivityIndicator: 'ActivityIndicator',
     View: 'View',
     Text: 'Text',
     Pressable: 'Pressable',
@@ -452,6 +453,7 @@ vi.mock('../../components/PhotoGrid', () => ({
 vi.mock('../DetailScreen', () => {
   function MockDetailScreen({
     candidate,
+    browseCandidates,
     duplicateCandidates,
     onClose,
     onKeep,
@@ -459,13 +461,16 @@ vi.mock('../DetailScreen', () => {
     onHardDelete,
   }: {
     candidate: { id: string } | null;
+    browseCandidates?: { id: string }[];
     duplicateCandidates?: { id: string }[];
     onClose: () => void;
     onKeep?: (ids?: string[]) => void;
     onPrimaryAction: (ids?: string[]) => void;
     onHardDelete: (ids?: string[]) => void;
   }) {
-    const detailScopeCount = candidate ? Math.max(1, duplicateCandidates?.length ?? 0) : 0;
+    const detailScopeCount = candidate
+      ? Math.max(1, browseCandidates?.length ?? duplicateCandidates?.length ?? 0)
+      : 0;
 
     return React.createElement(
       'View',
@@ -3928,6 +3933,7 @@ describe('PhotoGridScreen', () => {
       fallbackReason: null,
       output: await new Promise((resolve) => {
         expect(options.legacyOptions.resumeAfterAssetId).toBe('photo-3');
+        expect(options.displayProgressCurrent).toBe(5);
         resolveScan = resolve;
       }),
     }));
@@ -4789,6 +4795,41 @@ describe('PhotoGridScreen', () => {
     expect(collectRenderedTexts(renderer)).toContain('detail-scope:1');
   });
 
+  it('does not stack a second image list under the completed recognition summary', async () => {
+    const firstCandidate = createCleanupCandidate('result-list-1');
+    const secondCandidate = createCleanupCandidate('result-list-2');
+
+    photoScanSessionRuntimeApi.stagePhotoScanSessionRuntimeSnapshot({
+      permissionState: 'granted',
+      phase: 'completed',
+      authorizedCandidates: [firstCandidate, secondCandidate],
+      visibleCandidates: [firstCandidate, secondCandidate],
+      scanResultsCount: 2,
+      scanProgress: {
+        current: 2,
+        total: 2,
+        currentFileName: null,
+      },
+      scanScopeSelection: {
+        total: 2,
+        photo: 2,
+        video: 0,
+      },
+      summary: {
+        scannedAt: 1_710_000_000_000,
+        scannedCount: 2,
+        recycleBinCount: 0,
+      },
+      errorMessage: null,
+      updatedAt: Date.now(),
+    });
+
+    const renderer = await renderScreen();
+
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-result-list' })).toHaveLength(0);
+    expect(collectRenderedTexts(renderer)).toContain('发现 2 个待处理媒体');
+  });
+
   it('closes the open detail view when Android hardware back is pressed', async () => {
     setPlatformOS('android');
     const renderer = await renderScreen();
@@ -4851,7 +4892,7 @@ describe('PhotoGridScreen', () => {
     expect(renderedTexts).toContain('发现 1 个待处理媒体');
   });
 
-  it('opens duplicate detail with only the current related group instead of the whole result list', async () => {
+  it('opens detail from the current issue image list with that list as the swipe scope', async () => {
     mockLoadPhotoScanResultCache.mockResolvedValueOnce({
       activeCandidates: [
         {
@@ -4908,9 +4949,9 @@ describe('PhotoGridScreen', () => {
           duplicateGroup: {
             groupId: 'duplicate-group-a',
             representativeId: 'keep-best',
-            relation: 'near',
+            relation: 'exact',
             size: 3,
-            similarity: 0.85,
+            similarity: 0.98,
             representativeReason: 'higher-resolution',
             representativeWidth: 3024,
             representativeHeight: 4032,
@@ -4951,11 +4992,11 @@ describe('PhotoGridScreen', () => {
 
     const renderer = await renderScreen();
 
+    await pressByTestId(renderer, 'photo-grid-result-breakdown-duplicate');
     await pressByTestId(renderer, 'mock-photo-grid-press-duplicate-1');
 
     expect(collectRenderedTexts(renderer)).toContain('detail:duplicate-1');
     expect(collectRenderedTexts(renderer)).toContain('detail-scope:2');
-    expect(collectRenderedTexts(renderer)).not.toContain('detail-scope:3');
   });
 
   it('enters selection mode inside the active issue workspace and turns later taps into selection toggles instead of detail opens', async () => {
@@ -5178,8 +5219,8 @@ describe('PhotoGridScreen', () => {
     const renderedTexts = collectRenderedTexts(renderer);
 
     expect(mockAppendFalsePositiveCandidateIds).toHaveBeenCalledWith(['kept-candidate']);
-    expect(renderedTexts).toContain('grid-count:1');
-    expect(renderedTexts).toContain('remaining-candidate');
+    expect(renderedTexts).toContain('detail:remaining-candidate');
+    expect(renderedTexts).toContain('detail-scope:1');
     expect(renderedTexts).not.toContain('kept-candidate');
     expect(mockSavePhotoScanResultCache).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -5296,6 +5337,7 @@ describe('PhotoGridScreen', () => {
 
     const renderer = await renderScreen();
 
+    await pressByTestId(renderer, 'photo-grid-result-breakdown-duplicate');
     await pressByTestId(renderer, 'mock-photo-grid-press-duplicate-1');
     expect(collectRenderedTexts(renderer)).toContain('detail:duplicate-1');
     expect(collectRenderedTexts(renderer)).toContain('detail-scope:2');

@@ -48,6 +48,7 @@ vi.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
 vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
   View: 'View',
   Text: 'Text',
   Pressable: 'Pressable',
@@ -200,6 +201,38 @@ describe('SettingsScreen', () => {
     expect(renderedTexts).toContain('24');
     expect(renderer.root.findAllByProps({ testID: 'scan-range-option-all-disabled' })).toHaveLength(0);
     expect(renderedTexts).toContain('每周一 20:30 提醒你检查识别结果');
+  });
+
+  it('renders the settings page immediately while persisted settings are loading', () => {
+    const customTheme = {
+      ...getAppTheme('light'),
+      buttonPrimaryBackground: '#8844dd',
+    };
+
+    mockUseAppPreferences.mockReturnValue({
+      isReady: true,
+      language: 'zh-CN',
+      languagePreference: 'zh-CN',
+      themePreference: 'system',
+      resolvedThemeScheme: 'light',
+      theme: customTheme,
+      copy: getAppCopy('zh-CN'),
+      setLanguage: mockSetLanguage,
+      setThemePreference: mockSetThemePreference,
+    });
+    mockLoadScanRange.mockReturnValueOnce(new Promise(() => undefined));
+
+    let renderer!: ReturnType<typeof ReactTestRenderer.create>;
+
+    act(() => {
+      renderer = ReactTestRenderer.create(<SettingsScreen />);
+    });
+
+    expect(renderer.root.findByProps({ testID: 'settings-scroll-view' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'settings-header' })).toBeTruthy();
+    expect(renderer.root.findAllByProps({ testID: 'settings-loading-fallback' })).toHaveLength(0);
+
+    renderer.unmount();
   });
 
   it('shows the never-scanned copy when no scan history exists', async () => {

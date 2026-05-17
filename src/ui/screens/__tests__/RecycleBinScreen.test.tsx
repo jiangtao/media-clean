@@ -70,6 +70,7 @@ vi.mock('react-native', () => {
     Alert: {
       alert: alertMock,
     },
+    ActivityIndicator: 'ActivityIndicator',
     BackHandler: hardwareBackApi,
     View: 'View',
     Text: 'Text',
@@ -112,15 +113,21 @@ vi.mock('../../../application/AppPreferencesContext', () => ({
     language: 'zh-CN',
     copy: getAppCopy('zh-CN'),
     theme: {
+      scheme: 'light',
       safeArea: '#f3ecdf',
       pageTextPrimary: '#18212f',
-      pageTextMuted: '#7c8595',
       pageTextSecondary: '#546272',
+      pageTextMuted: '#7c8595',
+      cardBackground: '#fffaf1',
+      cardBorder: '#e7dcc7',
+      cardMutedBackground: '#f6f7fb',
+      cardMutedBorder: '#d8dce8',
+      thumbnailBackground: '#d8d2c5',
       actionBarBackground: '#142a33',
       actionBarText: '#fff7ec',
+      buttonPrimaryBackground: '#173944',
       buttonSecondaryBackground: '#efe6d6',
       buttonSecondaryText: '#28404c',
-      buttonPrimaryBackground: '#173944',
       buttonPrimaryText: '#ffffff',
       buttonDangerBackground: '#b34f2f',
       buttonDangerText: '#ffffff',
@@ -516,7 +523,9 @@ describe('RecycleBinScreen', () => {
     loadRecycleBinIdsMock.mockReturnValueOnce(idsDeferred.promise);
     const loadingRenderer = await renderRecycleBinScreen();
 
-    expect(loadingRenderer.root.findByProps({ testID: 'recycle-bin-loading-label' }).props.children).toBe('加载保留和清理…');
+    expect(loadingRenderer.root.findByProps({ testID: 'recycle-bin-loading-state' })).toBeTruthy();
+    expect(findTextNode(loadingRenderer, '加载保留和清理…')).toBeTruthy();
+    expect(loadingRenderer.root.findAllByProps({ testID: 'recycle-bin-loading-fallback' })).toHaveLength(0);
 
     await act(async () => {
       idsDeferred.resolve([]);

@@ -10,10 +10,12 @@ node_modules/
 /page/dist/
 /page/public/download/*.apk
 web-build/
+.next/
 expo-env.d.ts
 
 # Native
 .kotlin/
+target/
 *.orig.*
 *.jks
 *.p8
@@ -29,6 +31,7 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 .tmp/
+.mc/
 .claude/
 **/plans/
 docs/tmp/

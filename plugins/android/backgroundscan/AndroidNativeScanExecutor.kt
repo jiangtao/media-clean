@@ -73,6 +73,9 @@ data class AndroidNativeScanStartOptions(
   val jobId: String,
   val language: String,
   val assets: List<AndroidNativeScanAsset>,
+  val displayProgressTotal: Int?,
+  val displayProgressCurrent: Int?,
+  val displayProgressCompletedOffset: Int,
 )
 
 data class AndroidNativeScanRuntimeStatus(
@@ -118,6 +121,11 @@ private data class AndroidNativeScanRuntimeJob(
   @Volatile var lastNotificationUpdateAt: Long = 0L
   @Volatile var lastProgressEventAt: Long = 0L
 }
+
+private data class AndroidNativeScanDisplayProgress(
+  val current: Int,
+  val total: Int,
+)
 
 private data class AndroidNativeScanCompletedAsset(
   val index: Int,
@@ -801,6 +809,39 @@ class AndroidNativeScanExecutor(private val reactContext: ReactApplicationContex
     }
   }
 
+  private fun resolveDisplayProgress(
+    job: AndroidNativeScanRuntimeJob,
+    rawCurrent: Int,
+    rawTotal: Int,
+  ): AndroidNativeScanDisplayProgress {
+    val requestedDisplayTotal = job.options.displayProgressTotal?.coerceAtLeast(0)
+    val total = rawTotal.coerceAtLeast(0)
+    val displayTotal =
+      if (requestedDisplayTotal != null && requestedDisplayTotal >= total) {
+        requestedDisplayTotal
+      } else {
+        total
+      }
+    val displayBaseCurrent =
+      (job.options.displayProgressCurrent ?: job.options.displayProgressCompletedOffset)
+        .coerceIn(0, displayTotal)
+    val shouldApplyDisplayOffset =
+      requestedDisplayTotal != null &&
+        displayTotal > total &&
+        total == job.options.assets.size
+    val displayCurrent =
+      if (shouldApplyDisplayOffset) {
+        displayBaseCurrent + rawCurrent.coerceAtLeast(0)
+      } else {
+        rawCurrent.coerceAtLeast(0)
+      }
+
+    return AndroidNativeScanDisplayProgress(
+      current = displayCurrent.coerceIn(0, displayTotal.takeIf { it > 0 } ?: displayCurrent),
+      total = displayTotal,
+    )
+  }
+
   fun stop() {
     synchronized(lock) {
       stopLocked()
@@ -836,8 +877,20 @@ class AndroidNativeScanExecutor(private val reactContext: ReactApplicationContex
     val checkpointAnalyzedInputs = mutableListOf<AndroidNativeScanAnalyzedInput>()
 
     try {
-      updateRuntimeStatus(job, phase = "running", current = 0, total = total)
-      updateForegroundService(options.language, 0, total, null, force = true)
+      val initialDisplayProgress = resolveDisplayProgress(job, 0, total)
+      updateRuntimeStatus(
+        job,
+        phase = "running",
+        current = initialDisplayProgress.current,
+        total = initialDisplayProgress.total,
+      )
+      updateForegroundService(
+        options.language,
+        initialDisplayProgress.current,
+        initialDisplayProgress.total,
+        null,
+        force = true,
+      )
       job.lastNotificationUpdateAt = System.currentTimeMillis()
       if (total == 0) {
         updateRuntimeStatus(job, phase = "completed", current = 0, total = 0, processedCount = 0)
@@ -932,11 +985,12 @@ class AndroidNativeScanExecutor(private val reactContext: ReactApplicationContex
           checkpointFileName = resolveDisplayFileName(nextInput.asset)
         }
 
+        val displayProgress = resolveDisplayProgress(job, completedCount, total)
         updateRuntimeStatus(
           job,
           phase = "running",
-          current = completedCount,
-          total = total,
+          current = displayProgress.current,
+          total = displayProgress.total,
           processedCount = processedCount,
           currentFileName = currentFileName,
           lastProcessedAssetId = lastProcessedAssetId.ifBlank { null },
@@ -950,8 +1004,8 @@ class AndroidNativeScanExecutor(private val reactContext: ReactApplicationContex
         ) {
           updateForegroundService(
             options.language,
-            completedCount,
-            total,
+            displayProgress.current,
+            displayProgress.total,
             currentFileName,
             force = completedCount == total,
           )
@@ -967,8 +1021,8 @@ class AndroidNativeScanExecutor(private val reactContext: ReactApplicationContex
             EVENT_PROGRESS,
             createProgressEventMap(
               jobId = options.jobId,
-              current = completedCount,
-              total = total,
+              current = displayProgress.current,
+              total = displayProgress.total,
               currentFileName = currentFileName,
               isScanning = completedCount < total,
             ),
@@ -981,8 +1035,8 @@ class AndroidNativeScanExecutor(private val reactContext: ReactApplicationContex
             EVENT_CHECKPOINT,
             createCheckpointEventMap(
               jobId = options.jobId,
-              current = completedCount,
-              total = total,
+              current = displayProgress.current,
+              total = displayProgress.total,
               currentFileName = checkpointFileName,
               processedCount = processedCount,
               lastProcessedAssetId = lastProcessedAssetId,
@@ -994,33 +1048,36 @@ class AndroidNativeScanExecutor(private val reactContext: ReactApplicationContex
       }
 
       ensureActive(job)
+      val completedDisplayProgress = resolveDisplayProgress(job, completedCount, total)
       updateRuntimeStatus(
         job,
         phase = "completed",
-        current = completedCount,
-        total = total,
+        current = completedDisplayProgress.current,
+        total = completedDisplayProgress.total,
         processedCount = processedCount,
         currentFileName = currentFileName,
         lastProcessedAssetId = lastProcessedAssetId.ifBlank { null },
       )
       reactContext.emitNativeEvent(EVENT_COMPLETE, createCompleteEventMap(options.jobId, completedCount))
     } catch (cancelled: CancellationException) {
+      val stoppedDisplayProgress = resolveDisplayProgress(job, completedCount, total)
       updateRuntimeStatus(
         job,
         phase = "stopped",
-        current = completedCount,
-        total = total,
+        current = stoppedDisplayProgress.current,
+        total = stoppedDisplayProgress.total,
         processedCount = processedCount,
         currentFileName = currentFileName,
         lastProcessedAssetId = lastProcessedAssetId.ifBlank { null },
       )
       reactContext.emitNativeEvent(EVENT_STOPPED, createStoppedEventMap(options.jobId))
     } catch (error: Throwable) {
+      val failedDisplayProgress = resolveDisplayProgress(job, completedCount, total)
       updateRuntimeStatus(
         job,
         phase = "failed",
-        current = completedCount,
-        total = total,
+        current = failedDisplayProgress.current,
+        total = failedDisplayProgress.total,
         processedCount = processedCount,
         currentFileName = currentFileName,
         lastProcessedAssetId = lastProcessedAssetId.ifBlank { null },
@@ -1030,8 +1087,8 @@ class AndroidNativeScanExecutor(private val reactContext: ReactApplicationContex
         createErrorEventMap(
           jobId = options.jobId,
           throwable = error,
-          current = if (completedCount > 0) completedCount else null,
-          total = if (total > 0) total else null,
+          current = if (failedDisplayProgress.current > 0) failedDisplayProgress.current else null,
+          total = if (failedDisplayProgress.total > 0) failedDisplayProgress.total else null,
           currentFileName = currentFileName,
         ),
       )

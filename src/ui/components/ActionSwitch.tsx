@@ -1,7 +1,8 @@
-import { memo, useMemo, type ComponentProps } from 'react';
+import { memo, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
+import { AppIcon, type AppIconName } from '../icons/AppIcon';
+import { DesignIcon } from '../icons/DesignIcon';
 import { TouchSurface } from './TouchSurface';
 
 const SIZE_DEFAULT = 14;
@@ -10,7 +11,7 @@ const MUTED_DANGER = '#d8646a';
 const MUTED_KEEP = '#18bf63';
 
 type ActionTone = 'neutral' | 'danger' | 'keep';
-type ActionIconName = ComponentProps<typeof Ionicons>['name'];
+type ActionIconName = AppIconName;
 
 interface ActionSwitchProps {
   primaryLabel: string;
@@ -60,12 +61,12 @@ export const ActionSwitch = memo(function ActionSwitch({
       >
         <View style={styles.actionContent}>
           {primaryIcon ? (
-            <Ionicons
-              name={primaryIcon}
-              size={density === 'compact' ? SIZE_SMALL : SIZE_DEFAULT}
-              color={selectedAction === 'primary' ? '#ffffff' : 'rgba(255, 255, 255, 0.74)'}
-              testID={`${primaryTestID}-icon`}
-            />
+            renderActionIcon(
+              primaryIcon,
+              selectedAction === 'primary' ? '#ffffff' : 'rgba(255, 255, 255, 0.74)',
+              density === 'compact' ? SIZE_SMALL : SIZE_DEFAULT,
+              `${primaryTestID}-icon`,
+            )
           ) : null}
           <Text
             style={[
@@ -90,12 +91,12 @@ export const ActionSwitch = memo(function ActionSwitch({
       >
         <View style={styles.actionContent}>
           {secondaryIcon ? (
-            <Ionicons
-              name={secondaryIcon}
-              size={density === 'compact' ? SIZE_SMALL : SIZE_DEFAULT}
-              color={selectedAction === 'secondary' ? '#ffffff' : 'rgba(255, 255, 255, 0.74)'}
-              testID={`${secondaryTestID}-icon`}
-            />
+            renderActionIcon(
+              secondaryIcon,
+              selectedAction === 'secondary' ? '#ffffff' : 'rgba(255, 255, 255, 0.74)',
+              density === 'compact' ? SIZE_SMALL : SIZE_DEFAULT,
+              `${secondaryTestID}-icon`,
+            )
           ) : null}
           <Text
             style={[
@@ -110,6 +111,23 @@ export const ActionSwitch = memo(function ActionSwitch({
     </View>
   );
 });
+
+function renderActionIcon(
+  name: ActionIconName,
+  color: string,
+  size: number,
+  testID: string,
+) {
+  if (String(name).includes('checkmark')) {
+    return <DesignIcon name="check" width={size} height={size} color={color} testID={testID} />;
+  }
+
+  if (String(name).includes('trash')) {
+    return <DesignIcon name="nav-trash" width={size} height={size} color={color} testID={testID} />;
+  }
+
+  return <AppIcon name={name} size={size} color={color} testID={testID} />;
+}
 
 function resolveActiveSegmentStyle(
   tone: ActionTone,

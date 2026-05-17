@@ -1,5 +1,5 @@
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import type { AppThemePalette } from '../../theme/app-theme';
@@ -9,14 +9,33 @@ interface VideoPlayerProps {
   width: number;
   height: number;
   theme: AppThemePalette;
+  autoPlay?: boolean;
+  isActive?: boolean;
 }
 
-export function VideoPlayer({ uri, width, height, theme }: VideoPlayerProps) {
+export function VideoPlayer({ uri, width, height, theme, autoPlay = false, isActive = true }: VideoPlayerProps) {
   const playerRef = useVideoPlayer({ uri }, (instance) => {
     instance.loop = true;
-    instance.play();
   });
   const styles = useMemo(() => createStyles(theme, width, height), [theme, width, height]);
+
+  useEffect(() => {
+    if (autoPlay && isActive) {
+      runPlayerCommand(() => playerRef.play());
+    }
+  }, [autoPlay, isActive, playerRef, uri]);
+
+  useEffect(() => {
+    if (!isActive) {
+      runPlayerCommand(() => playerRef.pause());
+    }
+  }, [isActive, playerRef, uri]);
+
+  useEffect(() => {
+    return () => {
+      runPlayerCommand(() => playerRef.pause());
+    };
+  }, [playerRef, uri]);
 
   return (
     <View style={styles.container}>
@@ -29,6 +48,14 @@ export function VideoPlayer({ uri, width, height, theme }: VideoPlayerProps) {
       />
     </View>
   );
+}
+
+function runPlayerCommand(command: () => void) {
+  try {
+    command();
+  } catch {
+    // expo-video can release the native player before React runs cleanup.
+  }
 }
 
 function createStyles(theme: AppThemePalette, videoWidth: number, videoHeight: number) {

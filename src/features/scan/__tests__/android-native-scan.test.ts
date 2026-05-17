@@ -314,27 +314,29 @@ describe('android native scan facade', () => {
       jobId: string;
       assets: readonly { id: string }[];
       displayProgressTotal?: number;
+      displayProgressCurrent?: number;
       displayProgressCompletedOffset?: number;
     }) => {
       expect(options.jobId).toBe('scan-job-display-progress');
       expect(options.assets).toHaveLength(2);
+      expect(options.displayProgressCurrent).toBe(3);
       expect(options.displayProgressTotal).toBe(5);
       expect(options.displayProgressCompletedOffset).toBe(3);
 
       nativeEventsState.emit('AndroidNativeScanExecutorProgress', {
         jobId: 'scan-job-display-progress',
-        current: 4,
-        total: 5,
+        current: 1,
+        total: 2,
         currentFileName: 'IMG_003.jpg',
         isScanning: true,
-        percentage: 80,
+        percentage: 50,
         analyzedAssetId: 'photo-3',
         analyzedInput: createAnalyzedInput('photo-3'),
       });
       nativeEventsState.emit('AndroidNativeScanExecutorCheckpoint', {
         jobId: 'scan-job-display-progress',
-        current: 4,
-        total: 5,
+        current: 1,
+        total: 2,
         currentFileName: 'IMG_003.jpg',
         processedCount: 1,
         lastProcessedAssetId: 'photo-3',
@@ -360,6 +362,7 @@ describe('android native scan facade', () => {
       recycleBinIds: [],
       sourceCandidates: [createSourceCandidate('photo-3'), createSourceCandidate('photo-4')],
       language: 'zh-CN',
+      displayProgressCurrent: 3,
       displayProgressTotal: 5,
       displayProgressCompletedOffset: 3,
       legacyOptions: {

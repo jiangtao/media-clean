@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${SKIP_PRECOMMIT:-}" == "1" ]]; then
+  echo "Skipping pre-commit checks because SKIP_PRECOMMIT=1."
+  exit 0
+fi
+
+npm run verify:precommit

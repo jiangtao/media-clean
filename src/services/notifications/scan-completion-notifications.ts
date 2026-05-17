@@ -14,7 +14,7 @@ function buildScanCompletionCopy(
     return resultCount > 0
       ? {
           title: '扫描完成',
-          body: `已检查 ${scannedCount} 个媒体，发现 ${resultCount} 个异常媒体。`,
+          body: `已检查 ${scannedCount} 个媒体，发现 ${resultCount} 个待处理媒体。`,
         }
       : {
           title: '扫描完成',

@@ -68,7 +68,7 @@ describe('scan completion notifications', () => {
       expect.objectContaining({
         content: expect.objectContaining({
           title: '扫描完成',
-          body: '已检查 360 个媒体，发现 12 个异常媒体。',
+          body: '已检查 360 个媒体，发现 12 个待处理媒体。',
         }),
         trigger: {
           channelId: 'scan-completion',

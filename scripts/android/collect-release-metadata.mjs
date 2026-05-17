@@ -8,6 +8,7 @@ const artifactDir = path.join(repoRoot, 'artifacts', 'android-release');
 const checksumPath = path.join(artifactDir, 'app-release.sha256');
 const metadataPath = path.join(artifactDir, 'release-metadata.json');
 const appJsonPath = path.join(repoRoot, 'app.json');
+const sizeReportPath = path.join(artifactDir, 'apk-size-report.json');
 
 function sha256(filePath) {
   const hash = crypto.createHash('sha256');
@@ -37,7 +38,12 @@ function main() {
     version: expoConfig.version ?? null,
     versionCode: androidConfig.versionCode ?? null,
     packageName: androidConfig.package ?? null,
+    releaseArchitectures: (process.env.ANDROID_RELEASE_ARCHITECTURES ?? '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean),
     signingReportPath: path.relative(repoRoot, path.join(artifactDir, 'app-release.signing.txt')),
+    sizeReportPath: fs.existsSync(sizeReportPath) ? path.relative(repoRoot, sizeReportPath) : null,
     documentation: {
       zh: 'docs/release/android.md',
       en: 'docs/release/android.en.md',

@@ -19,22 +19,25 @@ APP_DATA_DIR="/data/user/0/${APP_ID}"
 TARGET_ASSET_ID="${TARGET_ASSET_ID:-}"
 TARGET_BUCKET_NAME="${TARGET_BUCKET_NAME:-MediaCleanSeed}"
 TARGET_MEDIA_TYPE="${TARGET_MEDIA_TYPE:-photo}"
+TARGET_COUNT="${TARGET_COUNT:-1}"
 CLEAR_FIRST=1
 
 usage() {
   cat <<'EOF'
 用法:
-  bash scripts/android/seed-emulator-recycle-bin.sh --serial <android-serial> [--asset-id <id>] [--bucket <name>] [--media-type <photo|video>] [--keep-existing]
+  bash scripts/android/seed-emulator-recycle-bin.sh --serial <android-serial> [--asset-id <id>] [--bucket <name>] [--media-type <photo|video>] [--count <n>] [--keep-existing]
 
 说明:
   从 emulator 中已存在的 operational store 读取真实 asset_manifest，
   然后把目标 asset_id 写入 recycle_bin_state，便于后续验证 Recycle Bin / restore 流程。
+  未指定 --asset-id 时，可用 --count 构造多图回收站 fixture，便于设计签收采集密集网格。
 
 选项:
   --serial <serial>        指定目标 Android serial
   --asset-id <id>          指定要写入 recycle_bin_state 的 asset_id
   --bucket <name>          若未指定 asset_id，则优先从该 bucket 中选择最新 asset，默认 MediaCleanSeed
   --media-type <photo|video> 若未指定 asset_id，则优先选择该媒体类型，默认 photo
+  --count <n>              若未指定 asset_id，最多写入 n 个回收站条目，默认 1
   --keep-existing          保留已有 recycle_bin_state，不先清空
   -h, --help               打印帮助
 EOF
@@ -66,6 +69,10 @@ while [[ $# -gt 0 ]]; do
       TARGET_MEDIA_TYPE="$2"
       shift 2
       ;;
+    --count)
+      TARGET_COUNT="$2"
+      shift 2
+      ;;
     --keep-existing)
       CLEAR_FIRST=0
       shift
@@ -91,6 +98,11 @@ if [[ -z "${SERIAL}" ]]; then
   exit 1
 fi
 
+if ! [[ "${TARGET_COUNT}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "--count 必须是正整数，当前: ${TARGET_COUNT}" >&2
+  exit 1
+fi
+
 if [[ "$(adb devices | awk -v serial="${SERIAL}" '$1 == serial { print $2 }')" != "device" ]]; then
   echo "指定设备不可用: ${SERIAL}" >&2
   exit 1
@@ -107,6 +119,7 @@ RECYCLE_BIN_SEED_JSON="$(
   TARGET_ASSET_ID="${TARGET_ASSET_ID}" \
   TARGET_BUCKET_NAME="${TARGET_BUCKET_NAME}" \
   TARGET_MEDIA_TYPE="${TARGET_MEDIA_TYPE}" \
+  TARGET_COUNT="${TARGET_COUNT}" \
   DB_LOCAL_PATH="${DB_LOCAL_PATH}" \
   RK_LOCAL_PATH="${RK_LOCAL_PATH}" \
   MEDIASTORE_DUMP_PATH="${MEDIASTORE_DUMP_PATH}" \
@@ -124,6 +137,7 @@ media_store_dump_path = os.environ["MEDIASTORE_DUMP_PATH"]
 target_asset_id = os.environ.get("TARGET_ASSET_ID", "").strip()
 target_bucket_name = os.environ.get("TARGET_BUCKET_NAME", "MediaCleanSeed").strip()
 target_media_type = os.environ.get("TARGET_MEDIA_TYPE", "photo").strip()
+target_count = max(1, int(os.environ.get("TARGET_COUNT", "1")))
 updated_at = int(time.time() * 1000)
 
 def open_sqlite_or_none(path):
@@ -265,10 +279,26 @@ if target_asset_id:
     if target_row is None:
         print(f"未找到指定 asset_id={target_asset_id} 对应的媒体。", file=sys.stderr)
         sys.exit(1)
+    selected_rows = [target_row]
 else:
     scoped_rows = [row for row in selectable_asset_records if row.get("bucket_name") == target_bucket_name]
     typed_rows = [row for row in scoped_rows if row.get("media_type") == target_media_type]
-    target_row = (typed_rows or scoped_rows or selectable_asset_records)[0]
+    ordered_rows = []
+    seen_asset_ids = set()
+    for row in [*typed_rows, *scoped_rows, *selectable_asset_records]:
+        asset_id = str(row["asset_id"])
+        if asset_id in seen_asset_ids:
+            continue
+        seen_asset_ids.add(asset_id)
+        ordered_rows.append(row)
+    selected_rows = ordered_rows[:target_count]
+    clone_index = 1
+    while len(selected_rows) < target_count and ordered_rows:
+        source_row = dict(ordered_rows[(len(selected_rows) - len(ordered_rows)) % len(ordered_rows)])
+        source_row["asset_id"] = f"{source_row['asset_id']}-design-{clone_index}"
+        selected_rows.append(source_row)
+        clone_index += 1
+    target_row = selected_rows[0]
     target_asset_id = str(target_row["asset_id"])
 
 def build_asset(row):
@@ -288,7 +318,7 @@ def build_asset(row):
 session_row = rk.execute(
     "select value from catalystLocalStorage where key = 'app-cleaner/photo-scan-session'"
 ).fetchone()
-session_candidate = None
+session_candidates_by_asset_id = {}
 if session_row and session_row[0]:
     try:
         session = json.loads(session_row[0])
@@ -296,40 +326,44 @@ if session_row and session_row[0]:
         session = None
     if isinstance(session, dict):
         candidates = session.get("authorizedCandidates") or []
-        session_candidate = next(
-            (
-                candidate
-                for candidate in candidates
-                if isinstance(candidate, dict)
-                and isinstance(candidate.get("asset"), dict)
-                and candidate["asset"].get("id") == target_asset_id
-            ),
-            None,
-        )
+        for candidate in candidates:
+            if not isinstance(candidate, dict) or not isinstance(candidate.get("asset"), dict):
+                continue
+            candidate_asset_id = candidate["asset"].get("id")
+            if isinstance(candidate_asset_id, str):
+                session_candidates_by_asset_id[candidate_asset_id] = candidate
 
-if session_candidate is None:
-    target_asset = build_asset(target_row)
-    media_type = target_asset["mediaType"]
-    session_candidate = {
-        "id": target_asset_id,
-        "asset": target_asset,
-        "score": 92 if media_type == "photo" else 90,
-        "confidence": "high",
-        "kind": "abnormal-video" if media_type == "video" else "abnormal-photo",
-        "primaryIssueType": "abnormal",
-        "issueTypes": ["abnormal"],
-        "reasons": [
-            "Seeded recycle-bin candidate",
-            "Deterministic observability fixture",
-        ],
-    }
+target_asset_ids = [str(row["asset_id"]) for row in selected_rows]
+session_candidates = []
+for selected_row in selected_rows:
+    selected_asset_id = str(selected_row["asset_id"])
+    session_candidate = session_candidates_by_asset_id.get(selected_asset_id)
+    if session_candidate is None:
+        target_asset = build_asset(selected_row)
+        media_type = target_asset["mediaType"]
+        session_candidate = {
+            "id": selected_asset_id,
+            "asset": target_asset,
+            "score": 92 if media_type == "photo" else 90,
+            "confidence": "high",
+            "kind": "abnormal-video" if media_type == "video" else "abnormal-photo",
+            "primaryIssueType": "abnormal",
+            "issueTypes": ["abnormal"],
+            "reasons": [
+                "Seeded recycle-bin candidate",
+                "Deterministic observability fixture",
+            ],
+        }
+    session_candidates.append(session_candidate)
 
 payload = {
     "assetId": target_asset_id,
+    "assetIds": target_asset_ids,
+    "assetCount": len(target_asset_ids),
     "bucketName": target_row.get("bucket_name") or target_bucket_name,
     "snapshot": {
-        "ids": [target_asset_id],
-        "candidates": [session_candidate],
+        "ids": target_asset_ids,
+        "candidates": session_candidates,
         "updatedAt": updated_at,
         "source": "manual",
     },
@@ -356,12 +390,54 @@ print(payload.get("bucketName") or "")
 PY
 )"
 
+TARGET_ASSET_COUNT="$(
+  RECYCLE_BIN_SEED_JSON="${RECYCLE_BIN_SEED_JSON}" python3 - <<'PY'
+import json
+import os
+payload = json.loads(os.environ["RECYCLE_BIN_SEED_JSON"])
+print(payload.get("assetCount") or len(payload.get("assetIds") or [payload["assetId"]]))
+PY
+)"
+
+TARGET_ASSET_IDS_JSON="$(
+  RECYCLE_BIN_SEED_JSON="${RECYCLE_BIN_SEED_JSON}" python3 - <<'PY'
+import json
+import os
+payload = json.loads(os.environ["RECYCLE_BIN_SEED_JSON"])
+print(json.dumps(payload.get("assetIds") or [payload["assetId"]], ensure_ascii=False, separators=(",", ":")))
+PY
+)"
+
 RECYCLE_BIN_CANDIDATE_CACHE_JSON="$(
   RECYCLE_BIN_SEED_JSON="${RECYCLE_BIN_SEED_JSON}" python3 - <<'PY'
 import json
 import os
 payload = json.loads(os.environ["RECYCLE_BIN_SEED_JSON"])
 print(json.dumps(payload["snapshot"], ensure_ascii=False, separators=(",", ":")))
+PY
+)"
+
+RECYCLE_BIN_STATE_INSERT_SQL="$(
+  RECYCLE_BIN_SEED_JSON="${RECYCLE_BIN_SEED_JSON}" python3 - <<'PY'
+import json
+import os
+
+payload = json.loads(os.environ["RECYCLE_BIN_SEED_JSON"])
+updated_at = int(payload["snapshot"]["updatedAt"])
+
+def quote(value):
+    return "'" + str(value).replace("'", "''") + "'"
+
+for asset_id in payload.get("assetIds") or [payload["assetId"]]:
+    print(
+        "insert into recycle_bin_state(asset_id,recycled_at,expires_at,source,updated_at) "
+        f"values({quote(asset_id)}, {updated_at}, null, 'manual', {updated_at}) "
+        "on conflict(asset_id) do update set "
+        "recycled_at=excluded.recycled_at, "
+        "expires_at=excluded.expires_at, "
+        "source=excluded.source, "
+        "updated_at=excluded.updated_at;"
+    )
 PY
 )"
 
@@ -391,16 +467,22 @@ sqlite3 "${DB_LOCAL_PATH}" \
   "create table if not exists recycle_bin_state(asset_id text primary key, recycled_at integer not null, expires_at integer, source text not null default 'manual', updated_at integer not null);"
 
 sqlite3 "${DB_LOCAL_PATH}" \
-  "insert into recycle_bin_state(asset_id,recycled_at,expires_at,source,updated_at) values('${TARGET_ASSET_ID//\'/''}', ${UPDATED_AT}, null, 'manual', ${UPDATED_AT}) on conflict(asset_id) do update set recycled_at=excluded.recycled_at, expires_at=excluded.expires_at, source=excluded.source, updated_at=excluded.updated_at;"
+  "${RECYCLE_BIN_STATE_INSERT_SQL}"
 
 sqlite3 "${RK_LOCAL_PATH}" \
   "insert into catalystLocalStorage(key,value) values('app-cleaner/recycle-bin-candidate-cache','${RECYCLE_BIN_CANDIDATE_CACHE_JSON//\'/''}') on conflict(key) do update set value=excluded.value;"
 
 sqlite3 "${RK_LOCAL_PATH}" \
-  "insert into catalystLocalStorage(key,value) values('app-cleaner/recycle-bin-ids','[\"${TARGET_ASSET_ID//\"/\\\"}\"]') on conflict(key) do update set value=excluded.value;"
+  "insert into catalystLocalStorage(key,value) values('app-cleaner/recycle-bin-ids','${TARGET_ASSET_IDS_JSON//\'/''}') on conflict(key) do update set value=excluded.value;"
 
 sqlite3 "${RK_LOCAL_PATH}" \
   "insert into catalystLocalStorage(key,value) values('app-cleaner/has-entered-workspace','true') on conflict(key) do update set value=excluded.value;"
+
+sqlite3 "${RK_LOCAL_PATH}" \
+  "insert into catalystLocalStorage(key,value) values('app-cleaner/app-language','zh-CN') on conflict(key) do update set value=excluded.value;"
+
+sqlite3 "${RK_LOCAL_PATH}" \
+  "insert into catalystLocalStorage(key,value) values('app-cleaner/theme-preference','system') on conflict(key) do update set value=excluded.value;"
 
 adb -s "${SERIAL}" push "${DB_LOCAL_PATH}" "${DB_REMOTE_TMP_PATH}" >/dev/null
 adb -s "${SERIAL}" shell "run-as ${APP_ID} sh -c 'mkdir -p files/SQLite && cat ${DB_REMOTE_TMP_PATH} > files/SQLite/app-cleaner-operational.db'" >/dev/null
@@ -412,6 +494,7 @@ adb -s "${SERIAL}" exec-out run-as "${APP_ID}" cat "${APP_DATA_DIR}/databases/RK
 
 echo "已写入 recycle_bin_state 到 ${SERIAL}:"
 echo "  asset_id: ${TARGET_ASSET_ID}"
+echo "  asset_count: ${TARGET_ASSET_COUNT}"
 echo "  bucket: ${TARGET_BUCKET_NAME}"
 echo
 echo "当前 recycle_bin_state:"
@@ -425,3 +508,6 @@ sqlite3 "${RK_VERIFY_PATH}" "select value from catalystLocalStorage where key='a
 echo
 echo "当前 has-entered-workspace:"
 sqlite3 "${RK_VERIFY_PATH}" "select value from catalystLocalStorage where key='app-cleaner/has-entered-workspace';"
+echo
+echo "当前设计签收偏好:"
+sqlite3 "${RK_VERIFY_PATH}" "select key,value from catalystLocalStorage where key in ('app-cleaner/app-language','app-cleaner/theme-preference') order by key;"

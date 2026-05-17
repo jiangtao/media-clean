@@ -1,6 +1,8 @@
 name: Android Agent Device Observability
 
 on:
+  # Agent-device lanes mutate app/device state and exercise permission-heavy
+  # flows. Keep them manual so PR checks stay lightweight and deterministic.
   workflow_dispatch:
     inputs:
       run_real_device_core:
@@ -13,52 +15,6 @@ on:
         required: false
         default: "d28739dc"
         type: string
-  pull_request:
-    paths:
-      - ".github/workflows/android-agent-device-observability.yml"
-      - "app.json"
-      - "package.json"
-      - "scripts/android/**"
-      - "scripts/device/**"
-      - "src/application/**"
-      - "src/features/**"
-      - "src/navigation/**"
-      - "src/services/**"
-      - "src/ui/**"
-      - "android/**"
-      - "README.md"
-      - "README.en.md"
-      - "docs/release/agent-device.md"
-      - "docs/release/agent-device.en.md"
-      - "docs/release/device-validation-lanes.md"
-      - "docs/release/device-validation-lanes.en.md"
-      - "docs/release/maestro.md"
-      - "docs/release/maestro.en.md"
-  push:
-    branches:
-      - main
-      - master
-      - develop
-    paths:
-      - ".github/workflows/android-agent-device-observability.yml"
-      - "app.json"
-      - "package.json"
-      - "scripts/android/**"
-      - "scripts/device/**"
-      - "src/application/**"
-      - "src/features/**"
-      - "src/navigation/**"
-      - "src/services/**"
-      - "src/ui/**"
-      - "android/**"
-      - "README.md"
-      - "README.en.md"
-      - "docs/release/agent-device.md"
-      - "docs/release/agent-device.en.md"
-      - "docs/release/device-validation-lanes.md"
-      - "docs/release/device-validation-lanes.en.md"
-      - "docs/release/maestro.md"
-      - "docs/release/maestro.en.md"
 
 permissions:
   contents: read

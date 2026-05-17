@@ -28,6 +28,10 @@
 5. [Theme Tokens and Tailwind Reuse Strategy](./theme-token-tailwind-strategy.en.md)
    - Current theme decision: Token-first + Tailwind-compatible + NativeWind optional.
    - RN keeps typed `StyleSheet.create()`, Electron uses generated Tailwind CSS `@theme`, and NativeWind is only a utility layer for new / low-risk components.
+6. [Android APK Size Analysis and Best Practices](./android-apk-size-analysis/_index.md)
+   - Current conclusion: the near-100MB APK is mainly caused by shipping a four-ABI universal APK; native `.so` files under `lib/` account for about 79.9% of compressed APK entries.
+   - Priority direction: create repeatable size reports first, then move the page-hosted user APK to arm-only / arm64 and add ABI, R8, resource shrink, and native dependency intake checks to pre-commit and release gates.
+   - Stage summary report: [Android APK Size Governance Report](../release/android-apk-size-governance-report.en.md).
 
 ## Execution Reminders
 
@@ -40,3 +44,5 @@
 7. Theme work starts with a token source of truth, not a full NativeWind rewrite. Tailwind / NativeWind / Electron CSS all derive from the same tokens.
 8. P0 execution order is Rust Core -> CLI; P2 v0.5.1 governance can run in parallel, and P1 Desktop productization comes later.
 9. The old RN macOS / TypeScript fixture research replaced by the new decisions is no longer kept as an execution entry point.
+10. Android APK size governance starts with ABI and native runtime decisions; i18n / theme token governance only supports bundle hygiene and resource budgeting, not primary APK slimming.
+11. Dependency, Android native, release workflow, and signing plugin changes must complete APK size analysis before pre-commit; CI should be the fallback gate, not the first place where the problem is discovered.

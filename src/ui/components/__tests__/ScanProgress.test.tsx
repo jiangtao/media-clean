@@ -103,7 +103,7 @@ describe('ScanProgress', () => {
     expect(texts).toContain('取消');
   });
 
-  it('renders the completion summary in the same inline block and places the abnormal result between title and progress', () => {
+  it('renders the completion summary in the same inline block and places the review result between title and progress', () => {
     const renderer = renderScanProgress({
       current: 360,
       total: 360,
@@ -112,26 +112,26 @@ describe('ScanProgress', () => {
     });
     const texts = collectTexts(renderer);
     const statusIndex = texts.indexOf('扫描完成');
-    const resultIndex = texts.indexOf('发现 18 个异常媒体');
+    const resultIndex = texts.indexOf('发现 18 个待处理媒体');
     const countIndex = texts.indexOf('360/360');
 
     expect(texts).toContain('扫描完成');
     expect(texts).toContain('360/360');
-    expect(texts).toContain('发现 18 个异常媒体');
+    expect(texts).toContain('发现 18 个待处理媒体');
     expect(statusIndex).toBeGreaterThanOrEqual(0);
     expect(resultIndex).toBeGreaterThan(statusIndex);
     expect(countIndex).toBeGreaterThan(resultIndex);
     expect(texts).not.toContain('取消');
   });
 
-  it('does not render the abnormal badge when the scan completes without abnormal media', () => {
+  it('does not render the review badge when the scan completes without review media', () => {
     const renderer = renderScanProgress({
       current: 360,
       total: 360,
       resultsCount: 0,
     });
 
-    expect(collectTexts(renderer)).not.toContain('发现 0 个异常媒体');
+    expect(collectTexts(renderer)).not.toContain('发现 0 个待处理媒体');
     expect(
       renderer.root.findAllByProps({ testID: 'scan-progress-result-badge' }),
     ).toHaveLength(0);
@@ -159,7 +159,7 @@ describe('ScanProgress', () => {
     });
 
     expect(renderer.root.findByProps({ testID: 'scan-progress-inline' })).toBeTruthy();
-    expect(collectTexts(renderer)).toContain('发现 9 个异常媒体');
+    expect(collectTexts(renderer)).toContain('发现 9 个待处理媒体');
   });
 
   it('uses theme-aware abnormal colors for the completion hint', () => {

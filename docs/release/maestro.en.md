@@ -62,7 +62,9 @@ INSTALL_FAILED_USER_RESTRICTED: Install canceled by user
 ```
 
 3. This indicates the interactive-acceptance chain is blocked by the device policy; it does not mean the `Media Clean` product itself failed to boot.
-4. Enable USB/debug installation in Developer Options first, then rerun `npm run test:maestro:smoke`.
+4. Additional confirmation: local `maestro 2.3.0` still attempts to install `maestro-server.apk` even when `--no-reinstall-driver` is passed. Its package name is `dev.mobile.maestro.test`, so an already-installed `dev.mobile.maestro` driver does not bypass this step.
+5. On the current Xiaomi / MIUI phone, if `dev.mobile.maestro.test` is not already installed, there is no repo-local scripted bypass. The practical fix is still to enable USB/debug installation in Developer Options and rerun `npm run test:maestro:smoke`.
+6. If the device policy cannot be relaxed, the repo-supported fallback is the emulator / CI lane rather than repeated retries on this handset.
 
 ## CI automation
 
@@ -79,6 +81,7 @@ Why this matters:
 
 1. If a local Xiaomi / MIUI device blocks the Maestro driver installation, CI can still provide a secondary interactive-acceptance signal.
 2. The smoke flow remains part of PR / branch automation, but the primary device-observability signal should come from `agent-device` artifacts.
+3. When the handset also blocks `dev.mobile.maestro` / `dev.mobile.maestro.test` installation, the CI emulator is the only stable Maestro execution path already supported by this repo.
 
 ## Recommended next additions
 

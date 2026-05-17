@@ -20,6 +20,24 @@ const RELEASE_SIGNING_CONFIG = `        release {
         }
 `;
 
+const DEBUG_APPLICATION_ID_SUFFIX_LINE =
+  "applicationIdSuffix = findProperty('android.debugApplicationIdSuffix') ?: '.debug'";
+
+const VALIDATION_BUILD_TYPE = `        validation {
+            initWith release
+            signingConfig signingConfigs.debug
+            applicationIdSuffix = findProperty('android.validationApplicationIdSuffix') ?: '.debug'
+            versionNameSuffix = '-validation'
+            matchingFallbacks = ['release']
+            def enableValidationShrinkResources = findProperty('android.enableShrinkResourcesInValidationBuilds') ?: findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
+            shrinkResources = enableValidationShrinkResources.toBoolean()
+            minifyEnabled = (findProperty('android.enableMinifyInValidationBuilds') ?: findProperty('android.enableMinifyInReleaseBuilds') ?: false).toBoolean()
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            def enablePngCrunchInValidation = findProperty('android.enablePngCrunchInReleaseBuilds') ?: 'true'
+            crunchPngs = enablePngCrunchInValidation.toBoolean()
+        }
+`;
+
 function ensureKeystoreBootstrap(contents) {
   if (contents.includes('def keystorePropertiesFile = rootProject.file("keystore.properties")')) {
     return contents;
@@ -46,6 +64,18 @@ function ensureDebugBuildTypeUsesDebugSigning(contents) {
   );
 }
 
+function ensureDebugBuildTypeHasApplicationIdSuffix(contents) {
+  const debugBlockMatch = contents.match(/buildTypes\s*\{\s*debug\s*\{[\s\S]*?\n\s*}/);
+  if (!debugBlockMatch || debugBlockMatch[0].includes('applicationIdSuffix')) {
+    return contents;
+  }
+
+  return contents.replace(
+    /(buildTypes\s*\{\s*debug\s*\{\n)/,
+    `$1            ${DEBUG_APPLICATION_ID_SUFFIX_LINE}\n`,
+  );
+}
+
 function ensureReleaseBuildTypeUsesReleaseSigning(contents) {
   const releaseSigningLine =
     'signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug';
@@ -56,13 +86,26 @@ function ensureReleaseBuildTypeUsesReleaseSigning(contents) {
   );
 }
 
+function ensureValidationBuildType(contents) {
+  if (contents.includes('validation {')) {
+    return contents;
+  }
+
+  return contents.replace(
+    /(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?\n\s*}\n)(\s*})/,
+    `$1${VALIDATION_BUILD_TYPE}$2`,
+  );
+}
+
 function withAndroidReleaseSigning(config) {
   return withAppBuildGradle(config, (modConfig) => {
     let contents = modConfig.modResults.contents;
     contents = ensureKeystoreBootstrap(contents);
     contents = ensureReleaseSigningConfig(contents);
     contents = ensureDebugBuildTypeUsesDebugSigning(contents);
+    contents = ensureDebugBuildTypeHasApplicationIdSuffix(contents);
     contents = ensureReleaseBuildTypeUsesReleaseSigning(contents);
+    contents = ensureValidationBuildType(contents);
     modConfig.modResults.contents = contents;
     return modConfig;
   });

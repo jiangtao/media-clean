@@ -2,6 +2,10 @@ appId: com.jt.mistapmediacleaner
 name: Landing and settings smoke
 ---
 - launchApp
+- extendedWaitUntil:
+    visible:
+      id: landing-screen
+    timeout: 60000
 - assertVisible:
     id: landing-screen
 - scrollUntilVisible:
@@ -13,10 +17,22 @@ name: Landing and settings smoke
     id: landing-primary-action
 - assertVisible:
     id: tab-button-Settings
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: tab-button-Settings
+- tapOn:
+    text: Settings
+    optional: true
+- tapOn:
+    text: 设置
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: settings-header
+    timeout: 30000
 - assertVisible:
-    id: settings-scroll-view
+    id: settings-header
 - scrollUntilVisible:
     element:
       id: language-option-en-US
@@ -24,7 +40,17 @@ name: Landing and settings smoke
     timeout: 20000
 - tapOn:
     id: language-option-en-US
+- scrollUntilVisible:
+    element:
+      text: "Scan Range"
+    direction: UP
+    timeout: 20000
 - assertVisible: "Scan Range"
+- scrollUntilVisible:
+    element:
+      text: "Appearance"
+    direction: DOWN
+    timeout: 20000
 - assertVisible: "Appearance"
 - scrollUntilVisible:
     element:
@@ -33,7 +59,7 @@ name: Landing and settings smoke
     timeout: 20000
 - tapOn:
     id: theme-option-dark
-- assertVisible: "Current theme:"
+- assertVisible: "Dark"
 - tapOn:
     id: theme-option-light
 - scrollUntilVisible:
@@ -43,5 +69,15 @@ name: Landing and settings smoke
     timeout: 20000
 - tapOn:
     id: language-option-zh-CN
+- scrollUntilVisible:
+    element:
+      text: "扫描范围"
+    direction: UP
+    timeout: 20000
 - assertVisible: "扫描范围"
+- scrollUntilVisible:
+    element:
+      text: "显示主题"
+    direction: DOWN
+    timeout: 20000
 - assertVisible: "显示主题"

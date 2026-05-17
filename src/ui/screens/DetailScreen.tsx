@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
@@ -12,7 +11,9 @@ import { ActionSwitch } from '../components/ActionSwitch';
 import { DuplicateCarousel } from '../components/DuplicateCarousel';
 import { buildSizedImageSource } from '../components/image-source';
 import { TouchSurface } from '../components/TouchSurface';
+import { AppIcon } from '../icons/AppIcon';
 import { VideoPlayer } from '../components/VideoPlayer';
+import { ZoomableImage } from '../components/ZoomableImage';
 
 interface DetailScreenProps {
   candidate: CleanupCandidate | null;
@@ -29,8 +30,19 @@ interface DetailScreenProps {
 
 function buildDetailCandidates(
   candidate: CleanupCandidate,
+  browseCandidates: CleanupCandidate[] | undefined,
   duplicateCandidates: CleanupCandidate[] | undefined,
 ) {
+  if (browseCandidates?.length) {
+    const entries = [...browseCandidates];
+
+    if (!entries.some((entry) => entry.id === candidate.id)) {
+      entries.unshift(candidate);
+    }
+
+    return Array.from(new Map(entries.map((entry) => [entry.id, entry])).values());
+  }
+
   if (!candidate.duplicateGroup) {
     return [candidate];
   }
@@ -102,18 +114,19 @@ function resolveDetailActionSelection(
         candidate.asset.fileSize >= candidate.duplicateGroup.representativeFileSize &&
         candidate.asset.creationTime >= candidate.duplicateGroup.representativeCreationTime);
 
-    return isRepresentativeCandidate ? 'secondary' : 'primary';
+    return isRepresentativeCandidate ? 'primary' : 'secondary';
   }
 
   if (candidate.score >= 80 && candidate.confidence === 'high') {
-    return 'primary';
+    return 'secondary';
   }
 
-  return 'secondary';
+  return 'primary';
 }
 
 export function DetailScreen({
   candidate,
+  browseCandidates,
   duplicateCandidates,
   language,
   theme,
@@ -133,8 +146,11 @@ export function DetailScreen({
     320,
   );
   const detailCandidates = useMemo(
-    () => (candidate ? buildDetailCandidates(candidate, duplicateCandidates) : []),
-    [candidate, duplicateCandidates],
+    () =>
+      candidate
+        ? buildDetailCandidates(candidate, browseCandidates, duplicateCandidates)
+        : [],
+    [browseCandidates, candidate, duplicateCandidates],
   );
   const [activeCandidateId, setActiveCandidateId] = useState<string | null>(candidate?.id ?? null);
   const [stageSize, setStageSize] = useState({
@@ -166,12 +182,19 @@ export function DetailScreen({
     viewerCandidates.findIndex((entry) => entry.id === activeDetailCandidate.id),
   );
   const actionTargetIds = [activeCandidateIdRef.current ?? activeDetailCandidate.id];
-  const primaryLabel =
-    mode === 'recycle' ? copy.preview.restoreCompactAction : copy.preview.clearCompactAction;
   const showKeepAction = mode === 'suggestions' && Boolean(onKeep);
-  const secondaryLabel = showKeepAction
-    ? copy.preview.keepCompactAction
-    : copy.preview.deleteForeverCompactAction;
+  const primaryLabel =
+    mode === 'recycle'
+      ? copy.preview.keepCompactAction
+      : showKeepAction
+        ? copy.preview.keepCompactAction
+        : copy.preview.clearCompactAction;
+  const secondaryLabel =
+    mode === 'recycle'
+      ? copy.preview.deleteForeverCompactAction
+      : showKeepAction
+        ? copy.preview.clearCompactAction
+        : copy.preview.deleteForeverCompactAction;
   const viewerTags = selectDetailViewerTags(
     activeDetailCandidate,
     getDetailViewerTags(activeDetailCandidate, language),
@@ -194,12 +217,17 @@ export function DetailScreen({
   };
 
   const handlePrimaryActionPress = () => {
+    if (showKeepAction) {
+      runActionSafely(() => onKeep?.(actionTargetIds));
+      return;
+    }
+
     runActionSafely(() => onPrimaryAction(actionTargetIds));
   };
 
   const handleSecondaryActionPress = () => {
     if (showKeepAction) {
-      runActionSafely(() => onKeep?.(actionTargetIds));
+      runActionSafely(() => onPrimaryAction(actionTargetIds));
       return;
     }
 
@@ -217,9 +245,11 @@ export function DetailScreen({
           style={styles.closeButton}
           pressedStyle={styles.closeButtonPressed}
           preset="icon"
+          accessibilityRole="button"
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           testID="detail-close-button"
         >
-          <Ionicons name="close" size={16} color="#ffffff" />
+          <AppIcon name="close" size={16} color="#ffffff" />
         </TouchSurface>
       </View>
 
@@ -247,6 +277,7 @@ export function DetailScreen({
         ) : activeDetailCandidate.asset.mediaType === 'video' ? (
           <View style={styles.singleStage} testID="detail-photo-preview">
             <VideoPlayer
+              key={activeDetailCandidate.id}
               uri={activeDetailCandidate.asset.uri}
               width={activeDetailCandidate.asset.width}
               height={activeDetailCandidate.asset.height}
@@ -255,20 +286,13 @@ export function DetailScreen({
           </View>
         ) : (
           <View style={styles.singleStage} testID="detail-photo-preview">
-            <Image
-              source={buildSizedImageSource(
-                activeDetailCandidate.asset.uri,
-                stageSize.width,
-                stageSize.height,
-              )}
-              style={styles.singleStageImage}
-              contentFit="contain"
-              cachePolicy="memory-disk"
-              priority="high"
-              allowDownscaling
-              transition={0}
-              recyclingKey={activeDetailCandidate.asset.uri}
-              testID="detail-photo-stage-image"
+            <ZoomableImage
+              uri={activeDetailCandidate.asset.uri}
+              width={stageSize.width}
+              height={stageSize.height}
+              maxScale={3}
+              minScale={1}
+              doubleTapReset
             />
           </View>
         )}
@@ -303,37 +327,18 @@ export function DetailScreen({
                 secondaryLabel={secondaryLabel}
                 onPrimaryPress={handlePrimaryActionPress}
                 onSecondaryPress={handleSecondaryActionPress}
-                primaryIcon={mode === 'recycle' ? 'arrow-undo-outline' : 'trash-outline'}
-                secondaryIcon={showKeepAction ? 'checkmark-circle-outline' : 'trash-outline'}
-                primaryTone={mode === 'recycle' ? 'keep' : 'danger'}
-                secondaryTone={showKeepAction ? 'keep' : 'danger'}
+                primaryIcon={mode === 'recycle' || showKeepAction ? 'checkmark-circle-outline' : 'trash-bin-outline'}
+                secondaryIcon="trash-bin-outline"
+                primaryTone={mode === 'recycle' || showKeepAction ? 'keep' : 'danger'}
+                secondaryTone="danger"
                 selectedAction={selectedAction}
                 density="compact"
                 testID="detail-action-switch"
-                primaryTestID="detail-primary-action"
-                secondaryTestID={showKeepAction ? 'detail-keep-action' : 'detail-hard-delete'}
+                primaryTestID={showKeepAction ? 'detail-keep-action' : 'detail-primary-action'}
+                secondaryTestID={showKeepAction ? 'detail-primary-action' : 'detail-hard-delete'}
               />
             </View>
           </View>
-
-          {viewerCandidates.length > 1 ? (
-            <View style={styles.paginationRow} testID="detail-pagination">
-              {viewerCandidates.map((item, index) => (
-                <View
-                  key={item.id}
-                  style={[
-                    styles.paginationDot,
-                    index === activeCandidateIndex && styles.paginationDotActive,
-                  ]}
-                  testID={
-                    index === activeCandidateIndex
-                      ? `detail-pagination-dot-active-${item.id}`
-                      : `detail-pagination-dot-${item.id}`
-                  }
-                />
-              ))}
-            </View>
-          ) : null}
         </View>
       </View>
     </View>
@@ -356,6 +361,8 @@ function createStyles(insets: { top: number; bottom: number; left: number; right
       marginBottom: 10,
       paddingLeft: 16 + insets.left,
       paddingRight: 16 + insets.right,
+      zIndex: 10,
+      elevation: 10,
     },
     indexText: {
       color: '#ffffff',
@@ -364,12 +371,14 @@ function createStyles(insets: { top: number; bottom: number; left: number; right
       letterSpacing: 0.2,
     },
     closeButton: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: 'rgba(255, 255, 255, 0.14)',
+      zIndex: 11,
+      elevation: 11,
     },
     closeButtonPressed: {
       backgroundColor: 'rgba(255, 255, 255, 0.22)',
@@ -437,24 +446,6 @@ function createStyles(insets: { top: number; bottom: number; left: number; right
     },
     actionGroup: {
       justifyContent: 'flex-end',
-    },
-    paginationRow: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: 8,
-      minHeight: 14,
-    },
-    paginationDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: 'rgba(255, 255, 255, 0.24)',
-    },
-    paginationDotActive: {
-      width: 24,
-      borderRadius: 6,
-      backgroundColor: 'rgba(255, 255, 255, 0.92)',
     },
   });
 }

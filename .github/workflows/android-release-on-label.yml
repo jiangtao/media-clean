@@ -1,0 +1,85 @@
+name: Android Release on Label
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  check-and-trigger:
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release-android')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check permissions
+        id: auth
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          # 检查是否为仓库 owner
+          if [[ "$ACTOR" == "$OWNER" ]]; then
+            echo "authorized=true" >> $GITHUB_OUTPUT
+            echo "Authorized: Repository owner"
+            exit 0
+          fi
+
+          # 检查是否为 admin
+          ROLE=$(gh api repos/${{ github.repository }}/collaborators/$ACTOR/permission -q '.permission' 2>/dev/null || echo "none")
+          if [[ "$ROLE" == "admin" ]]; then
+            echo "authorized=true" >> $GITHUB_OUTPUT
+            echo "Authorized: Admin"
+          else
+            echo "authorized=false" >> $GITHUB_OUTPUT
+            echo "Not authorized: $ACTOR (role: $ROLE)"
+          fi
+
+      - name: Get version
+        if: steps.auth.outputs.authorized == 'true'
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Trigger release
+        if: steps.auth.outputs.authorized == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Triggering Android release v${{ steps.version.outputs.version }}"
+
+          gh workflow run android-release.yml \
+            --ref main \
+            --field release_tag="android-v${{ steps.version.outputs.version }}"
+
+      - name: Comment on PR (success)
+        if: steps.auth.outputs.authorized == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ steps.version.outputs.version }}';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `Release Triggered\n\nAndroid release android-v${version} has been triggered by @${context.actor}.\n\nTrack progress: [Actions](../../actions)`
+            });
+
+      - name: Comment on PR (unauthorized)
+        if: steps.auth.outputs.authorized == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `Release Request Denied\n\nOnly repository owners and admins can trigger releases.\n\nPlease ask an admin to manually trigger the release workflow.`
+            });
+
+      - name: Fail if unauthorized
+        if: steps.auth.outputs.authorized == 'false'
+        run: |
+          echo "Only owners/admins can trigger releases"
+          exit 1

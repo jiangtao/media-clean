@@ -136,7 +136,7 @@ export async function configureCleanupReminderChannel(copy?: ReminderChannelCopy
   await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
     name: copy?.name ?? '定期清理提醒',
     importance: Notifications.AndroidImportance.DEFAULT,
-    description: copy?.description ?? '提醒你重新扫描最近媒体并清理误触、异常与重复内容。',
+    description: copy?.description ?? '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
     enableVibrate: true,
     showBadge: false,
   });

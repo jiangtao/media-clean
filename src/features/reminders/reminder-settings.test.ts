@@ -21,7 +21,7 @@ describe('reminder settings', () => {
       weekday: 1,
       hour: 20,
       minute: 30,
-      summary: '定期检查最近拍摄的照片和视频，优先清理误触、异常与重复内容。',
+      summary: '定期检查最近拍摄的照片和视频，优先清理重复、模糊与相似内容。',
       notificationId: null,
       nextTriggerAt: null,
     });
@@ -166,7 +166,7 @@ describe('reminder settings', () => {
       weekday: 7,
       hour: 23,
       minute: 0,
-      summary: '定期检查最近拍摄的照片和视频，优先清理误触、异常与重复内容。',
+      summary: '定期检查最近拍摄的照片和视频，优先清理重复、模糊与相似内容。',
       notificationId: null,
       nextTriggerAt: null,
     });

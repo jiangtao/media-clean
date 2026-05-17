@@ -1,0 +1,32 @@
+appId: com.jt.mistapmediacleaner
+name: Open Photo Result Grid
+---
+# 从照片 Tab、扫描摘要页或扫描入口页收敛到具体问题网格。
+
+- tapOn:
+    id: "tab-button-Photos"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+- runFlow:
+    when:
+      visible:
+        id: "photo-grid-start-scan-button"
+    file: start-scan-and-wait.yaml
+
+- runFlow:
+    when:
+      visible:
+        id: "photo-grid-result-breakdown-duplicate"
+    file: open-duplicate-result-grid.yaml
+
+- runFlow:
+    when:
+      visible:
+        id: "photo-grid-result-breakdown-blurry"
+    file: open-blurry-result-grid.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: "scan-result-grid-item"
+    timeout: 15000

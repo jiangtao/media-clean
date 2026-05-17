@@ -35,8 +35,8 @@ describe('ActionSwitch', () => {
     act(() => {
       renderer = TestRenderer.create(
         <ActionSwitch
-          primaryLabel="清除"
-          secondaryLabel="保留"
+          primaryLabel="保留"
+          secondaryLabel="清除"
           onPrimaryPress={vi.fn()}
           onSecondaryPress={vi.fn()}
           selectedAction={null}
@@ -55,19 +55,19 @@ describe('ActionSwitch', () => {
     expect(secondaryStyle.backgroundColor).toBeUndefined();
   });
 
-  it('highlights the recommended keep action when the secondary side is selected', () => {
+  it('highlights the recommended keep action when the primary side is selected', () => {
     let renderer!: ReturnType<typeof TestRenderer.create>;
 
     act(() => {
       renderer = TestRenderer.create(
         <ActionSwitch
-          primaryLabel="清除"
-          secondaryLabel="保留"
+          primaryLabel="保留"
+          secondaryLabel="清除"
           onPrimaryPress={vi.fn()}
           onSecondaryPress={vi.fn()}
-          primaryTone="danger"
-          secondaryTone="keep"
-          selectedAction="secondary"
+          primaryTone="keep"
+          secondaryTone="danger"
+          selectedAction="primary"
         />,
       );
     });
@@ -79,8 +79,8 @@ describe('ActionSwitch', () => {
       renderer.root.findByProps({ testID: 'action-switch-secondary' }).props.style,
     );
 
-    expect(primaryStyle.backgroundColor).toBeUndefined();
-    expect(secondaryStyle.backgroundColor).toBe('#18bf63');
+    expect(primaryStyle.backgroundColor).toBe('#18bf63');
+    expect(secondaryStyle.backgroundColor).toBeUndefined();
   });
 
   it('renders shared icon glyphs when action icons are provided', () => {
@@ -89,10 +89,10 @@ describe('ActionSwitch', () => {
     act(() => {
       renderer = TestRenderer.create(
         <ActionSwitch
-          primaryLabel="清除"
-          secondaryLabel="保留"
-          primaryIcon="trash-outline"
-          secondaryIcon="checkmark-circle-outline"
+          primaryLabel="保留"
+          secondaryLabel="清除"
+          primaryIcon="checkmark-circle-outline"
+          secondaryIcon="trash-outline"
           onPrimaryPress={vi.fn()}
           onSecondaryPress={vi.fn()}
           selectedAction="secondary"

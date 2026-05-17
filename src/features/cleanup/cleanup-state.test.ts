@@ -24,7 +24,7 @@ const candidate = (id: string): CleanupCandidate => ({
 });
 
 describe('cleanup state', () => {
-  it('moves high-confidence candidates into recycle bin during auto cleanup', () => {
+  it('moves suggested-cleanup candidates into recycle bin during auto cleanup', () => {
     const state = createInitialCleanupState([
       candidate('a'),
       candidate('b'),

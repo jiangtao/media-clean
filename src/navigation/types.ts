@@ -2,14 +2,14 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 export type MainTabParamList = {
-  Photos: undefined;
+  Photos: { autoStartScan?: boolean } | undefined;
   RecycleBin: undefined;
   Settings: undefined;
 };
 
 export type RootStackParamList = {
   Landing: undefined;
-  Main: NavigatorScreenParams<MainTabParamList>;
+  Main: NavigatorScreenParams<MainTabParamList> | undefined;
   Detail: { candidateId: string };
 };
 

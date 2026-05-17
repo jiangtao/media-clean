@@ -7,7 +7,7 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     server: {
       deps: {
-        inline: ['react-native', 'expo'],
+        inline: ['react-native', 'expo', 'react-native-gesture-handler', 'react-native-reanimated'],
       },
     },
   },

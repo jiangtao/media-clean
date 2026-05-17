@@ -40,7 +40,7 @@ const baseSettings: ReminderSettings = {
   minute: 30,
   notificationId: 'existing-reminder-id',
   nextTriggerAt: 1_710_000_000_000,
-  summary: '定期检查最近拍摄的照片和视频，优先清理误触、异常与重复内容。',
+  summary: '定期检查最近拍摄的照片和视频，优先清理重复、模糊与相似内容。',
 };
 
 describe('reminder runtime', () => {
@@ -79,7 +79,7 @@ describe('reminder runtime', () => {
     await expect(
       reconcileReminderRuntimeOnLaunch('zh-CN', {
         name: '定期清理提醒',
-        description: '提醒你重新扫描最近媒体并清理误触、异常与重复内容。',
+        description: '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
       }),
     ).resolves.toEqual({
       settings: {
@@ -119,7 +119,7 @@ describe('reminder runtime', () => {
     await expect(
       reconcileReminderRuntimeInForeground('zh-CN', {
         name: '定期清理提醒',
-        description: '提醒你重新扫描最近媒体并清理误触、异常与重复内容。',
+        description: '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
       }),
     ).resolves.toEqual({
       settings: {
@@ -152,7 +152,7 @@ describe('reminder runtime', () => {
         'zh-CN',
         {
           name: '定期清理提醒',
-          description: '提醒你重新扫描最近媒体并清理误触、异常与重复内容。',
+          description: '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
         },
         { requestPermissionOnEnable: true },
       ),
@@ -204,7 +204,7 @@ describe('reminder runtime', () => {
         'zh-CN',
         {
           name: '定期清理提醒',
-          description: '提醒你重新扫描最近媒体并清理误触、异常与重复内容。',
+          description: '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
         },
         { requestPermissionOnEnable: true },
       ),
@@ -243,7 +243,7 @@ describe('reminder runtime', () => {
     await expect(
       reconcileReminderRuntimeSettings(baseSettings, 'zh-CN', {
         name: '定期清理提醒',
-        description: '提醒你重新扫描最近媒体并清理误触、异常与重复内容。',
+        description: '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
       }),
     ).resolves.toEqual({
       settings: {
@@ -277,7 +277,7 @@ describe('reminder runtime', () => {
     await expect(
       reconcileReminderRuntimeSettings(baseSettings, 'zh-CN', {
         name: '定期清理提醒',
-        description: '提醒你重新扫描最近媒体并清理误触、异常与重复内容。',
+        description: '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
       }),
     ).resolves.toEqual({
       settings: {
@@ -301,7 +301,7 @@ describe('reminder runtime', () => {
       }),
       {
         name: '定期清理提醒',
-        description: '提醒你重新扫描最近媒体并清理误触、异常与重复内容。',
+        description: '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
       },
     );
     expect(reminderStorageApi.saveReminderSettings).toHaveBeenCalledWith({

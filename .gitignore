@@ -8,6 +8,7 @@ node_modules/
 .expo/
 /dist/
 /page/dist/
+/page/public/download/*.apk
 web-build/
 expo-env.d.ts
 
@@ -51,3 +52,4 @@ docs/archive/tmp/
 
 # local agent worktrees
 .claude/
+EXECUTION_SUMMARY.md

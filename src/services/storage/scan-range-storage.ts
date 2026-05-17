@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SCAN_RANGE_KEY = 'app-cleaner/scan-range';
 
-export const VALID_SCAN_RANGES = [1, 2, 3, 6, 12] as const;
+export const VALID_SCAN_RANGES = [1, 2, 3, 6, 12, 24] as const;
 
 export type ScanRange = (typeof VALID_SCAN_RANGES)[number];
 

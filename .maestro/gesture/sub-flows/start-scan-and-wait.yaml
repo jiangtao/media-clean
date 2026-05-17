@@ -1,0 +1,13 @@
+appId: com.jt.mistapmediacleaner
+name: Start Scan and Wait
+---
+# 启动扫描并等待完成
+
+- tapOn:
+    id: "photo-grid-start-scan-button"
+
+# 等待扫描完成 - 等待进度条消失或网格出现
+- extendedWaitUntil:
+    visible:
+      id: "scan-result-grid-item"
+    timeout: 60000

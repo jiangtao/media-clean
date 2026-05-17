@@ -1,0 +1,9 @@
+appId: com.jt.mistapmediacleaner
+name: Open Blurry Result Grid
+---
+- tapOn:
+    id: "photo-grid-result-breakdown-blurry"
+- extendedWaitUntil:
+    visible:
+      id: "scan-result-grid-item"
+    timeout: 15000

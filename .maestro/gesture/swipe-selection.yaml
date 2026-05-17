@@ -1,0 +1,143 @@
+appId: com.jt.mistapmediacleaner
+name: Swipe Selection E2E
+---
+# v0.4.1 滑动选中最终端到端测试
+# 前置条件:
+# - 功能实现已经完成；开发中快反馈不强制运行本 flow。
+# - 设备中已有扫描结果，且当前网格至少有一屏以上候选项。
+# - package.json 的 test:gesture:swipe 仍指向本文件。
+# - Maestro 无法稳定断言矩形范围和 selected count，关键步骤保留截图作为人工验收证据。
+
+# 导航到扫描结果页
+- launchApp
+- waitForAnimationToEnd:
+    timeout: 10000
+- runFlow:
+    when:
+      visible:
+        id: "landing-primary-action"
+    file: sub-flows/landing-to-scan-results.yaml
+
+# App 可能已经完成 onboarding，并直接停在照片 Tab 或扫描摘要页。
+- runFlow:
+    when:
+      visible:
+        id: "tab-button-Photos"
+    file: sub-flows/open-photo-result-grid.yaml
+
+# 等待网格加载
+- extendedWaitUntil:
+    visible:
+      id: "scan-result-grid-item"
+    timeout: 10000
+
+# 1. 长按第一个网格项进入选择模式
+- longPressOn:
+    id: "photo-grid-item"
+
+# 验证选中模式控件和选择指示器出现
+- extendedWaitUntil:
+    visible:
+      id: "photo-grid-close-button"
+    timeout: 5000
+- assertVisible:
+    id: "photo-selection-toggle-button"
+- extendedWaitUntil:
+    visible:
+      id: "selection-checkmark"
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: "selection-indicator-empty"
+    timeout: 5000
+
+# 截图: 选择模式状态
+- takeScreenshot: swipe-selection-01-selection-mode
+
+# 2. 横向滑动选择同一行
+- swipe:
+    direction: RIGHT
+    duration: 900
+    from:
+      id: "photo-grid-item"
+
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# 截图: 横向滑动后，应显示同一行多项被选中
+- takeScreenshot: swipe-selection-02-after-horizontal-swipe
+
+- extendedWaitUntil:
+    visible:
+      id: "selection-checkmark"
+    timeout: 5000
+- assertVisible:
+    id: "selection-checkmark-icon"
+
+# 3. 媒体项起手竖向滑动应进入批量选择，而不是被当作滚动。
+# 人工验收: 截图应显示同一列或竖向矩形范围内新增选中项。
+- swipe:
+    start: 18%, 42%
+    end: 18%, 68%
+    duration: 900
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: swipe-selection-03-after-vertical-selection
+- assertVisible:
+    id: "selection-checkmark"
+
+# 4. 边缘/空白起手的纵向滚动不应改变选择集合
+# 人工验收: 对比滚动前后截图，列表位置应变化，header selected count 应保持不变。
+- takeScreenshot: swipe-selection-04-before-edge-scroll
+- swipe:
+    start: 95%, 72%
+    end: 95%, 40%
+    duration: 700
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: swipe-selection-05-after-edge-scroll
+- assertVisible:
+    id: "photo-grid-close-button"
+- assertVisible:
+    id: "photo-selection-toggle-button"
+
+# 5. 斜向矩形选择
+# 人工验收: 截图应显示起点到终点形成的完整矩形区域被选中，不只是对角线路径。
+- swipe:
+    start: 18%, 42%
+    end: 82%, 68%
+    duration: 1000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: swipe-selection-06-after-diagonal-rectangle
+- assertVisible:
+    id: "selection-checkmark"
+- assertVisible:
+    id: "photo-grid-close-button"
+
+# 6. 全选后再全不选。第二次点击应清空选择但保持选中模式。
+- tapOn:
+    id: "photo-selection-toggle-button"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: swipe-selection-07-after-select-all
+- tapOn:
+    id: "photo-selection-toggle-button"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: swipe-selection-08-after-deselect-all
+- assertVisible:
+    id: "photo-grid-close-button"
+- assertVisible:
+    id: "selection-indicator-empty"
+
+# 7. 点击 X 退出选中模式
+- tapOn:
+    id: "photo-grid-close-button"
+- waitForAnimationToEnd:
+    timeout: 3000
+- extendedWaitUntil:
+    visible:
+      id: "photo-grid-back-button"
+    timeout: 5000
+- takeScreenshot: swipe-selection-09-after-exit-selection-mode

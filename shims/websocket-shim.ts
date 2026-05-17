@@ -31,37 +31,37 @@ if (typeof global.WebSocket === 'undefined') {
       this.url = String(url);
       this.readyState = 0; // CONNECTING
       // Auto-trigger open after a tick
-   setTimeout(() => {
+      setTimeout(() => {
         this.readyState = 1; // OPEN
-     if (this.onopen) {
+        if (this.onopen) {
           try {
-     this.onopen({ type: 'open' });
-  } catch {}
+            this.onopen({ type: 'open' });
+          } catch { }
         }
       }, 0);
     }
 
     send(data: any): void {
-  // Stub - prevents crashes
+      // Stub - prevents crashes
     }
 
     close(code?: number, reason?: string): void {
       this.readyState = 3; // CLOSED
-   if (this.onclose) {
+      if (this.onclose) {
         try {
-       this.onclose({ type: 'close', code: code || 1000, reason: reason || '', wasClean: true });
-        } catch {}
+          this.onclose({ type: 'close', code: code || 1000, reason: reason || '', wasClean: true });
+        } catch { }
       }
     }
 
- addEventListener(type: string, listener: any): void {}
-    removeEventListener(type: string, listener: any): void {}
+    addEventListener(type: string, listener: any): void { }
+    removeEventListener(type: string, listener: any): void { }
     dispatchEvent(event: any): boolean {
-   return true;
+      return true;
     }
   };
 
   (global as any).WebSocket = WebSocketStub;
 }
 
-export {};
+export { };

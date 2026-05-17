@@ -2,7 +2,7 @@
 
 [中文版本](./vercel.md)
 
-This document defines the Vercel auto-deployment contract for the Media Clean publishing page. The page code lives under `page/` and is decoupled from the Expo Android/iOS app build.
+This document defines the Vercel auto-deployment contract for the Media Clean publishing page. The page code still deploys independently under `page/`; the formal Android APK download file is injected into the page static output by the Android release workflow.
 
 ## Project Config
 
@@ -23,11 +23,13 @@ This document defines the Vercel auto-deployment contract for the Media Clean pu
 3. Root `package.json` provides `page:build/page:dev/page:preview/page:deploy/page:deploy:prod` for repository-root validation and deployment.
 4. Do not commit `.vercel/`; the linked `projectId/orgId` are fixed in the workflow, and GitHub only needs the `VERCEL_TOKEN` secret.
 5. The Android download entry in the page is pinned to:
-   `https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk`
-6. These changes automatically trigger a production page deploy:
+   `https://mc.jerret.me/download/android-latest.apk`
+6. Page-only deploys hydrate `page/public/download/android-latest.apk` from the GitHub latest backup asset before build and deploy so a new page deployment cannot remove the download file.
+7. These changes automatically trigger a production page deploy:
    - `page/**`
    - `.github/workflows/android-release.yml`
    - `scripts/release/verify-android-release-page-contract.mjs`
+   - `scripts/release/prepare-page-android-download.mjs`
 
 ## DNS Setup
 
@@ -61,7 +63,7 @@ After that:
 
 1. pushing to `main/master` with page or release-page-contract changes automatically triggers `.github/workflows/page-vercel.yml`
 2. it can also be triggered manually with `workflow_dispatch`
-3. the workflow verifies the release-page contract, builds the static page, deploys production, and then verifies `mc-khaki.vercel.app`
+3. the workflow hydrates the Android APK, verifies the release-page contract, builds the static page, deploys production, and then verifies `https://mc.jerret.me`
 
 Post-deploy checks:
 
@@ -70,4 +72,5 @@ Post-deploy checks:
 3. The phone mock background and three interface gallery images have no 404s.
 4. `apps/icons/manifest.json` is reachable and `start_url` points to `/`.
 5. `/landing.html` rewrites back to the homepage.
-6. Android download buttons point to the latest formal APK.
+6. Android download buttons point to `https://mc.jerret.me/download/android-latest.apk`.
+7. A HEAD request to `https://mc.jerret.me/download/android-latest.apk` succeeds and returns the APK download response.

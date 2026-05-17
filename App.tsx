@@ -1,5 +1,7 @@
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
+import { LogBox } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import {
@@ -9,6 +11,10 @@ import {
 import { CleanupReminderBootstrap } from './src/application/CleanupReminderBootstrap';
 import { AppErrorBoundary } from './src/application/AppErrorBoundary';
 import { RootNavigator } from './src/navigation/RootNavigator';
+
+if (process.env.EXPO_PUBLIC_MAESTRO_SMOKE === '1') {
+  LogBox.ignoreAllLogs(true);
+}
 
 function AppShell() {
   const { resolvedThemeScheme, theme } = useAppPreferences();
@@ -50,12 +56,14 @@ function AppShell() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <AppPreferencesProvider>
-        <AppErrorBoundary>
-          <AppShell />
-        </AppErrorBoundary>
-      </AppPreferencesProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AppPreferencesProvider>
+          <AppErrorBoundary>
+            <AppShell />
+          </AppErrorBoundary>
+        </AppPreferencesProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

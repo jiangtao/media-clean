@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import type { AppThemePalette } from '../../theme/app-theme';
+import { AppIcon, type AppIconName } from '../icons/AppIcon';
 import { TouchSurface } from './TouchSurface';
 
 const SIZE_LARGE = 16;
@@ -11,7 +11,7 @@ const SIZE_SMALL = 12;
 export interface SegmentedControlOption {
   value: string;
   label: string;
-  icon?: string;
+  icon?: AppIconName;
   count?: number;
 }
 
@@ -38,8 +38,8 @@ export function SegmentedControl({ options, selectedValue, onChange, theme }: Se
         >
           <View style={styles.buttonContent}>
             {option.icon ? (
-              <Ionicons
-                name={option.icon as React.ComponentProps<typeof Ionicons>['name']}
+              <AppIcon
+                name={option.icon}
                 size={SIZE_LARGE}
                 color={selectedValue === option.value ? '#ffffff' : theme.pageTextSecondary}
                 testID={`segmented-icon-${option.value}`}

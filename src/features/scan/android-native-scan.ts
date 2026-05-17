@@ -36,6 +36,7 @@ export interface AndroidNativeScanStartOptions {
   falsePositiveIds: readonly string[];
   recycleBinCandidateCache: readonly CleanupCandidate[];
   resumeAfterAssetId?: string | null;
+  displayProgressCurrent?: number;
   displayProgressTotal?: number;
   displayProgressCompletedOffset?: number;
 }
@@ -114,6 +115,7 @@ interface AndroidNativeScanModule {
     jobId: string;
     language: string;
     resumeAfterAssetId?: string | null;
+    displayProgressCurrent?: number;
     displayProgressTotal?: number;
     displayProgressCompletedOffset?: number;
     executionProfile: AndroidNativeScanExecutionProfile;
@@ -134,6 +136,7 @@ export interface AndroidNativeScanFacadeOptions {
   recycleBinIds: string[];
   sourceCandidates: readonly CleanupCandidate[];
   language: string;
+  displayProgressCurrent?: number;
   displayProgressTotal?: number;
   displayProgressCompletedOffset?: number;
   legacyOptions: ScanMediaLibraryOptions;
@@ -152,6 +155,15 @@ export interface AndroidNativeScanExecutionResult {
   mode: AndroidNativeScanExecutionMode;
   fallbackReason: AndroidNativeScanFallbackReason | null;
   output: ScanOutput;
+}
+
+interface AndroidNativeDisplayProgressInput {
+  current: number;
+  total: number;
+  dirtyAssetCount: number;
+  displayProgressCurrent?: number;
+  displayProgressTotal?: number;
+  displayProgressCompletedOffset?: number;
 }
 
 const ANDROID_NATIVE_SCAN_PROGRESS_EVENT = 'AndroidNativeScanExecutorProgress';
@@ -210,6 +222,37 @@ function buildNativeAssetDescriptors(sourceCandidates: readonly CleanupCandidate
     fileSize: candidate.asset.fileSize,
     creationTime: candidate.asset.creationTime,
   }));
+}
+
+function normalizeProgressCount(value: number | null | undefined) {
+  return Math.max(0, Math.floor(value ?? 0));
+}
+
+function resolveAndroidNativeDisplayProgress(input: AndroidNativeDisplayProgressInput) {
+  const current = normalizeProgressCount(input.current);
+  const total = normalizeProgressCount(input.total);
+  const dirtyAssetCount = normalizeProgressCount(input.dirtyAssetCount);
+  const displayTotal = normalizeProgressCount(input.displayProgressTotal);
+  const completedOffset = normalizeProgressCount(
+    input.displayProgressCurrent ?? input.displayProgressCompletedOffset,
+  );
+  const shouldApplyDisplayOffset = displayTotal > total && total === dirtyAssetCount;
+
+  if (!shouldApplyDisplayOffset) {
+    return {
+      current: Math.min(current, total > 0 ? total : current),
+      total,
+    };
+  }
+
+  return {
+    current: Math.min(completedOffset + current, displayTotal),
+    total: displayTotal,
+  };
+}
+
+function buildProgressPercentage(progress: { current: number; total: number }) {
+  return progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
 }
 
 export async function isAndroidNativeScanSupported() {
@@ -386,12 +429,21 @@ async function observeAndroidNativeScan(
           analyzedInputsById.set(event.analyzedAssetId, event.analyzedInput);
         }
 
-        options.onProgress?.({
+        const displayProgress = resolveAndroidNativeDisplayProgress({
           current: event.current ?? 0,
           total: event.total ?? 0,
+          dirtyAssetCount: options.sourceCandidates.length,
+          displayProgressCurrent: options.displayProgressCurrent,
+          displayProgressTotal: options.displayProgressTotal,
+          displayProgressCompletedOffset: options.displayProgressCompletedOffset,
+        });
+
+        options.onProgress?.({
+          current: displayProgress.current,
+          total: displayProgress.total,
           currentFileName: event.currentFileName ?? '',
           isScanning: event.isScanning ?? true,
-          percentage: event.percentage ?? 0,
+          percentage: buildProgressPercentage(displayProgress),
           analyzedAssetId: event.analyzedAssetId,
           analyzedInput: event.analyzedInput ?? null,
           analyzedMediaType: event.analyzedMediaType,
@@ -410,7 +462,22 @@ async function observeAndroidNativeScan(
           analyzedInputsById.set(analyzedInput.asset.id, analyzedInput);
         });
 
-        void Promise.resolve(options.onCheckpoint?.(event)).catch(rejectOnce);
+        const displayProgress = resolveAndroidNativeDisplayProgress({
+          current: event.current,
+          total: event.total,
+          dirtyAssetCount: options.sourceCandidates.length,
+          displayProgressCurrent: options.displayProgressCurrent,
+          displayProgressTotal: options.displayProgressTotal,
+          displayProgressCompletedOffset: options.displayProgressCompletedOffset,
+        });
+
+        void Promise.resolve(
+          options.onCheckpoint?.({
+            ...event,
+            current: displayProgress.current,
+            total: displayProgress.total,
+          }),
+        ).catch(rejectOnce);
       },
     );
 
@@ -459,22 +526,28 @@ async function observeAndroidNativeScan(
         analyzedInputsById.set(analyzedInput.asset.id, analyzedInput);
       });
 
-      options.onProgress?.({
+      const displayProgress = resolveAndroidNativeDisplayProgress({
         current: runtime.status.current,
         total: runtime.status.total,
+        dirtyAssetCount: options.sourceCandidates.length,
+        displayProgressCurrent: options.displayProgressCurrent,
+        displayProgressTotal: options.displayProgressTotal,
+        displayProgressCompletedOffset: options.displayProgressCompletedOffset,
+      });
+
+      options.onProgress?.({
+        current: displayProgress.current,
+        total: displayProgress.total,
         currentFileName: runtime.status.currentFileName ?? '',
         isScanning: runtime.status.phase === 'running',
-        percentage:
-          runtime.status.total > 0
-            ? (runtime.status.current / runtime.status.total) * 100
-            : 0,
+        percentage: buildProgressPercentage(displayProgress),
       });
 
       if (runtime.snapshot?.analyzedInputs.length) {
         void Promise.resolve(
           options.onCheckpoint?.({
-            current: runtime.status.current,
-            total: runtime.status.total,
+            current: displayProgress.current,
+            total: displayProgress.total,
             currentFileName: runtime.status.currentFileName ?? null,
             processedCount: runtime.status.processedCount,
             lastProcessedAssetId: runtime.status.lastProcessedAssetId,
@@ -517,6 +590,7 @@ async function observeAndroidNativeScan(
             jobId: options.jobId,
             language: options.language,
             resumeAfterAssetId: options.resumeAfterAssetId ?? null,
+            displayProgressCurrent: options.displayProgressCurrent,
             displayProgressTotal: options.displayProgressTotal,
             displayProgressCompletedOffset: options.displayProgressCompletedOffset,
             executionProfile: ANDROID_NATIVE_SCAN_EXECUTION_PROFILE,
@@ -575,6 +649,7 @@ export async function executeAndroidNativeFirstScan(
     falsePositiveIds: [...(options.legacyOptions.falsePositiveIds ?? [])],
     recycleBinCandidateCache: [...(options.legacyOptions.recycleBinCandidateCache ?? [])],
     resumeAfterAssetId: options.legacyOptions.resumeAfterAssetId ?? null,
+    displayProgressCurrent: options.displayProgressCurrent,
     displayProgressTotal: options.displayProgressTotal,
     displayProgressCompletedOffset: options.displayProgressCompletedOffset,
     onProgress: options.legacyOptions.onProgress,

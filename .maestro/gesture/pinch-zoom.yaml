@@ -1,0 +1,70 @@
+appId: com.jt.mistapmediacleaner
+name: Pinch Zoom E2E
+---
+# 图片双指缩放测试
+
+# 导航到扫描结果页
+- launchApp
+- runFlow:
+    when:
+      visible: "Landing"
+    file: sub-flows/landing-to-scan-results.yaml
+
+# 等待网格加载
+- extendedWaitUntil:
+    visible:
+      id: "scan-result-grid-item"
+    timeout: 10000
+
+# 点击第一个网格项进入详情页
+- tapOn:
+    id: "photo-grid-item"
+
+# 等待详情页打开
+- extendedWaitUntil:
+    visible:
+      id: "detail-viewer"
+    timeout: 10000
+
+# 截图: 详情页初始状态
+- takeScreenshot: pinch-zoom-01-detail-initial
+
+# 双击图片 (模拟双击缩放/重置)
+- doubleTapOn:
+    id: "zoomable-image"
+
+# 等待缩放动画
+- waitForAnimationToEnd
+
+# 截图: 双击后
+- takeScreenshot: pinch-zoom-02-after-double-tap
+
+# 验证图片还在 (ZoomableImage 渲染正常)
+- assertVisible:
+    id: "zoomable-image"
+
+# 拖动图片 (模拟平移)
+- swipe:
+    direction: LEFT
+    from:
+      id: "detail-photo-preview"
+
+# 等待动画
+- waitForAnimationToEnd
+
+# 截图: 拖动后
+- takeScreenshot: pinch-zoom-03-after-pan
+
+# 验证详情页仍然打开
+- assertVisible:
+    id: "detail-viewer"
+
+# 关闭详情页
+- tapOn:
+    id: "detail-close-button"
+
+# 验证回到网格页
+- extendedWaitUntil:
+    visible:
+      id: "scan-result-grid-item"
+    timeout: 5000

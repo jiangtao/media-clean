@@ -1,4 +1,20 @@
+import React from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+
+const runtime = vi.hoisted(() => ({
+  safeAreaInsets: { top: 0, bottom: 0, left: 0, right: 0 },
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => runtime.safeAreaInsets,
+  SafeAreaProvider: ({ children }: { children: any }) => children,
+}));
+
+import { getAppTheme } from '../../theme/app-theme';
+import { TabBar } from '../../ui/components/TabBar';
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // BDD Scenario 1.1: User switches tabs
 // Tests for the TabBar component logic
@@ -7,29 +23,62 @@ describe('TabBar', () => {
   const mockOnTabPress = vi.fn();
 
   const defaultTabs = [
-    { name: 'Photos', label: '照片', icon: 'images-outline', badge: undefined },
-    { name: 'RecycleBin', label: '保留和清理', icon: 'trash-outline', badge: undefined },
-    { name: 'Settings', label: '设置', icon: 'settings-outline', badge: undefined },
+    { name: 'Photos', label: '照片', icon: 'nav-photo' as const, badge: undefined },
+    { name: 'RecycleBin', label: '回收站', icon: 'nav-trash' as const, badge: undefined },
+    { name: 'Settings', label: '设置', icon: 'nav-setting' as const, badge: undefined },
   ];
 
   beforeEach(() => {
     mockOnTabPress.mockClear();
+    runtime.safeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
   });
+
+  function renderTabBar() {
+    let renderer!: ReturnType<typeof TestRenderer.create>;
+
+    act(() => {
+      renderer = TestRenderer.create(
+        <TabBar
+          tabs={defaultTabs}
+          activeTab="Photos"
+          onTabPress={mockOnTabPress}
+          theme={getAppTheme('light')}
+        />,
+      );
+    });
+
+    return renderer;
+  }
+
+  function flattenStyle(style: unknown): Record<string, unknown> {
+    if (Array.isArray(style)) {
+      return style.reduce<Record<string, unknown>>(
+        (acc, entry) => ({ ...acc, ...flattenStyle(entry) }),
+        {},
+      );
+    }
+
+    if (style && typeof style === 'object') {
+      return style as Record<string, unknown>;
+    }
+
+    return {};
+  }
 
   describe('Tab rendering', () => {
     it('should render all 3 tabs', () => {
       // Verify all 3 tabs exist with their labels
       expect(defaultTabs).toHaveLength(3);
       expect(defaultTabs[0].label).toBe('照片');
-      expect(defaultTabs[1].label).toBe('保留和清理');
+      expect(defaultTabs[1].label).toBe('回收站');
       expect(defaultTabs[2].label).toBe('设置');
     });
 
     it('should render tab icons', () => {
       // Verify icons are defined
-      expect(defaultTabs[0].icon).toBe('images-outline');
-      expect(defaultTabs[1].icon).toBe('trash-outline');
-      expect(defaultTabs[2].icon).toBe('settings-outline');
+      expect(defaultTabs[0].icon).toBe('nav-photo');
+      expect(defaultTabs[1].icon).toBe('nav-trash');
+      expect(defaultTabs[2].icon).toBe('nav-setting');
     });
 
     it('should mark Photos tab as active by default', () => {
@@ -76,9 +125,9 @@ describe('TabBar', () => {
   describe('Badge display', () => {
     it('should display badge with count when badge value is provided', () => {
       const tabsWithBadge = [
-        { name: 'Photos', label: '照片', icon: 'images-outline', badge: undefined },
-        { name: 'RecycleBin', label: '保留和清理', icon: 'trash-outline', badge: 5 },
-        { name: 'Settings', label: '设置', icon: 'settings-outline', badge: undefined },
+        { name: 'Photos', label: '照片', icon: 'nav-photo', badge: undefined },
+        { name: 'RecycleBin', label: '回收站', icon: 'nav-trash', badge: 5 },
+        { name: 'Settings', label: '设置', icon: 'nav-setting', badge: undefined },
       ];
 
       // Badge should be defined for RecycleBin
@@ -101,9 +150,9 @@ describe('TabBar', () => {
 
     it('should not display badge when badge value is 0', () => {
       const tabsWithZeroBadge = [
-        { name: 'Photos', label: '照片', icon: 'images-outline', badge: undefined },
-        { name: 'RecycleBin', label: '保留和清理', icon: 'trash-outline', badge: 0 },
-        { name: 'Settings', label: '设置', icon: 'settings-outline', badge: undefined },
+        { name: 'Photos', label: '照片', icon: 'nav-photo', badge: undefined },
+        { name: 'RecycleBin', label: '回收站', icon: 'nav-trash', badge: 0 },
+        { name: 'Settings', label: '设置', icon: 'nav-setting', badge: undefined },
       ];
 
       // Should not show badge for 0
@@ -137,33 +186,52 @@ describe('TabBar', () => {
     it('should render tab labels for screen readers', () => {
       // All labels should be rendered as text
       expect(defaultTabs[0].label).toBe('照片');
-      expect(defaultTabs[1].label).toBe('保留和清理');
+      expect(defaultTabs[1].label).toBe('回收站');
       expect(defaultTabs[2].label).toBe('设置');
     });
   });
 
   describe('Theme integration', () => {
     it('should apply theme colors to tab labels', () => {
-      // Inactive tabs use theme.pageTextMuted
-      // Active tabs use theme.pageTextPrimary
+      // Inactive tabs use theme.pageTextMuted; active tabs use the primary accent.
       const theme = {
         pageTextMuted: '#7c8595',
-        pageTextPrimary: '#18212f',
+        buttonPrimaryBackground: '#18212f',
       };
       expect(theme.pageTextMuted).toBeDefined();
-      expect(theme.pageTextPrimary).toBeDefined();
+      expect(theme.buttonPrimaryBackground).toBeDefined();
     });
 
     it('should apply theme colors to container', () => {
-      // Container uses theme.cardBackground
+      // The container stays transparent so the page background shows through.
       const theme = {
-        cardBackground: '#fffaf1',
+        safeArea: '#fffaf1',
       };
-      expect(theme.cardBackground).toBeDefined();
+      expect(theme.safeArea).toBeDefined();
     });
   });
 
   describe('Tab bar structure', () => {
+    it('should keep the tab bar above Android system navigation bars', () => {
+      runtime.safeAreaInsets = { top: 0, bottom: 34, left: 0, right: 0 };
+
+      const renderer = renderTabBar();
+      const safeAreaStyle = flattenStyle(
+        renderer.root.findByProps({ testID: 'main-tab-bar-safe-area' }).props.style,
+      );
+
+      expect(safeAreaStyle?.paddingBottom).toBe(34);
+    });
+
+    it('should keep a minimum bottom breathing room when no bottom inset exists', () => {
+      const renderer = renderTabBar();
+      const safeAreaStyle = flattenStyle(
+        renderer.root.findByProps({ testID: 'main-tab-bar-safe-area' }).props.style,
+      );
+
+      expect(safeAreaStyle?.paddingBottom).toBe(8);
+    });
+
     it('should have correct tab bar height', () => {
       // Tab bar has height: 56
       const tabBarHeight = 56;

@@ -2,7 +2,7 @@
 
 [English Version](./vercel.en.md)
 
-本文档定义 Media Clean 发布页的 Vercel 自动发布配置。发布页代码位于 `page/`，不与 Expo App 的 Android/iOS 构建耦合。
+本文档定义 Media Clean 发布页的 Vercel 自动发布配置。发布页代码位于 `page/`，页面代码仍可独立部署；Android 正式 APK 下载文件由 Android release workflow 注入到 page 静态产物。
 
 ## 项目配置
 
@@ -23,11 +23,13 @@
 3. 根 `package.json` 提供 `page:build/page:dev/page:preview/page:deploy/page:deploy:prod` 便于从仓库根目录验证和发布。
 4. 不提交 `.vercel/`；当前已 link 的 `projectId/orgId` 已固定进 workflow，GitHub 只需提供 `VERCEL_TOKEN` secret。
 5. `page` 的 Android 下载入口统一指向：
-   `https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk`
-6. 以下变更会自动触发 page 生产部署：
+   `https://mc.jerret.me/download/android-latest.apk`
+6. page-only deploy 会先从 GitHub latest 备份资产 hydrate `page/public/download/android-latest.apk`，再构建和部署，避免新页面部署清空下载文件。
+7. 以下变更会自动触发 page 生产部署：
    - `page/**`
    - `.github/workflows/android-release.yml`
    - `scripts/release/verify-android-release-page-contract.mjs`
+   - `scripts/release/prepare-page-android-download.mjs`
 
 ## DNS 接入
 
@@ -61,7 +63,7 @@ gh secret set VERCEL_TOKEN --repo jiangtao/media-clean
 
 1. push 到 `main/master` 且命中 page/release-page contract 路径时，会自动触发 `.github/workflows/page-vercel.yml`
 2. 也可以手动 `workflow_dispatch`
-3. workflow 会先校验 release-page contract，再 build，再 deploy production，最后回查 `mc-khaki.vercel.app`
+3. workflow 会先 hydrate Android APK、校验 release-page contract，再 build，再 deploy production，最后回查 `https://mc.jerret.me`
 
 发布后检查：
 
@@ -70,4 +72,5 @@ gh secret set VERCEL_TOKEN --repo jiangtao/media-clean
 3. 手机 mock 背景图与 3 张界面展示图无 404。
 4. `apps/icons/manifest.json` 可访问，且 `start_url` 指向 `/`。
 5. `/landing.html` 能兼容回到首页。
-6. Android 下载按钮指向最新正式 APK。
+6. Android 下载按钮指向 `https://mc.jerret.me/download/android-latest.apk`。
+7. `https://mc.jerret.me/download/android-latest.apk` HEAD 请求成功，并返回 APK 下载响应。

@@ -8,6 +8,7 @@ import {
   clearPhotoScanResultCache,
   loadFalsePositiveCandidateIds,
   loadAssetManifestEntries,
+  loadCleanupReportSnapshot,
   loadLastScanMeta,
   loadMediaAnalysisCache,
   loadLastValidScanBaseline,
@@ -756,6 +757,12 @@ describe('persisted media ledger storage', () => {
     await syncPersistedMediaLedger({
       deletedIds: ['candidate-2'],
       updatedAt: 1_710_000_600_000,
+    });
+
+    await expect(loadCleanupReportSnapshot()).resolves.toEqual({
+      cleanedItemCount: 1,
+      cleanedBytes: 2048,
+      lastCleanedAt: 1_710_000_600_000,
     });
 
     await expect(loadUserDecisions()).resolves.toEqual([

@@ -23,6 +23,8 @@ vi.mock('expo-media-library', () => ({
   SortBy: {
     creationTime: 'creationTime',
   },
+  getAssetsAsync: vi.fn(),
+  getAssetInfoAsync: vi.fn(),
 }));
 
 vi.mock('expo-file-system/legacy', () => ({
@@ -39,7 +41,14 @@ vi.mock('../../../services/storage/app-storage', () => ({
   saveMediaAnalysisCache: vi.fn(),
 }));
 
-import { buildScanOutputFromAnalyzedInputs } from '../scan-media-library';
+import * as MediaLibrary from 'expo-media-library';
+import { analyzeVisualsForAsset } from '../../../services/media/analyze-visuals';
+import {
+  loadFalsePositiveCandidateIds,
+  loadMediaAnalysisCache,
+  saveMediaAnalysisCache,
+} from '../../../services/storage/app-storage';
+import { buildScanOutputFromAnalyzedInputs, scanMediaLibrary } from '../scan-media-library';
 
 function createAnalyzedInput(id: string) {
   return {
@@ -61,6 +70,43 @@ function createAnalyzedInput(id: string) {
     },
     fingerprint: null,
     analysisStatus: 'ok' as const,
+  };
+}
+
+function createCachedRecycleCandidate(id: string) {
+  return {
+    id,
+    asset: {
+      id,
+      uri: `file:///${id}.jpg`,
+      previewUri: `file:///${id}.jpg`,
+      mediaType: 'photo' as const,
+      width: 640,
+      height: 640,
+      duration: 0,
+      fileSize: 80_000,
+      creationTime: 1_710_000_000_000,
+    },
+    score: 90,
+    confidence: 'high' as const,
+    kind: 'abnormal-photo' as const,
+    primaryIssueType: 'abnormal' as const,
+    issueTypes: ['abnormal' as const],
+    reasons: ['测试命中'],
+  };
+}
+
+function createMediaAsset(id: string) {
+  return {
+    id,
+    filename: `${id}.jpg`,
+    uri: `file:///${id}.jpg`,
+    mediaType: MediaLibrary.MediaType.photo,
+    width: 640,
+    height: 640,
+    duration: 0,
+    creationTime: 1_710_000_000_000,
+    modificationTime: 1_710_000_000_000,
   };
 }
 
@@ -107,5 +153,59 @@ describe('buildScanOutputFromAnalyzedInputs', () => {
     expect(output.state.activeCandidates).toHaveLength(0);
     expect(output.state.recycleBin).toHaveLength(1);
     expect(output.summary.recycleBinCount).toBe(1);
+  });
+
+  it('keeps existing recycle-bin ids separate from newly recognized scan results', () => {
+    const recycleBinIds = Array.from({ length: 9 }, (_, index) => `recycle-${index + 1}`);
+    const output = buildScanOutputFromAnalyzedInputs(
+      [
+        createAnalyzedInput('new-cleanup-1'),
+        createAnalyzedInput('new-cleanup-2'),
+        createAnalyzedInput('recycle-1'),
+      ],
+      recycleBinIds,
+      {
+        recycleBinCandidateCache: recycleBinIds.map(createCachedRecycleCandidate),
+        scannedAt: 1_710_000_000_999,
+        scannedCount: 11,
+      },
+    );
+
+    expect(output.state.activeCandidates.map((candidate) => candidate.id)).toEqual([
+      'new-cleanup-1',
+      'new-cleanup-2',
+    ]);
+    expect(output.state.recycleBin.map((candidate) => candidate.id).sort()).toEqual(recycleBinIds);
+    expect(output.summary.recycleBinCount).toBe(9);
+  });
+});
+
+describe('scanMediaLibrary recycle-bin exclusion', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(loadFalsePositiveCandidateIds).mockResolvedValue([]);
+    vi.mocked(loadMediaAnalysisCache).mockResolvedValue({});
+    vi.mocked(MediaLibrary.getAssetInfoAsync).mockRejectedValue(new Error('Unexpected pinned lookup'));
+  });
+
+  it('does not reanalyze cached recycle-bin ids during a later scan', async () => {
+    const recycleBinIds = Array.from({ length: 9 }, (_, index) => `recycle-${index + 1}`);
+    vi.mocked(MediaLibrary.getAssetsAsync).mockResolvedValueOnce({
+      assets: recycleBinIds.map(createMediaAsset),
+      endCursor: '',
+      hasNextPage: false,
+      totalCount: recycleBinIds.length,
+    });
+
+    const output = await scanMediaLibrary(recycleBinIds, {
+      recycleBinCandidateCache: recycleBinIds.map(createCachedRecycleCandidate),
+      yieldToMainThread: async () => {},
+    });
+
+    expect(analyzeVisualsForAsset).not.toHaveBeenCalled();
+    expect(saveMediaAnalysisCache).not.toHaveBeenCalled();
+    expect(output.state.activeCandidates).toEqual([]);
+    expect(output.state.recycleBin.map((candidate) => candidate.id).sort()).toEqual(recycleBinIds);
+    expect(output.summary.recycleBinCount).toBe(9);
   });
 });

@@ -16,6 +16,7 @@ vi.mock('react-native', () => {
     Dimensions: {
       get: () => ({ width: 375, height: 812 }),
     },
+    useWindowDimensions: () => ({ width: 375, height: 812, scale: 3, fontScale: 1 }),
     PixelRatio: {
       get: () => 3,
     },
@@ -96,11 +97,14 @@ const mockTheme: AppThemePalette = {
   inputText: '#18212f',
   buttonPrimaryBackground: '#173944',
   buttonPrimaryText: '#ffffff',
+  buttonSuccessBackground: '#18bf63',
+  buttonSuccessPressedBackground: '#15ad59',
   buttonSecondaryBackground: '#efe6d6',
   buttonSecondaryText: '#28404c',
   buttonTertiaryBackground: '#304856',
   buttonTertiaryText: '#e2edf0',
   buttonDangerBackground: '#b34f2f',
+  buttonDangerPressedBackground: '#c65a60',
   buttonDangerText: '#ffffff',
   chipBackground: '#efe6d6',
   chipBorder: '#e1d5c2',
@@ -188,8 +192,12 @@ describe('PhotoGridItem selection visuals', () => {
     const emptyIndicator = renderer.root.findByProps({ testID: 'selection-indicator-empty' });
 
     expect(flattenStyle(emptyIndicator.props.style)).toMatchObject({
-      backgroundColor: 'rgba(255, 255, 255, 0.08)',
-      borderColor: 'rgba(255, 255, 255, 0.96)',
+      width: 18,
+      height: 18,
+      top: 7,
+      right: 7,
+      backgroundColor: 'rgba(15, 23, 42, 0.08)',
+      borderColor: 'rgba(255, 255, 255, 0.98)',
     });
   });
 
@@ -213,8 +221,12 @@ describe('PhotoGridItem selection visuals', () => {
     const checkmarkIcon = renderer.root.findByProps({ testID: 'selection-checkmark-icon' });
 
     expect(flattenStyle(filledIndicator.props.style)).toMatchObject({
+      width: 18,
+      height: 18,
+      top: 7,
+      right: 7,
       backgroundColor: '#2f80ff',
-      borderColor: 'rgba(255, 255, 255, 0.96)',
+      borderColor: 'rgba(255, 255, 255, 0.98)',
     });
     expect(checkmarkIcon.props.name).toBe('checkmark');
     expect(checkmarkIcon.props.color).toBe('#ffffff');

@@ -6,7 +6,8 @@ import { spawnSync } from 'node:child_process';
 const repoRoot = process.cwd();
 const defaultApkPath = path.join(repoRoot, 'android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
 const artifactDir = path.join(repoRoot, 'artifacts', 'android-debug');
-const reportPath = path.join(artifactDir, 'app-debug.signing.txt');
+const artifactBaseName = process.env.ANDROID_DEBUG_ARTIFACT_BASENAME ?? 'app-debug';
+const reportPath = path.join(artifactDir, `${artifactBaseName}.signing.txt`);
 
 function findApkSignerCandidates() {
   const candidates = [];

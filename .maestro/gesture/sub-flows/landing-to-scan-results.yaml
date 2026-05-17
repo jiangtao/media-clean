@@ -1,0 +1,49 @@
+appId: com.jt.mistapmediacleaner
+name: Navigate Landing to Scan Results
+---
+# 从 Landing 页导航到扫描结果页
+
+- extendedWaitUntil:
+    visible:
+      id: "landing-primary-action"
+    timeout: 10000
+
+- tapOn:
+    id: "landing-primary-action"
+
+# 等待 Tab 出现
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "tab-button-Photos"
+    timeout: 10000
+
+- tapOn:
+    id: "tab-button-Photos"
+
+# 等待网格加载 (可能直接有结果，也可能需要扫描)
+- runFlow:
+    when:
+      visible:
+        id: "photo-grid-start-scan-button"
+    file: start-scan-and-wait.yaml
+
+# 扫描完成后可能先进入摘要页，需要点击一个异常分类进入网格。
+- runFlow:
+    when:
+      visible:
+        id: "photo-grid-result-breakdown-duplicate"
+    file: open-duplicate-result-grid.yaml
+
+- runFlow:
+    when:
+      visible:
+        id: "photo-grid-result-breakdown-blurry"
+    file: open-blurry-result-grid.yaml
+
+# 等待结果加载
+- extendedWaitUntil:
+    visible:
+      id: "scan-result-grid-item"
+    timeout: 15000

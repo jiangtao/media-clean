@@ -8,7 +8,7 @@ import {
   formatLocalizedDuration,
   formatLocalizedSize,
   getAppCopy,
-  getCandidateTitle,
+  getCandidateDisplayTitle,
   getConfidenceLabel,
   getDuplicateCardSummary,
   getIssueTypeLabel,
@@ -37,7 +37,7 @@ export function CandidateCard({
   onToggleSelect,
 }: CandidateCardProps) {
   const copy = getAppCopy(language);
-  const title = getCandidateTitle(candidate.kind, language);
+  const title = getCandidateDisplayTitle(candidate, language);
   const duplicateSummary = getDuplicateCardSummary(candidate, language);
   const styles = useMemo(() => createStyles(theme), [theme]);
 

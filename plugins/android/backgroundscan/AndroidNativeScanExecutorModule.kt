@@ -50,6 +50,12 @@ class AndroidNativeScanExecutorModule(
           throw IllegalArgumentException("Missing required field: language")
         },
         assets = parseAssets(assets),
+        displayProgressTotal = readOptionalInt(options, "displayProgressTotal"),
+        displayProgressCurrent = readOptionalInt(options, "displayProgressCurrent"),
+        displayProgressCompletedOffset = readOptionalInt(
+          options,
+          "displayProgressCompletedOffset",
+        ) ?: 0,
       )
 
       executor.start(parsedOptions)
@@ -83,5 +89,13 @@ class AndroidNativeScanExecutorModule(
   override fun invalidate() {
     executor.stop()
     super.invalidate()
+  }
+
+  private fun readOptionalInt(options: ReadableMap, key: String): Int? {
+    if (!options.hasKey(key) || options.isNull(key)) {
+      return null
+    }
+
+    return options.getDouble(key).toInt()
   }
 }

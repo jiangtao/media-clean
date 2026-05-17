@@ -5,8 +5,12 @@ import path from 'node:path';
 const repoRoot = process.cwd();
 const defaultApkPath = path.join(repoRoot, 'android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
 const artifactDir = path.join(repoRoot, 'artifacts', 'android-debug');
-const checksumPath = path.join(artifactDir, 'app-debug.sha256');
-const metadataPath = path.join(artifactDir, 'debug-metadata.json');
+const artifactBaseName = process.env.ANDROID_DEBUG_ARTIFACT_BASENAME ?? 'app-debug';
+const checksumPath = path.join(artifactDir, `${artifactBaseName}.sha256`);
+const metadataPath = path.join(
+  artifactDir,
+  artifactBaseName === 'app-debug' ? 'debug-metadata.json' : `${artifactBaseName}.metadata.json`,
+);
 const appJsonPath = path.join(repoRoot, 'app.json');
 
 function sha256(filePath) {
@@ -24,6 +28,8 @@ function main() {
   const appConfig = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
   const expoConfig = appConfig.expo ?? {};
   const androidConfig = expoConfig.android ?? {};
+  const applicationIdSuffix = process.env.ANDROID_DEBUG_APPLICATION_ID_SUFFIX ?? '';
+  const packageName = androidConfig.package ? `${androidConfig.package}${applicationIdSuffix}` : null;
   const checksum = sha256(apkPath);
 
   fs.mkdirSync(artifactDir, { recursive: true });
@@ -32,13 +38,18 @@ function main() {
   const metadata = {
     generatedAt: new Date().toISOString(),
     artifactType: 'apk',
-    buildChannel: 'debug',
+    buildChannel: process.env.ANDROID_DEBUG_BUILD_CHANNEL ?? 'debug',
     artifactPath: path.relative(repoRoot, apkPath),
     checksumSha256: checksum,
     version: expoConfig.version ?? null,
     versionCode: androidConfig.versionCode ?? null,
-    packageName: androidConfig.package ?? null,
-    signingReportPath: path.relative(repoRoot, path.join(artifactDir, 'app-debug.signing.txt')),
+    packageName,
+    applicationIdSuffix,
+    debugArchitectures: (process.env.ANDROID_DEBUG_ARCHITECTURES ?? '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean),
+    signingReportPath: path.relative(repoRoot, path.join(artifactDir, `${artifactBaseName}.signing.txt`)),
     documentation: {
       zh: 'docs/release/android.md',
       en: 'docs/release/android.en.md',

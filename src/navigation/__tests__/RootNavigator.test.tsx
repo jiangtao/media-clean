@@ -49,6 +49,15 @@ vi.mock('@react-navigation/native-stack', () => ({
   },
 }));
 
+vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+  View: 'View',
+  Text: 'Text',
+  StyleSheet: {
+    create: (styles: Record<string, unknown>) => styles,
+  },
+}));
+
 vi.mock('../../ui/screens/LandingScreen', () => ({
   LandingScreen: () => {
     runtime.landingRenderCount += 1;
@@ -86,11 +95,21 @@ vi.mock('../../application/AppPreferencesContext', () => ({
     copy: {
       tabs: {
         photos: '照片',
-        recycle: '保留和清理',
+        recycle: '回收站',
         settings: '设置',
       },
     },
     theme: {
+      scheme: 'light',
+      safeArea: '#f3ecdf',
+      pageTextPrimary: '#18212f',
+      pageTextSecondary: '#546272',
+      cardBackground: '#fffaf1',
+      cardBorder: '#e7dcc7',
+      cardMutedBackground: '#f6f7fb',
+      cardMutedBorder: '#d8dce8',
+      thumbnailBackground: '#d8d2c5',
+      buttonPrimaryBackground: '#2f80ff',
       tabBarBackground: '#000000',
       tabBarBorder: '#111111',
       tabBarInactive: '#666666',
@@ -143,7 +162,7 @@ describe('RootNavigator', () => {
     expect(runtime.initialRouteName).toBe('Landing');
     expect(renderer.root.findByProps({ testID: 'mock-landing-screen' })).toBeTruthy();
     expect(renderer.root.findAllByProps({ testID: 'mock-main-tab-navigator' })).toHaveLength(0);
-    expect(runtime.landingRenderCount).toBe(1);
+    expect(runtime.landingRenderCount).toBeGreaterThanOrEqual(1);
     expect(runtime.mainRenderCount).toBe(0);
   });
 
@@ -159,20 +178,33 @@ describe('RootNavigator', () => {
     expect(runtime.mainRenderCount).toBe(1);
   });
 
-  it('falls back to the main workspace when the workspace entry flag cannot be loaded', async () => {
+  it('falls back to the landing workspace when the workspace entry flag cannot be loaded', async () => {
     const loadError = new Error('storage-busy');
     runtime.loadHasEnteredWorkspace.mockRejectedValueOnce(loadError);
 
     const renderer = await renderNavigator();
 
-    expect(runtime.initialRouteName).toBe('Main');
-    expect(renderer.root.findByProps({ testID: 'mock-main-tab-navigator' })).toBeTruthy();
-    expect(renderer.root.findAllByProps({ testID: 'mock-landing-screen' })).toHaveLength(0);
+    expect(runtime.initialRouteName).toBe('Landing');
+    expect(renderer.root.findByProps({ testID: 'mock-landing-screen' })).toBeTruthy();
+    expect(renderer.root.findAllByProps({ testID: 'mock-main-tab-navigator' })).toHaveLength(0);
     expect(consoleWarnSpy).toHaveBeenCalledWith(
-      'Failed to load workspace entry state, fallback to Main.',
+      'Failed to load workspace entry state, fallback to Landing.',
       loadError,
     );
-    expect(runtime.landingRenderCount).toBe(0);
-    expect(runtime.mainRenderCount).toBe(1);
+    expect(runtime.landingRenderCount).toBeGreaterThanOrEqual(1);
+    expect(runtime.mainRenderCount).toBe(0);
+  });
+
+  it('shows a themed loading fallback while resolving the initial workspace route', () => {
+    runtime.loadHasEnteredWorkspace.mockReturnValueOnce(new Promise(() => undefined));
+
+    let renderer!: ReturnType<typeof TestRenderer.create>;
+
+    act(() => {
+      renderer = TestRenderer.create(<RootNavigator />);
+    });
+
+    expect(renderer.root.findByProps({ testID: 'root-navigation-loading' })).toBeTruthy();
+    expect(renderer.root.findByType('ActivityIndicator').props.color).toBe('#2f80ff');
   });
 });

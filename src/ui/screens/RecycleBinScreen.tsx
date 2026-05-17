@@ -544,16 +544,9 @@ export function RecycleBinScreen({
     ]),
   );
 
-  const DetailScreenCompat = DetailScreen as unknown as React.ComponentType<
-    React.ComponentProps<typeof DetailScreen> & {
-      onPrimaryAction?: (ids?: string[]) => void | Promise<void>;
-      onHardDelete?: (ids?: string[]) => void | Promise<void>;
-    }
-  >;
-
   if (previewCandidate) {
     return (
-      <DetailScreenCompat
+      <DetailScreen
         candidate={previewCandidate}
         duplicateCandidates={previewDuplicateCandidates}
         language={language}
@@ -671,10 +664,9 @@ export function RecycleBinScreen({
           gridLayout={gridLayout}
         />
       ) : !hasHydrated && isHydrating ? (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText} testID="recycle-bin-loading-label">
-            {loadingLabel}
-          </Text>
+        <View style={styles.noticeCard} testID="recycle-bin-loading-state">
+          <Text style={styles.noticeTitle}>{copy.common.statusTitle}</Text>
+          <Text style={styles.noticeText}>{loadingLabel}</Text>
         </View>
       ) : (
         <View style={styles.emptyContainer} testID="recycle-bin-empty-state">

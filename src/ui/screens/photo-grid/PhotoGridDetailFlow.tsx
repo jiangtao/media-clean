@@ -17,12 +17,6 @@ interface PhotoGridDetailFlowProps {
   onKeep: (ids?: string[]) => void | Promise<void>;
 }
 
-const DetailScreenCompat = DetailScreen as unknown as React.ComponentType<
-  React.ComponentProps<typeof DetailScreen> & {
-    onKeep?: (ids?: string[]) => void | Promise<void>;
-  }
->;
-
 export function PhotoGridDetailFlow({
   candidate,
   browseCandidates,
@@ -35,7 +29,7 @@ export function PhotoGridDetailFlow({
   onKeep,
 }: PhotoGridDetailFlowProps) {
   return (
-    <DetailScreenCompat
+    <DetailScreen
       candidate={candidate}
       browseCandidates={browseCandidates}
       duplicateCandidates={duplicateCandidates}

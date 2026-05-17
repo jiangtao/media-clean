@@ -4,10 +4,15 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MainTabNavigator } from './MainTabNavigator';
 import type { RootStackParamList } from './types';
 import { useAppPreferences } from '../application/AppPreferencesContext';
-import { LandingScreen } from '../ui/screens/LandingScreen';
 import { loadHasEnteredWorkspace } from '../services/storage/workspace-entry-storage';
+import { ActivityLoadingFallback } from '../ui/components/ActivityLoadingFallback';
+import { LandingScreen } from '../ui/screens/LandingScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+function LandingStackScreen(props: React.ComponentProps<typeof LandingScreen>) {
+  return <LandingScreen {...props} />;
+}
 
 export function RootNavigator() {
   const { theme } = useAppPreferences();
@@ -36,7 +41,7 @@ export function RootNavigator() {
   }, []);
 
   if (initialRouteName === null) {
-    return null;
+    return <ActivityLoadingFallback theme={theme} testID="root-navigation-loading" />;
   }
 
   return (
@@ -50,7 +55,7 @@ export function RootNavigator() {
         },
       }}
     >
-      <Stack.Screen name="Landing" component={LandingScreen} />
+      <Stack.Screen name="Landing" component={LandingStackScreen} />
       <Stack.Screen name="Main" component={MainTabNavigator} />
     </Stack.Navigator>
   );

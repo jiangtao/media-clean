@@ -1,6 +1,6 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const runtime = vi.hoisted(() => ({
   recycleBinIds: [] as string[],
@@ -26,6 +26,10 @@ vi.mock('@react-navigation/bottom-tabs', () => ({
       }) => React.ReactNode;
     }) => {
       runtime.navigatorSpy(rest);
+      const screenElements = React.Children.toArray(children).filter(React.isValidElement) as Array<
+        React.ReactElement<{ name: string; component?: React.ComponentType<any> }>
+      >;
+
       return React.createElement(
         React.Fragment,
         null,
@@ -42,6 +46,15 @@ vi.mock('@react-navigation/bottom-tabs', () => ({
             navigate: runtime.navigate,
           },
         }),
+        ...screenElements
+          .filter((screen) => screen.props.component)
+          .map((screen) =>
+            React.createElement(screen.props.component!, {
+              key: `rendered-${screen.props.name}`,
+              navigation: { navigate: runtime.navigate },
+              route: { key: `${screen.props.name}-key`, name: screen.props.name },
+            }),
+          ),
         children,
       );
     },
@@ -50,6 +63,15 @@ vi.mock('@react-navigation/bottom-tabs', () => ({
       return React.createElement('View', { testID: `mock-screen-${props.name}` });
     },
   }),
+}));
+
+vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+  View: 'View',
+  Text: 'Text',
+  StyleSheet: {
+    create: (styles: Record<string, unknown>) => styles,
+  },
 }));
 
 vi.mock('../../ui/components/TabBar', () => ({
@@ -81,6 +103,15 @@ vi.mock('../../application/AppPreferencesContext', () => ({
       },
     },
     theme: {
+      scheme: 'light',
+      safeArea: '#f3ecdf',
+      pageTextPrimary: '#18212f',
+      pageTextSecondary: '#546272',
+      cardBackground: '#fffaf1',
+      cardBorder: '#e7dcc7',
+      cardMutedBackground: '#f6f7fb',
+      thumbnailBackground: '#d8d2c5',
+      buttonPrimaryBackground: '#173944',
       tabBarBackground: '#000000',
       tabBarBorder: '#111111',
       tabBarInactive: '#666666',
@@ -98,12 +129,16 @@ import { __resetMainTabNavigatorSessionState, MainTabNavigator } from '../MainTa
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+const mountedRenderers: Array<ReturnType<typeof TestRenderer.create>> = [];
+
 function renderNavigator() {
   let renderer!: ReturnType<typeof TestRenderer.create>;
 
   act(() => {
     renderer = TestRenderer.create(<MainTabNavigator />);
   });
+
+  mountedRenderers.push(renderer);
 
   return renderer;
 }
@@ -140,6 +175,14 @@ describe('MainTabNavigator recycle bin badge', () => {
     runtime.navigate.mockReset();
     runtime.screenSpy.mockReset();
     runtime.navigatorSpy.mockReset();
+  });
+
+  afterEach(() => {
+    for (const renderer of mountedRenderers.splice(0)) {
+      act(() => {
+        renderer.unmount();
+      });
+    }
   });
 
   it('在回收站存在条目时，应把 badge 透传给 TabBar', () => {
@@ -241,5 +284,14 @@ describe('MainTabNavigator recycle bin badge', () => {
 
     const remountedNavigatorProps = runtime.navigatorSpy.mock.lastCall?.[0] as { initialRouteName?: string };
     expect(remountedNavigatorProps.initialRouteName).toBe('RecycleBin');
+  });
+
+  it('tab screens render synchronously without page bundle loading fallbacks', () => {
+    const renderer = renderNavigator();
+
+    expect(renderer.root.findByProps({ testID: 'mock-photo-grid-screen' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'mock-recycle-bin-screen' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'mock-settings-screen' })).toBeTruthy();
+    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
   });
 });

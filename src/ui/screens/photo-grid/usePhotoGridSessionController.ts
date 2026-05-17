@@ -2980,6 +2980,7 @@ export function usePhotoGridSessionController({
                   recycleBinIds: recycleBinIdsValue,
                   sourceCandidates,
                   language,
+                  displayProgressCurrent,
                   displayProgressTotal,
                   displayProgressCompletedOffset,
                   attachToRunningIfPresent: nativeRuntimeStatus?.phase === 'running',

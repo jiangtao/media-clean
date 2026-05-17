@@ -277,6 +277,7 @@ export function DetailScreen({
         ) : activeDetailCandidate.asset.mediaType === 'video' ? (
           <View style={styles.singleStage} testID="detail-photo-preview">
             <VideoPlayer
+              key={activeDetailCandidate.id}
               uri={activeDetailCandidate.asset.uri}
               width={activeDetailCandidate.asset.width}
               height={activeDetailCandidate.asset.height}
@@ -338,25 +339,6 @@ export function DetailScreen({
               />
             </View>
           </View>
-
-          {viewerCandidates.length > 1 ? (
-            <View style={styles.paginationRow} testID="detail-pagination">
-              {viewerCandidates.map((item, index) => (
-                <View
-                  key={item.id}
-                  style={[
-                    styles.paginationDot,
-                    index === activeCandidateIndex && styles.paginationDotActive,
-                  ]}
-                  testID={
-                    index === activeCandidateIndex
-                      ? `detail-pagination-dot-active-${item.id}`
-                      : `detail-pagination-dot-${item.id}`
-                  }
-                />
-              ))}
-            </View>
-          ) : null}
         </View>
       </View>
     </View>
@@ -464,24 +446,6 @@ function createStyles(insets: { top: number; bottom: number; left: number; right
     },
     actionGroup: {
       justifyContent: 'flex-end',
-    },
-    paginationRow: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: 8,
-      minHeight: 14,
-    },
-    paginationDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: 'rgba(255, 255, 255, 0.24)',
-    },
-    paginationDotActive: {
-      width: 24,
-      borderRadius: 6,
-      backgroundColor: 'rgba(255, 255, 255, 0.92)',
     },
   });
 }

@@ -3,11 +3,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import type { MainTabParamList } from './types';
 import { TabBar } from '../ui/components/TabBar';
+import { useAppPreferences } from '../application/AppPreferencesContext';
+import { loadRecycleBinIds } from '../services/storage/app-storage';
 import { PhotoGridScreen } from '../ui/screens/PhotoGridScreen';
 import { RecycleBinScreen } from '../ui/screens/RecycleBinScreen';
 import { SettingsScreen } from '../ui/screens/SettingsScreen';
-import { useAppPreferences } from '../application/AppPreferencesContext';
-import { loadRecycleBinIds } from '../services/storage/app-storage';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 let lastSelectedMainTab: keyof MainTabParamList = 'Photos';
@@ -34,6 +34,7 @@ function useMainTabScreenContext() {
 
 function PhotosTabScreen({ route }: { route?: { params?: MainTabParamList['Photos'] } }) {
   const { recycleBinIds, onRecycleBinIdsChange } = useMainTabScreenContext();
+
   return (
     <PhotoGridScreen
       recycleBinIds={recycleBinIds}
@@ -45,6 +46,7 @@ function PhotosTabScreen({ route }: { route?: { params?: MainTabParamList['Photo
 
 function RecycleBinTabScreen({ navigation }: { navigation: any }) {
   const { recycleBinIds, onRecycleBinIdsChange, rememberSelectedTab } = useMainTabScreenContext();
+
   return (
     <RecycleBinScreen
       recycleBinIds={recycleBinIds}
@@ -55,6 +57,10 @@ function RecycleBinTabScreen({ navigation }: { navigation: any }) {
       }}
     />
   );
+}
+
+function SettingsTabScreen() {
+  return <SettingsScreen />;
 }
 
 export function MainTabNavigator({
@@ -158,7 +164,7 @@ export function MainTabNavigator({
       >
         <Tab.Screen name="Photos" component={PhotosTabScreen} />
         <Tab.Screen name="RecycleBin" component={RecycleBinTabScreen} />
-        <Tab.Screen name="Settings" component={SettingsScreen} />
+        <Tab.Screen name="Settings" component={SettingsTabScreen} />
       </Tab.Navigator>
     </MainTabScreenContext.Provider>
   );

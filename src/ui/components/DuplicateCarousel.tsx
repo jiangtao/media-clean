@@ -33,8 +33,14 @@ interface ViewerItem {
   duration: number;
 }
 
+interface WindowedViewerItem extends ViewerItem {
+  index: number;
+  reuseSlot: number;
+}
+
 const DEFAULT_STAGE_WIDTH = Math.max(Dimensions.get('window').width - 32, 280);
 const DEFAULT_STAGE_HEIGHT = Math.max(Math.round(DEFAULT_STAGE_WIDTH * 1.45), 320);
+const WINDOWED_VIEW_REUSE_SLOT_COUNT = 3;
 
 function buildViewerItems(
   candidate: CleanupCandidate,
@@ -58,6 +64,27 @@ function buildViewerItems(
   );
 }
 
+function buildWindowedViewerItems(viewerItems: ViewerItem[], currentIndex: number): WindowedViewerItem[] {
+  const startIndex = Math.max(0, currentIndex - 1);
+  const endIndex = Math.min(viewerItems.length - 1, currentIndex + 1);
+  const items: WindowedViewerItem[] = [];
+
+  for (let index = startIndex; index <= endIndex; index += 1) {
+    const item = viewerItems[index];
+    if (!item) {
+      continue;
+    }
+
+    items.push({
+      ...item,
+      index,
+      reuseSlot: index % WINDOWED_VIEW_REUSE_SLOT_COUNT,
+    });
+  }
+
+  return items;
+}
+
 export function DuplicateCarousel({
   candidate,
   duplicateCandidates,
@@ -77,6 +104,7 @@ export function DuplicateCarousel({
     height: DEFAULT_STAGE_HEIGHT,
   });
   const scrollRef = useRef<ScrollView | null>(null);
+  const syncedScrollPositionRef = useRef<{ index: number; width: number } | null>(null);
 
   useEffect(() => {
     if (activeId !== undefined) {
@@ -94,6 +122,10 @@ export function DuplicateCarousel({
     0,
     viewerItems.findIndex((item) => item.id === resolvedActiveId),
   );
+  const windowedViewerItems = useMemo(
+    () => buildWindowedViewerItems(viewerItems, currentIndex),
+    [currentIndex, viewerItems],
+  );
 
   useEffect(() => {
     if (!resolvedActiveId) {
@@ -105,6 +137,18 @@ export function DuplicateCarousel({
       return;
     }
 
+    const syncedScrollPosition = syncedScrollPositionRef.current;
+    if (
+      syncedScrollPosition?.index === focusedIndex &&
+      syncedScrollPosition.width === stageSize.width
+    ) {
+      return;
+    }
+
+    syncedScrollPositionRef.current = {
+      index: focusedIndex,
+      width: stageSize.width,
+    };
     scrollRef.current?.scrollTo?.({
       x: focusedIndex * stageSize.width,
       animated: false,
@@ -130,6 +174,15 @@ export function DuplicateCarousel({
     }
 
     const nextIndex = Math.max(0, Math.min(viewerItems.length - 1, Math.round(offsetX / width)));
+    syncedScrollPositionRef.current = {
+      index: nextIndex,
+      width,
+    };
+
+    if (nextIndex === currentIndex) {
+      return;
+    }
+
     syncFocusedItem(nextIndex);
   };
 
@@ -138,6 +191,10 @@ export function DuplicateCarousel({
       return;
     }
 
+    syncedScrollPositionRef.current = {
+      index: nextIndex,
+      width: stageSize.width,
+    };
     syncFocusedItem(nextIndex);
     scrollRef.current?.scrollTo?.({
       x: nextIndex * stageSize.width,
@@ -170,18 +227,34 @@ export function DuplicateCarousel({
       <View
         style={styles.stage}
         testID="duplicate-stage"
-        onLayout={(event) =>
-          setStageSize({
+        onLayout={(event) => {
+          const nextStageSize = {
             width: event.nativeEvent.layout.width || DEFAULT_STAGE_WIDTH,
             height: event.nativeEvent.layout.height || DEFAULT_STAGE_HEIGHT,
-          })
-        }
+          };
+
+          setStageSize((currentStageSize) =>
+            currentStageSize.width === nextStageSize.width &&
+            currentStageSize.height === nextStageSize.height
+              ? currentStageSize
+              : nextStageSize,
+          );
+        }}
       >
         <ScrollView
           ref={scrollRef}
+          style={styles.stageScroll}
+          contentContainerStyle={[
+            styles.stageScrollContent,
+            {
+              width: stageSize.width * viewerItems.length,
+              height: stageSize.height,
+            },
+          ]}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
+          removeClippedSubviews
           scrollEnabled={viewerItems.length > 1}
           decelerationRate="fast"
           onMomentumScrollEnd={(event) =>
@@ -192,10 +265,10 @@ export function DuplicateCarousel({
           }
           testID="duplicate-stage-scroll"
         >
-          {viewerItems.map((item) => (
+          {windowedViewerItems.map((item) => (
             <View
-              key={item.id}
-              style={[styles.slide, { width: stageSize.width }]}
+              key={`${item.mediaType}-${item.reuseSlot}`}
+              style={[styles.slide, { width: stageSize.width, left: item.index * stageSize.width }]}
               testID={`duplicate-stage-slide-${item.id}`}
             >
               {item.mediaType === 'video' ? (
@@ -205,6 +278,7 @@ export function DuplicateCarousel({
                     width={item.width}
                     height={item.height}
                     theme={theme}
+                    isActive={item.id === resolvedActiveId}
                   />
                 </View>
               ) : (
@@ -268,8 +342,17 @@ function createStyles() {
       alignItems: 'center',
       overflow: 'hidden',
     },
+    stageScroll: {
+      width: '100%',
+      height: '100%',
+    },
+    stageScrollContent: {
+      position: 'relative',
+    },
     slide: {
-      flex: 1,
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
       justifyContent: 'center',
       alignItems: 'center',
     },

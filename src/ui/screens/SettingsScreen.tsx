@@ -200,7 +200,6 @@ export function SettingsScreen() {
   const [lastScanTime, setLastScanTime] = useState<number | null>(null);
   const [persistentCacheSizeBytes, setPersistentCacheSizeBytes] = useState(0);
   const [isClearingPersistentCache, setIsClearingPersistentCache] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const styles = useMemo(() => createStyles(theme, layout), [theme, layout]);
   const settingsCopy = copy.settings;
   const reminderChannelCopy = useMemo(
@@ -248,13 +247,9 @@ export function SettingsScreen() {
             );
             setReminderSettings(reminderRuntime.settings);
             setNotificationPermissionGranted(reminderRuntime.permissionGranted);
-            setIsLoading(false);
           }
         } catch (error) {
           console.error('Failed to load settings:', error);
-          if (isActive) {
-            setIsLoading(false);
-          }
         }
       }
 
@@ -542,14 +537,6 @@ export function SettingsScreen() {
       minute: '2-digit',
     });
   };
-
-  if (isLoading) {
-    return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <Text style={styles.loadingText}>{settingsCopy.loading}</Text>
-      </View>
-    );
-  }
 
   const cacheSizeText = formatLocalizedSize(persistentCacheSizeBytes, language);
   const cacheMetaText = `${settingsCopy.lastScanTitle} ${getLastScanDisplay()}`;

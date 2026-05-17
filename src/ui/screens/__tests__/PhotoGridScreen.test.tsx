@@ -84,6 +84,7 @@ vi.mock('react-native', () => {
   };
 
   return {
+    ActivityIndicator: 'ActivityIndicator',
     View: 'View',
     Text: 'Text',
     Pressable: 'Pressable',
@@ -3932,6 +3933,7 @@ describe('PhotoGridScreen', () => {
       fallbackReason: null,
       output: await new Promise((resolve) => {
         expect(options.legacyOptions.resumeAfterAssetId).toBe('photo-3');
+        expect(options.displayProgressCurrent).toBe(5);
         resolveScan = resolve;
       }),
     }));

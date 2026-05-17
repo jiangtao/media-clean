@@ -241,7 +241,7 @@ describe('DetailScreen', () => {
     expect(renderer.toJSON()).toBeNull();
   });
 
-  it('renders the simplified immersive viewer with index, tags, actions, and pagination', () => {
+  it('renders the simplified immersive viewer with index, tags, actions, and no pagination dots', () => {
     const { renderer } = renderDetailScreen();
     const texts = collectTexts(renderer);
     const closeButtonStyle = flattenStyle(
@@ -279,7 +279,7 @@ describe('DetailScreen', () => {
     expect(renderer.root.findByProps({ testID: 'detail-primary-action' })).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'detail-keep-action' })).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'detail-action-switch' })).toBeTruthy();
-    expect(renderer.root.findByProps({ testID: 'detail-pagination' })).toBeTruthy();
+    expect(renderer.root.findAllByProps({ testID: 'detail-pagination' })).toHaveLength(0);
     expect(texts).toContain('清理');
     expect(texts).toContain('保留');
     expect(closeButtonStyle.width).toBe(44);

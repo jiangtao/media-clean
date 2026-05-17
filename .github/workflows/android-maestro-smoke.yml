@@ -111,11 +111,7 @@ jobs:
             mkdir -p /tmp/maestro-smoke-ci
             cp .maestro/smoke/*.yaml /tmp/maestro-smoke-ci/
             sed -i 's/^appId: .*/appId: com.jt.mistapmediacleaner.debug/' /tmp/maestro-smoke-ci/*.yaml
-            maestro --device emulator-5554 test \
-              --format junit \
-              --output artifacts/maestro/maestro-report.xml \
-              --test-output-dir artifacts/maestro \
-              /tmp/maestro-smoke-ci
+            MAESTRO_CLI_NO_ANALYTICS=1 maestro --device emulator-5554 test --format junit --output artifacts/maestro/maestro-report.xml --test-output-dir artifacts/maestro /tmp/maestro-smoke-ci
 
       - name: Upload Maestro artifacts
         if: always()

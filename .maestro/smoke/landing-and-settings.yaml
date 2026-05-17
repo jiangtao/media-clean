@@ -21,6 +21,12 @@ name: Landing and settings smoke
     timeout: 5000
 - tapOn:
     id: tab-button-Settings
+- tapOn:
+    text: Settings
+    optional: true
+- tapOn:
+    text: 设置
+    optional: true
 - extendedWaitUntil:
     visible:
       id: settings-header

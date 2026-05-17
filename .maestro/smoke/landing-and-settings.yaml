@@ -2,6 +2,10 @@ appId: com.jt.mistapmediacleaner
 name: Landing and settings smoke
 ---
 - launchApp
+- extendedWaitUntil:
+    visible:
+      id: landing-screen
+    timeout: 60000
 - assertVisible:
     id: landing-screen
 - scrollUntilVisible:

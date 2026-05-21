@@ -301,7 +301,7 @@ function isValidMediaAssetSnapshot(value: unknown): value is MediaAssetSnapshot 
     return false;
   }
 
-  const { id, uri, previewUri, mediaType, width, height, duration, fileSize, creationTime } = value;
+  const { id, uri, previewUri, mediaType, width, height, orientation, duration, fileSize, creationTime } = value;
 
   return (
     typeof id === 'string' &&
@@ -310,6 +310,7 @@ function isValidMediaAssetSnapshot(value: unknown): value is MediaAssetSnapshot 
     (mediaType === 'photo' || mediaType === 'video') &&
     isFiniteNumber(width) &&
     isFiniteNumber(height) &&
+    (orientation === undefined || orientation === null || isFiniteNumber(orientation)) &&
     isFiniteNumber(duration) &&
     isFiniteNumber(fileSize) &&
     isFiniteNumber(creationTime)

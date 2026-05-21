@@ -1,4 +1,44 @@
+import React from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
+
+import { COMPONENT_TOKENS } from '../../../theme/generated/component-tokens.generated';
+import { SelectionBar, SELECTION_BAR_STYLE_TOKENS } from '../SelectionBar';
+
+vi.mock('react-native', () => ({
+  View: 'View',
+  Text: 'Text',
+  Pressable: 'Pressable',
+  TouchableOpacity: 'TouchableOpacity',
+  StyleSheet: {
+    create: (styles: Record<string, unknown>) => styles,
+    hairlineWidth: 1,
+  },
+}));
+
+const theme = {
+  cardBackground: '#fffaf1',
+  cardBorder: '#e7dcc7',
+  cardMutedBackground: '#f6f7fb',
+  pageTextPrimary: '#18212f',
+  buttonDangerBackground: '#b34f2f',
+  buttonDangerText: '#ffffff',
+} as never;
+
+function flattenStyle(style: unknown): Record<string, unknown> {
+  if (Array.isArray(style)) {
+    return style.reduce<Record<string, unknown>>(
+      (acc, entry) => ({ ...acc, ...flattenStyle(entry) }),
+      {},
+    );
+  }
+
+  if (style && typeof style === 'object') {
+    return style as Record<string, unknown>;
+  }
+
+  return {};
+}
 
 describe('SelectionBar', () => {
   describe('Scenario 4.1: Long press enters selection mode', () => {
@@ -95,6 +135,51 @@ describe('SelectionBar', () => {
       const locale = 'en-US';
       const expectedText = `${selectedCount} selected`;
       expect(expectedText).toBe('5 selected');
+    });
+  });
+
+  describe('leaf style and testID contract', () => {
+    it('uses file-backed component tokens for rendered selection controls', () => {
+      const onSelectAll = vi.fn();
+      const onDeselectAll = vi.fn();
+      const onClean = vi.fn();
+      let renderer!: ReturnType<typeof TestRenderer.create>;
+
+      act(() => {
+        renderer = TestRenderer.create(
+          <SelectionBar
+            selectedCount={0}
+            totalCount={10}
+            isSelectionMode
+            onSelectAll={onSelectAll}
+            onDeselectAll={onDeselectAll}
+            onClean={onClean}
+            theme={theme}
+          />,
+        );
+      });
+
+      const rootStyle = flattenStyle(renderer.root.findByProps({ testID: 'selection-bar' }).props.style);
+      const selectAllButton = renderer.root.findByProps({ testID: 'select-all-button' });
+      const cleanButtonStyle = flattenStyle(renderer.root.findByProps({ testID: 'clean-button' }).props.style);
+      const countTextStyle = flattenStyle(renderer.root.findByProps({ testID: 'selection-count' }).props.style);
+
+      expect(SELECTION_BAR_STYLE_TOKENS).toBe(COMPONENT_TOKENS.selectionBar);
+      expect(rootStyle.paddingHorizontal).toBe(SELECTION_BAR_STYLE_TOKENS.spacing.horizontal);
+      expect(rootStyle.paddingVertical).toBe(SELECTION_BAR_STYLE_TOKENS.spacing.vertical);
+      expect(countTextStyle.fontSize).toBe(SELECTION_BAR_STYLE_TOKENS.typography.countSize);
+      expect(flattenStyle(selectAllButton.props.style).borderRadius).toBe(
+        SELECTION_BAR_STYLE_TOKENS.radius.button,
+      );
+      expect(cleanButtonStyle.opacity).toBe(SELECTION_BAR_STYLE_TOKENS.state.disabledOpacity);
+
+      act(() => {
+        selectAllButton.props.onPress();
+      });
+
+      expect(onSelectAll).toHaveBeenCalledTimes(1);
+      expect(onDeselectAll).not.toHaveBeenCalled();
+      expect(onClean).not.toHaveBeenCalled();
     });
   });
 });

@@ -22,6 +22,26 @@ const ALLOWED_ZERO_IMPORT_DEPENDENCIES = new Map([
     'react-native-worklets',
     'Runtime peer for react-native-reanimated 4 worklets on native builds.',
   ],
+  [
+    'nativewind',
+    'Consumed by Babel, Metro, Tailwind preset, generated CSS, and NativeWind types rather than direct app-source imports.',
+  ],
+  [
+    '@rn-primitives/slot',
+    'Baseline RNR runtime dependency required by registry-compatible primitives when slot-based components are added.',
+  ],
+  [
+    '@rn-primitives/types',
+    'Baseline RNR type contract dependency required by registry-compatible primitive source.',
+  ],
+  [
+    'class-variance-authority',
+    'Baseline RNR variant utility dependency for shadcn/RNR-compatible primitive source.',
+  ],
+  [
+    'lucide-react-native',
+    'Baseline icon dependency for RNR-compatible primitive and action-button implementations.',
+  ],
 ]);
 
 function readJson(filePath) {

@@ -237,9 +237,10 @@ Acceptance should focus on:
 4. Maestro acceptance contract: [docs/release/maestro.en.md](./docs/release/maestro.en.md); Chinese version: [docs/release/maestro.md](./docs/release/maestro.md).
 5. Vercel release contract: [docs/release/vercel.en.md](./docs/release/vercel.en.md); Chinese version: [docs/release/vercel.md](./docs/release/vercel.md).
 6. Android scan and recognition design: [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md); Chinese version: [design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md).
-7. Execution standard: [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md); Chinese version: [docs/standards/execution-standards.md](./docs/standards/execution-standards.md).
-8. Team-mode standard: [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md); Chinese version: [docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md).
-9. Publishing page directory docs: [page/README.en.md](./page/README.en.md); Chinese version: [page/README.md](./page/README.md).
+7. Android manual product smoke case: [docs/testing/android-manual-product-smoke.md](./docs/testing/android-manual-product-smoke.md).
+8. Execution standard: [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md); Chinese version: [docs/standards/execution-standards.md](./docs/standards/execution-standards.md).
+9. Team-mode standard: [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md); Chinese version: [docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md).
+10. Publishing page directory docs: [page/README.en.md](./page/README.en.md); Chinese version: [page/README.md](./page/README.md).
 
 Android device observability workflows:
 

@@ -1,4 +1,35 @@
+import React from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+
+import { ScanCounter, SCAN_COUNTER_STYLE_TOKENS } from '../ScanCounter';
+
+vi.mock('react-native', () => ({
+  View: 'View',
+  Text: 'Text',
+  StyleSheet: {
+    create: (styles: Record<string, unknown>) => styles,
+  },
+}));
+
+const theme = {
+  pageTextPrimary: '#18212f',
+} as never;
+
+function flattenStyle(style: unknown): Record<string, unknown> {
+  if (Array.isArray(style)) {
+    return style.reduce<Record<string, unknown>>(
+      (acc, entry) => ({ ...acc, ...flattenStyle(entry) }),
+      {},
+    );
+  }
+
+  if (style && typeof style === 'object') {
+    return style as Record<string, unknown>;
+  }
+
+  return {};
+}
 
 // ============================================================================
 // ScanCounter Component Logic
@@ -422,5 +453,27 @@ describe('Edge cases', () => {
     expect(counter.getDisplayValue()).toBe(-50);
 
     counter.cleanup();
+  });
+});
+
+describe('ScanCounter leaf style and testID contract', () => {
+  it('keeps the rendered scan counter anchor and status typography stable', () => {
+    let renderer!: ReturnType<typeof TestRenderer.create>;
+
+    act(() => {
+      renderer = TestRenderer.create(
+        <ScanCounter current={5} total={10} theme={theme} animated={false} locale="zh-CN" />,
+      );
+    });
+
+    const root = renderer.root.findByProps({ testID: 'scan-counter' });
+    const statusText = renderer.root.findByType('Text');
+    const statusStyle = flattenStyle(statusText.props.style);
+
+    expect(root).toBeTruthy();
+    expect(statusText.props.children).toBe('识别中... 5/10');
+    expect(statusStyle.fontSize).toBe(SCAN_COUNTER_STYLE_TOKENS.typography.statusSize);
+    expect(statusStyle.fontWeight).toBe(SCAN_COUNTER_STYLE_TOKENS.typography.statusWeight);
+    expect(statusStyle.color).toBe('#18212f');
   });
 });

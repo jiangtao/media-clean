@@ -25,7 +25,7 @@ interface DesignIconProps {
   width: number;
   height: number;
   align?: 'start' | 'center';
-  color?: string;
+  color: string;
   secondaryColor?: string;
   testID?: string;
 }
@@ -35,8 +35,8 @@ interface SvgProcessRingProps {
   progress: number;
   current?: number;
   total?: number;
-  color?: string;
-  trackColor?: string;
+  color: string;
+  trackColor: string;
   strokeWidth?: number;
   children?: React.ReactNode;
   testID?: string;
@@ -176,8 +176,8 @@ export function DesignIcon({
   width,
   height,
   align = 'center',
-  color = '#2563EB',
-  secondaryColor = '#FFFFFF',
+  color,
+  secondaryColor = color,
   testID,
 }: DesignIconProps) {
   const svg = getNativeSvgModule();
@@ -282,8 +282,8 @@ export function DesignIcon({
 export function SvgProcessRing({
   size,
   progress,
-  color = '#2563EB',
-  trackColor = '#EFF6FF',
+  color,
+  trackColor,
   strokeWidth = 12,
   children,
   testID,
@@ -674,8 +674,8 @@ function StackIcon({ svg, width, height, viewBox, color, secondaryColor, testID 
     <Svg width={width} height={height} viewBox={viewBox} fill="none" overflow="visible" testID={testID}>
       <Rect x="6" y="4" width="14" height="14" rx="2" fill={secondaryColor} />
       <Rect x="4" y="6" width="14" height="14" rx="2" fill={color} />
-      <Path d="M8 16L11 11L14 16H8Z" fill="#FFFFFF" opacity="0.8" />
-      <Path d="M13 16L15.5 12L18 16H13Z" fill="#FFFFFF" opacity="0.8" />
+      <Path d="M8 16L11 11L14 16H8Z" fill={secondaryColor} opacity="0.8" />
+      <Path d="M13 16L15.5 12L18 16H13Z" fill={secondaryColor} opacity="0.8" />
     </Svg>
   );
 }

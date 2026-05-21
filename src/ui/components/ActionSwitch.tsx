@@ -1,14 +1,12 @@
 import { memo, useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { COMPONENT_TOKENS } from '../../theme/generated/component-tokens.generated';
 import { AppIcon, type AppIconName } from '../icons/AppIcon';
 import { DesignIcon } from '../icons/DesignIcon';
-import { TouchSurface } from './TouchSurface';
+import { Text, TouchSurface } from '../primitives';
 
-const SIZE_DEFAULT = 14;
-const SIZE_SMALL = 12;
-const MUTED_DANGER = '#d8646a';
-const MUTED_KEEP = '#18bf63';
+export const ACTION_SWITCH_STYLE_TOKENS = COMPONENT_TOKENS.actionSwitch;
 
 type ActionTone = 'neutral' | 'danger' | 'keep';
 type ActionIconName = AppIconName;
@@ -45,6 +43,9 @@ export const ActionSwitch = memo(function ActionSwitch({
   density = 'regular',
 }: ActionSwitchProps) {
   const styles = useMemo(() => createStyles(density), [density]);
+  const iconSize = density === 'compact'
+    ? ACTION_SWITCH_STYLE_TOKENS.size.iconCompact
+    : ACTION_SWITCH_STYLE_TOKENS.size.iconRegular;
 
   return (
     <View style={styles.actionSwitch} testID={testID}>
@@ -63,8 +64,10 @@ export const ActionSwitch = memo(function ActionSwitch({
           {primaryIcon ? (
             renderActionIcon(
               primaryIcon,
-              selectedAction === 'primary' ? '#ffffff' : 'rgba(255, 255, 255, 0.74)',
-              density === 'compact' ? SIZE_SMALL : SIZE_DEFAULT,
+              selectedAction === 'primary'
+                ? ACTION_SWITCH_STYLE_TOKENS.color.activeText
+                : ACTION_SWITCH_STYLE_TOKENS.color.inactiveIcon,
+              iconSize,
               `${primaryTestID}-icon`,
             )
           ) : null}
@@ -93,8 +96,10 @@ export const ActionSwitch = memo(function ActionSwitch({
           {secondaryIcon ? (
             renderActionIcon(
               secondaryIcon,
-              selectedAction === 'secondary' ? '#ffffff' : 'rgba(255, 255, 255, 0.74)',
-              density === 'compact' ? SIZE_SMALL : SIZE_DEFAULT,
+              selectedAction === 'secondary'
+                ? ACTION_SWITCH_STYLE_TOKENS.color.activeText
+                : ACTION_SWITCH_STYLE_TOKENS.color.inactiveIcon,
+              iconSize,
               `${secondaryTestID}-icon`,
             )
           ) : null}
@@ -151,16 +156,26 @@ function createStyles(density: 'regular' | 'compact') {
     actionSwitch: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: compact ? 4 : 6,
+      gap: compact ? ACTION_SWITCH_STYLE_TOKENS.gap.compact : ACTION_SWITCH_STYLE_TOKENS.gap.regular,
       padding: 0,
-      borderRadius: compact ? 16 : 18,
+      borderRadius: compact
+        ? ACTION_SWITCH_STYLE_TOKENS.radius.compact
+        : ACTION_SWITCH_STYLE_TOKENS.radius.regular,
       backgroundColor: 'transparent',
     },
     actionSegment: {
-      minWidth: compact ? 56 : 64,
-      height: compact ? 32 : 36,
-      borderRadius: compact ? 16 : 18,
-      paddingHorizontal: compact ? 10 : 12,
+      minWidth: compact
+        ? ACTION_SWITCH_STYLE_TOKENS.size.segmentMinWidthCompact
+        : ACTION_SWITCH_STYLE_TOKENS.size.segmentMinWidthRegular,
+      height: compact
+        ? ACTION_SWITCH_STYLE_TOKENS.size.segmentHeightCompact
+        : ACTION_SWITCH_STYLE_TOKENS.size.segmentHeightRegular,
+      borderRadius: compact
+        ? ACTION_SWITCH_STYLE_TOKENS.radius.compact
+        : ACTION_SWITCH_STYLE_TOKENS.radius.regular,
+      paddingHorizontal: compact
+        ? ACTION_SWITCH_STYLE_TOKENS.size.segmentPaddingHorizontalCompact
+        : ACTION_SWITCH_STYLE_TOKENS.size.segmentPaddingHorizontalRegular,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -168,28 +183,34 @@ function createStyles(density: 'regular' | 'compact') {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: compact ? 4 : 5,
+      gap: compact
+        ? ACTION_SWITCH_STYLE_TOKENS.gap.contentCompact
+        : ACTION_SWITCH_STYLE_TOKENS.gap.contentRegular,
     },
     inactiveActionSegment: {},
     keepActionSegment: {
-      backgroundColor: MUTED_KEEP,
+      backgroundColor: ACTION_SWITCH_STYLE_TOKENS.color.keepBackground,
     },
     dangerActionSegment: {
-      backgroundColor: MUTED_DANGER,
+      backgroundColor: ACTION_SWITCH_STYLE_TOKENS.color.dangerBackground,
     },
     neutralActionSegment: {
-      backgroundColor: '#242424',
+      backgroundColor: ACTION_SWITCH_STYLE_TOKENS.color.neutralBackground,
     },
     actionText: {
-      fontSize: compact ? SIZE_SMALL : SIZE_DEFAULT,
-      fontWeight: '800',
-      letterSpacing: compact ? 0.1 : 0.2,
+      fontSize: compact
+        ? ACTION_SWITCH_STYLE_TOKENS.typography.fontSizeCompact
+        : ACTION_SWITCH_STYLE_TOKENS.typography.fontSizeRegular,
+      fontWeight: ACTION_SWITCH_STYLE_TOKENS.typography.fontWeight,
+      letterSpacing: compact
+        ? ACTION_SWITCH_STYLE_TOKENS.typography.letterSpacingCompact
+        : ACTION_SWITCH_STYLE_TOKENS.typography.letterSpacingRegular,
     },
     activeActionText: {
-      color: '#ffffff',
+      color: ACTION_SWITCH_STYLE_TOKENS.color.activeText,
     },
     inactiveActionText: {
-      color: 'rgba(255, 255, 255, 0.78)',
+      color: ACTION_SWITCH_STYLE_TOKENS.color.inactiveText,
     },
   });
 }

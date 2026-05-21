@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import {
+  BackHandler,
+  Pressable,
+  StyleSheet,
+  Text as RNText,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,6 +21,8 @@ import { buildSelectionToggleLabel } from './photo-grid/selection-mode-labels';
 import { useAppPreferences } from '../../application/AppPreferencesContext';
 import type { CleanupCandidate } from '../../domain/recognition/types';
 import type { AppThemePalette } from '../../theme/app-theme';
+import { Card, Text } from '../primitives';
+import { PhotoGridSkeleton } from '../skeletons';
 import {
   buildMediaGridLayout,
   buildPhotoGridContentPadding,
@@ -35,10 +44,6 @@ type BreakdownItem = {
   label: string;
   count: number;
 };
-
-type ScanCompletionPhase = 'idle' | 'recognizing';
-
-const RECOGNITION_TRANSITION_MS = 780;
 
 const legacyInstrumentationStyles = StyleSheet.create({
   root: {
@@ -88,9 +93,9 @@ function formatScanRangeDate(value: number) {
 }
 
 function buildScanBatchRangeLabel(
-  language: string,
   range: ScanBatchRangeState,
   formatter: (start: string, end: string) => string,
+  earliestMediaLabel: string,
 ) {
   if (!range?.endAt) {
     return null;
@@ -98,9 +103,7 @@ function buildScanBatchRangeLabel(
 
   const startText =
     range.startAt === null
-      ? language === 'zh-CN'
-        ? '最早媒体'
-        : 'Earliest media'
+      ? earliestMediaLabel
       : formatScanRangeDate(range.startAt);
 
   return formatter(startText, formatScanRangeDate(range.endAt));
@@ -130,37 +133,37 @@ function LegacyInstrumentationSurface({
 }: LegacyInstrumentationSurfaceProps) {
   return (
     <View style={legacyInstrumentationStyles.root}>
-      <Text>{title}</Text>
-      {body ? <Text>{body}</Text> : null}
-      {result ? <Text>{result}</Text> : null}
-      {progressValue ? <Text>{progressValue}</Text> : null}
+      <RNText>{title}</RNText>
+      {body ? <RNText>{body}</RNText> : null}
+      {result ? <RNText>{result}</RNText> : null}
+      {progressValue ? <RNText>{progressValue}</RNText> : null}
       {scopeTexts.map((text) => (
-        <Text key={text}>{text}</Text>
+        <RNText key={text}>{text}</RNText>
       ))}
       {breakdownTexts.map((text) => (
-        <Text key={text}>{text}</Text>
+        <RNText key={text}>{text}</RNText>
       ))}
       {isScanning ? <View pointerEvents="none" testID="photo-grid-loading-overlay" /> : null}
 
       <View testID="mock-photo-grid">
-        <Text>{`grid-count:${displayedCandidates.length}`}</Text>
+        <RNText>{`grid-count:${displayedCandidates.length}`}</RNText>
         <View testID={gridTestID}>
           {displayedCandidates.map((candidate) => (
             <View key={candidate.id}>
-              <Text>{candidate.id}</Text>
+              <RNText>{candidate.id}</RNText>
               <Pressable
                 testID={`mock-photo-grid-press-${candidate.id}`}
                 onPress={() => (isSelectionMode ? onSelect(candidate.id) : onItemPress(candidate))}
                 onLongPress={() => onSelect(candidate.id)}
               >
-                <Text>{`press:${candidate.id}`}</Text>
+                <RNText>{`press:${candidate.id}`}</RNText>
               </Pressable>
               <Pressable
                 testID={itemTestID}
                 onPress={() => (isSelectionMode ? onSelect(candidate.id) : onItemPress(candidate))}
                 onLongPress={() => onSelect(candidate.id)}
               >
-                <Text>{candidate.id}</Text>
+                <RNText>{candidate.id}</RNText>
               </Pressable>
             </View>
           ))}
@@ -170,13 +173,13 @@ function LegacyInstrumentationSurface({
       {isSelectionMode ? (
         <>
           <Pressable testID="photo-selection-toggle-button" onPress={onToggleSelectAll}>
-            <Text>{selectionToggleLabel}</Text>
+            <RNText>{selectionToggleLabel}</RNText>
           </Pressable>
           <Pressable testID="keep-selected-button" onPress={onKeepSelected}>
-            <Text>{`${keepSelectedLabel} (${selectedCount})`}</Text>
+            <RNText>{`${keepSelectedLabel} (${selectedCount})`}</RNText>
           </Pressable>
           <Pressable testID="cleanup-selected-button" onPress={onCleanupSelected}>
-            <Text>{`${cleanupSelectedLabel} (${selectedCount})`}</Text>
+            <RNText>{`${cleanupSelectedLabel} (${selectedCount})`}</RNText>
           </Pressable>
         </>
       ) : null}
@@ -209,32 +212,6 @@ function sumCandidateBytes(candidates: readonly CleanupCandidate[]) {
   return candidates.reduce((total, candidate) => total + (candidate.asset.fileSize ?? 0), 0);
 }
 
-function buildPhotoGridStateText(language: string) {
-  if (language === 'en-US') {
-    return {
-      readyTitle: '',
-      readyBody: 'Find duplicate, blurry, and similar items. Results stay here for review.',
-      scanningTitle: 'Scanning your media',
-      scanningBody: 'Review the current batch while the device continues scanning locally.',
-      recognizingTitle: 'Recognizing results',
-      recognizingBody: 'Scan reached 100%. Sorting the local findings into review groups.',
-      resultTitle: 'Scan complete, flagged results found',
-      resultBody: (count: number) => `Reviewed ${count} media items in this batch`,
-    };
-  }
-
-  return {
-    readyTitle: '',
-    readyBody: '识别重复、模糊与相似内容，结果留在当前页面继续判断。',
-    scanningTitle: '正在扫描照片',
-    scanningBody: '正在分析相册中的媒体文件，结果会按本地规则逐步回填到当前会话。',
-    recognizingTitle: '识别中',
-    recognizingBody: '扫描进度已完成，正在整理重复、模糊与相似分类结果。',
-    resultTitle: '扫描完成，发现异常结果',
-    resultBody: (count: number) => `共识别 ${count} 个媒体`,
-  };
-}
-
 export function PhotoGridScreen({
   recycleBinIds = [],
   onRecycleBinIdsChange,
@@ -249,7 +226,17 @@ export function PhotoGridScreen({
     () => buildMediaGridLayout(insets, dimensions),
     [dimensions, insets],
   );
-  const screenText = useMemo(() => buildPhotoGridStateText(language), [language]);
+  const screenText = useMemo(
+    () => ({
+      readyTitle: '',
+      readyBody: copy.screens.photoGrid.stateReadyBody,
+      scanningTitle: copy.screens.photoGrid.stateScanningTitle,
+      scanningBody: copy.screens.photoGrid.stateScanningBody,
+      resultTitle: copy.screens.photoGrid.stateResultTitle,
+      resultBody: copy.screens.photoGrid.stateResultBody,
+    }),
+    [copy.screens.photoGrid],
+  );
   const [activeIssueFilter, setActiveIssueFilter] = useState<IssueFilterKey | null>(null);
   const [shouldRetainResultCategories, setShouldRetainResultCategories] = useState(false);
   const {
@@ -289,42 +276,36 @@ export function PhotoGridScreen({
     recycleBinIds,
     onRecycleBinIdsChange,
   });
-  const previousScanningRef = useRef(isScanning);
-  const recognitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastActiveScanBatchRangeLabelRef = useRef<string | null>(null);
   const didAutoStartScanRef = useRef(false);
-  const [scanCompletionPhase, setScanCompletionPhase] = useState<ScanCompletionPhase>('idle');
 
   const currentScanBatchRangeLabel = useMemo(
     () =>
       buildScanBatchRangeLabel(
-        language,
         scanBatchRange,
         copy.screens.photoGrid.scanCurrentBatchRange,
+        copy.screens.photoGrid.scanEarliestMediaLabel,
       ),
-    [copy.screens.photoGrid.scanCurrentBatchRange, language, scanBatchRange],
+    [
+      copy.screens.photoGrid.scanCurrentBatchRange,
+      copy.screens.photoGrid.scanEarliestMediaLabel,
+      scanBatchRange,
+    ],
   );
   const completedScanRangeLabel = useMemo(
-    () => buildScanBatchRangeLabel(language, scanBatchRange, copy.screens.photoGrid.scanBatchRange),
-    [copy.screens.photoGrid.scanBatchRange, language, scanBatchRange],
+    () =>
+      buildScanBatchRangeLabel(
+        scanBatchRange,
+        copy.screens.photoGrid.scanBatchRange,
+        copy.screens.photoGrid.scanEarliestMediaLabel,
+      ),
+    [
+      copy.screens.photoGrid.scanBatchRange,
+      copy.screens.photoGrid.scanEarliestMediaLabel,
+      scanBatchRange,
+    ],
   );
-  useEffect(() => {
-    if (isScanning && currentScanBatchRangeLabel) {
-      lastActiveScanBatchRangeLabelRef.current = currentScanBatchRangeLabel;
-    }
-  }, [currentScanBatchRangeLabel, isScanning]);
-  const isRecognitionRangeState =
-    !isScanning &&
-    hasCompletedScan &&
-    scanResultsCount > 0 &&
-    scanCompletionPhase === 'recognizing';
-  const shouldShowScanRangeLabel = isScanning || isRecognitionRangeState;
-  const entryScanRangeLabel =
-    isScanning
-      ? currentScanBatchRangeLabel
-      : isRecognitionRangeState
-        ? lastActiveScanBatchRangeLabelRef.current ?? currentScanBatchRangeLabel
-        : completedScanRangeLabel;
+  const shouldShowScanRangeLabel = isScanning;
+  const entryScanRangeLabel = isScanning ? currentScanBatchRangeLabel : completedScanRangeLabel;
   const entryScanScopeCount = isScanning ? scanProgress.total : scanScopeSelection.total;
   const entryCopy = useMemo(
     () =>
@@ -411,8 +392,6 @@ export function PhotoGridScreen({
   const showPermissionPrompt = permissionState === 'denied';
   const showLoadingPrompt = permissionState === 'loading';
   const showScanPrompt = permissionState === 'granted';
-  const isRecognizingResults =
-    showScanPrompt && isRecognitionRangeState;
   useEffect(() => {
     if ((isScanning || !hasCompletedScan) && shouldRetainResultCategories) {
       setShouldRetainResultCategories(false);
@@ -426,7 +405,6 @@ export function PhotoGridScreen({
   const hasResultState =
     showScanPrompt &&
     !isScanning &&
-    !isRecognizingResults &&
     hasCompletedScan &&
     (scanResultsCount > 0 || shouldRetainResultCategories);
   const areResultCategoriesEmpty =
@@ -437,7 +415,6 @@ export function PhotoGridScreen({
   const isScanAllCompleteState =
     showScanPrompt &&
     !isScanning &&
-    !isRecognizingResults &&
     hasCompletedScan &&
     hasCompletedFullScan &&
     scanResultsCount === 0 &&
@@ -445,52 +422,11 @@ export function PhotoGridScreen({
   const isScanExhaustedState =
     showScanPrompt &&
     !isScanning &&
-    !isRecognizingResults &&
     hasCompletedScan &&
     !hasCompletedFullScan &&
     scanResultsCount === 0 &&
     !hasResultState;
   const showIssueWorkspace = hasResultState && activeIssueFilter !== null;
-
-  useEffect(() => {
-    const wasScanning = previousScanningRef.current;
-    previousScanningRef.current = isScanning;
-
-    if (isScanning || !showScanPrompt) {
-      if (recognitionTimerRef.current) {
-        clearTimeout(recognitionTimerRef.current);
-        recognitionTimerRef.current = null;
-      }
-      setScanCompletionPhase('idle');
-      return;
-    }
-
-    if (!wasScanning || !hasCompletedScan || scanResultsCount === 0) {
-      setScanCompletionPhase('idle');
-      return;
-    }
-
-    if ((globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT) {
-      setScanCompletionPhase('idle');
-      return;
-    }
-
-    setScanCompletionPhase('recognizing');
-    recognitionTimerRef.current = setTimeout(() => {
-      setScanCompletionPhase('idle');
-      recognitionTimerRef.current = null;
-    }, RECOGNITION_TRANSITION_MS);
-  }, [hasCompletedScan, isScanning, scanResultsCount, showScanPrompt]);
-
-  useEffect(
-    () => () => {
-      if (recognitionTimerRef.current) {
-        clearTimeout(recognitionTimerRef.current);
-        recognitionTimerRef.current = null;
-      }
-    },
-    [],
-  );
 
   useEffect(() => {
     if (!hasResultState) {
@@ -610,24 +546,6 @@ export function PhotoGridScreen({
     void handleStartScan();
   }, [autoStartScan, handleStartScan, hasCompletedScan, isScanning, showScanPrompt]);
 
-  if (previewCandidate) {
-    return (
-      <PhotoGridDetailFlow
-        candidate={previewCandidate}
-        browseCandidates={
-          previewBrowseCandidates.length > 0 ? previewBrowseCandidates : undefined
-        }
-        duplicateCandidates={previewDuplicateCandidates}
-        language={language}
-        theme={theme}
-        onClose={handleClosePreview}
-        onPrimaryAction={handlePreviewPrimaryAction}
-        onHardDelete={handlePreviewHardDelete}
-        onKeep={handlePreviewKeep}
-      />
-    );
-  }
-
   const entryCardTestID = isScanAllCompleteState
     ? 'photo-grid-scan-all-complete-state'
     : isScanExhaustedState
@@ -654,12 +572,6 @@ export function PhotoGridScreen({
       ? copy.screens.photoGrid.scanAllCompleteTitle
       : null
     : completedScanRangeLabel;
-  const recognitionProgressTotal = Math.max(
-    scanProgress.total,
-    scanProgress.current,
-    scanScopeSelection.total,
-    1,
-  );
   const selectionToggleLabel = buildSelectionToggleLabel(language, isAllIssueSelected);
   const legacySelectionToggleLabel = buildSelectionToggleLabel(language, legacyIsAllSelected);
   const legacyGridTestID = hasCompletedScan
@@ -685,17 +597,7 @@ export function PhotoGridScreen({
 
   return (
     <View style={styles.container}>
-      {showLoadingPrompt ? (
-        <PhotoGridEntryCard
-          variant="loading"
-          rootTestID={entryCardTestID}
-          title={screenText.readyTitle}
-          body={screenText.readyBody}
-          theme={theme}
-          language={language}
-          compact={gridLayout.isSELike}
-        />
-      ) : null}
+      {showLoadingPrompt ? <PhotoGridSkeleton variant="permissionChecking" /> : null}
 
       {showPermissionPrompt ? (
         <View style={styles.entryFrame}>
@@ -725,8 +627,6 @@ export function PhotoGridScreen({
                     ? 'scanResult'
                     : isScanning
                       ? 'scanning'
-                      : isRecognizingResults
-                        ? 'recognizing'
                       : isScanAllCompleteState
                         ? 'scanAllComplete'
                         : isScanExhaustedState
@@ -740,8 +640,6 @@ export function PhotoGridScreen({
                     ? resultTitle
                     : isScanning
                       ? screenText.scanningTitle
-                      : isRecognizingResults
-                        ? screenText.recognizingTitle
                       : isGrantedIdleState
                         ? screenText.readyTitle
                         : entryCopy.title
@@ -751,8 +649,6 @@ export function PhotoGridScreen({
                     ? resultBody
                     : isScanning
                       ? screenText.scanningBody
-                      : isRecognizingResults
-                        ? screenText.recognizingBody
                       : isGrantedIdleState
                         ? screenText.readyBody
                         : (entryCopy.body ?? null)
@@ -769,9 +665,7 @@ export function PhotoGridScreen({
                         : null
                 }
                 actionLabel={
-                  isRecognizingResults
-                    ? null
-                    : hasResultState
+                  hasResultState
                     ? hasCompletedFullScan
                       ? null
                       : resultActionLabel
@@ -783,9 +677,7 @@ export function PhotoGridScreen({
                 actionDisabled={isScanning}
                 actionTestID="photo-grid-start-scan-button"
                 progress={
-                  isRecognizingResults
-                    ? { current: recognitionProgressTotal, total: recognitionProgressTotal }
-                    : entryCopy.progress ?? null
+                  entryCopy.progress ?? null
                 }
                 currentFileName={scanProgress.currentFileName}
                 resultsCount={scanResultsCount}
@@ -801,20 +693,20 @@ export function PhotoGridScreen({
           ) : null}
 
           {resumeMessage ? (
-            <View style={styles.noticeCard}>
+            <Card variant="muted" theme={theme} style={styles.noticeCard}>
               <Text style={styles.noticeTitle}>{copy.common.statusTitle}</Text>
               <Text style={styles.noticeText}>{resumeMessage}</Text>
-            </View>
+            </Card>
           ) : null}
 
           {errorMessage ? (
-            <View style={styles.noticeCard}>
+            <Card variant="muted" theme={theme} style={styles.noticeCard}>
               <Text style={styles.noticeTitle}>{copy.common.statusTitle}</Text>
               <Text style={styles.noticeText}>{errorMessage}</Text>
-            </View>
+            </Card>
           ) : null}
 
-          {!showIssueWorkspace && shouldRenderLegacyInstrumentationSurface() ? (
+          {!previewCandidate && !showIssueWorkspace && shouldRenderLegacyInstrumentationSurface() ? (
             <LegacyInstrumentationSurface
               title={entryCopy.title}
               body={entryCopy.body ?? null}
@@ -870,6 +762,24 @@ export function PhotoGridScreen({
           ) : null}
         </>
       ) : null}
+
+      {previewCandidate ? (
+        <View style={styles.previewOverlay} testID="photo-grid-detail-overlay">
+          <PhotoGridDetailFlow
+            candidate={previewCandidate}
+            browseCandidates={
+              previewBrowseCandidates.length > 0 ? previewBrowseCandidates : undefined
+            }
+            duplicateCandidates={previewDuplicateCandidates}
+            language={language}
+            theme={theme}
+            onClose={handleClosePreview}
+            onPrimaryAction={handlePreviewPrimaryAction}
+            onHardDelete={handlePreviewHardDelete}
+            onKeep={handlePreviewKeep}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -882,6 +792,11 @@ function createStyles(
     container: {
       flex: 1,
       backgroundColor: theme.safeArea,
+    },
+    previewOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 20,
+      elevation: 20,
     },
     entryFrame: {
       paddingTop: Math.max(insets.top - 12, 0),

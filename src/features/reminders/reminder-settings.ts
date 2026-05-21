@@ -71,10 +71,6 @@ export function formatReminderTime(settings: Pick<ReminderSettings, 'hour' | 'mi
     .padStart(2, '0')}`;
 }
 
-function formatWeekday(weekday: number) {
-  return listReminderWeekdayLabels('zh-CN')[weekday - 1]?.replace('周', '') ?? '一';
-}
-
 export function listReminderFrequencyOptions(language: AppLanguage = 'zh-CN') {
   const labels = listReminderFrequencyLabels(language);
   return [
@@ -137,19 +133,6 @@ export function buildReminderSummary(
   settings: ReminderSettings,
   language: AppLanguage = 'zh-CN',
 ) {
-  if (language === 'zh-CN') {
-    if (!settings.enabled) {
-      return '未开启定期清理提醒';
-    }
-
-    const time = formatReminderTime(settings);
-    if (settings.frequency === 'daily') {
-      return `每天 ${time} 提醒你检查识别结果`;
-    }
-
-    return `每周${formatWeekday(settings.weekday)} ${time} 提醒你检查识别结果`;
-  }
-
   return buildReminderScheduleSummary(settings, language);
 }
 

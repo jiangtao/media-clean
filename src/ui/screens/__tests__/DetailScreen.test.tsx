@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,7 +14,38 @@ vi.mock('react-native', () => ({
   Text: 'Text',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  Animated: {
+    Value: class {
+      value: number;
+
+      constructor(value: number) {
+        this.value = value;
+      }
+
+      setValue(value: number) {
+        this.value = value;
+      }
+    },
+    View: 'Animated.View',
+    loop: () => ({
+      start: () => undefined,
+      stop: () => undefined,
+    }),
+    sequence: (animations: unknown[]) => animations,
+    timing: () => ({}),
+  },
+  Easing: {
+    ease: 'ease',
+    inOut: (easing: unknown) => easing,
+  },
   StyleSheet: {
+    absoluteFill: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+    },
     create: (styles: Record<string, unknown>) => styles,
   },
   Dimensions: {
@@ -235,10 +269,34 @@ describe('DetailScreen', () => {
     vi.clearAllMocks();
   });
 
-  it('renders null when no candidate is provided', () => {
+  it('keeps the high-risk Detail boundary markers in the screen source', () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../DetailScreen.tsx'),
+      'utf8',
+    );
+
+    expect(source).toContain('DetailSkeleton');
+    expect(source).toContain('ActionSwitch');
+    expect(source).toContain('DuplicateCarousel');
+    expect(source).toContain('ZoomableImage');
+    expect(source).toContain('VideoPlayer');
+    expect(source).toContain('activeCandidateIdRef');
+    expect(source).toContain('runActionSafely');
+    expect(source).toContain('detail-viewer');
+    expect(source).toContain('detail-viewer-index');
+    expect(source).toContain('detail-action-switch');
+    expect(source).toContain('detail-primary-action');
+    expect(source).toContain('detail-hard-delete');
+  });
+
+  it('renders the detail skeleton when no candidate is provided', () => {
     const { renderer } = renderDetailScreen(null);
 
-    expect(renderer.toJSON()).toBeNull();
+    expect(renderer.root.findByProps({ testID: 'detail-skeleton' })).toBeTruthy();
+    expect(
+      renderer.root.findByProps({ testID: 'detail-skeleton-stage' }).props.accessibilityLabel,
+    ).toBe('正在加载媒体详情');
+    expect(renderer.root.findAllByProps({ testID: 'detail-viewer' })).toHaveLength(0);
   });
 
   it('renders the simplified immersive viewer with index, tags, actions, and no pagination dots', () => {
@@ -269,6 +327,7 @@ describe('DetailScreen', () => {
     );
 
     expect(renderer.root.findByProps({ testID: 'detail-viewer' })).toBeTruthy();
+    expect(renderer.root.findAllByProps({ testID: 'detail-skeleton' })).toHaveLength(0);
     expect(
       flattenText(renderer.root.findByProps({ testID: 'detail-viewer-index' }).props.children),
     ).toBe('1 / 2');

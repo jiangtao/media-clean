@@ -1,15 +1,16 @@
 import * as MediaLibrary from 'expo-media-library';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, BackHandler, View, Text, StyleSheet, useWindowDimensions } from 'react-native';
+import { Alert, BackHandler, View, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { PhotoGrid } from '../components/PhotoGrid';
 import type { SwipeSelectionReason } from '../hooks/useSwipeSelection';
 import { DetailScreen } from './DetailScreen';
-import { TouchSurface } from '../components/TouchSurface';
 import { AppIcon } from '../icons/AppIcon';
 import { DesignIcon } from '../icons/DesignIcon';
+import { Button, Card, IconButton, Text } from '../primitives';
+import { RecycleBinSkeleton } from '../skeletons';
 import { useAppPreferences } from '../../application/AppPreferencesContext';
 import type { CleanupCandidate } from '../../domain/recognition/types';
 import type { CleanupState } from '../../features/cleanup/cleanup-state';
@@ -36,10 +37,13 @@ import {
   RECYCLE_BIN_DESIGN_CONTENT_WIDTH,
 } from './screen-layout';
 import { ensureMediaLibraryDeletePermissionsAsync } from '../../services/media-library-permissions';
+import { COMPONENT_TOKENS } from '../../theme/generated/component-tokens.generated';
 import {
   buildSelectionHeaderTitle,
   buildSelectionToggleLabel,
 } from './photo-grid/selection-mode-labels';
+
+const RECYCLE_BIN_STYLE_TOKENS = COMPONENT_TOKENS.recycleBin;
 
 function normalizeIds(ids: string[]) {
   return Array.from(new Set(ids)).sort();
@@ -66,10 +70,7 @@ function buildHydratedRecycleBinState(activeCandidates: CleanupCandidate[], recy
   };
 }
 
-function getDuplicateGroupCandidates(
-  candidates: CleanupCandidate[],
-  candidate: CleanupCandidate | null,
-) {
+function getDuplicateGroupCandidates(candidates: CleanupCandidate[], candidate: CleanupCandidate | null) {
   const groupId = candidate?.duplicateGroup?.groupId;
 
   if (!groupId) {
@@ -90,8 +91,9 @@ function buildNextDetailCandidate(
   }
 
   const targetIdSet = new Set(targetIds);
-  const scopedCandidates = getDuplicateGroupCandidates(recycleBinCandidates, seedCandidate);
-  const detailCandidates = scopedCandidates.length > 0 ? scopedCandidates : [seedCandidate];
+  const detailCandidates = recycleBinCandidates.some((candidate) => candidate.id === seedCandidate.id)
+    ? recycleBinCandidates
+    : [seedCandidate, ...recycleBinCandidates];
   const currentIndex = Math.max(
     0,
     detailCandidates.findIndex((candidate) => candidate.id === activeId),
@@ -175,7 +177,6 @@ export function RecycleBinScreen({
   const baseContentPadding = useMemo(() => buildPhotoGridContentPadding(insets), [insets]);
   const recycleBinTexts = useMemo(() => buildRecycleBinTexts(copy), [copy]);
   const recycleBinCopy = copy.screens.recycleBin;
-  const loadingLabel = recycleBinCopy.loading;
 
   const [state, setState] = useState<CleanupState>(createInitialCleanupState([]));
   const [previewCandidate, setPreviewCandidate] = useState<CleanupCandidate | null>(null);
@@ -544,27 +545,12 @@ export function RecycleBinScreen({
     ]),
   );
 
-  if (previewCandidate) {
-    return (
-      <DetailScreen
-        candidate={previewCandidate}
-        duplicateCandidates={previewDuplicateCandidates}
-        language={language}
-        theme={theme}
-        mode="recycle"
-        onClose={handleClosePreview}
-        onPrimaryAction={(ids) => void handleRestore(ids)}
-        onHardDelete={(ids) => requestDeleteConfirmation(ids, 'detail')}
-      />
-    );
-  }
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={styles.headerLeading}>
-            <TouchSurface
+            <IconButton
               style={styles.backButton}
               pressedStyle={styles.backButtonPressed}
               onPress={() => {
@@ -575,7 +561,8 @@ export function RecycleBinScreen({
 
                 onBackToPhotos?.();
               }}
-              preset="pill"
+              size={isCompact ? 36 : 40}
+              theme={theme}
               testID="recycle-back-button"
             >
               <AppIcon
@@ -583,7 +570,7 @@ export function RecycleBinScreen({
                 size={24}
                 color={theme.pageTextPrimary}
               />
-            </TouchSurface>
+            </IconButton>
 
             <View style={styles.headerCopy}>
               <Text
@@ -598,37 +585,36 @@ export function RecycleBinScreen({
             </View>
           </View>
           {hasRecycleBinItems && isSelectionMode ? (
-            <TouchSurface
+            <Button
               style={[styles.selectionToggleButton, styles.selectionToggleButtonTop]}
-              pressedStyle={styles.selectionToggleButtonPressed}
               onPress={handleToggleSelectAll}
-              preset="pill"
+              variant="secondary"
+              theme={theme}
+              textStyle={[styles.selectionActionText, styles.selectionToggleText]}
               testID="recycle-selection-toggle-button"
             >
-              <Text style={[styles.selectionActionText, styles.selectionToggleText]}>
-                {selectionToggleLabel}
-              </Text>
-            </TouchSurface>
+              {selectionToggleLabel}
+            </Button>
           ) : null}
         </View>
       </View>
 
       {errorMessage ? (
-        <View style={styles.noticeCard}>
+        <Card theme={theme} style={styles.noticeCard}>
           <Text style={styles.noticeTitle}>{copy.common.statusTitle}</Text>
           <Text style={styles.noticeText}>{errorMessage}</Text>
-        </View>
+        </Card>
       ) : null}
 
       {hasRecycleBinItems ? (
-        <View style={styles.summaryCard} testID="cleanup-report-card">
+        <Card theme={theme} style={styles.summaryCard} testID="cleanup-report-card">
           <View style={styles.summaryMetricRow}>
             <View style={styles.summaryLeadingIconShell}>
               <DesignIcon
                 name="nav-trash"
                 width={summaryIconSize}
                 height={summaryIconSize}
-                color="#ff3138"
+                color={theme.buttonDangerBackground}
               />
             </View>
             <View style={styles.summaryPrimaryMetric}>
@@ -645,7 +631,7 @@ export function RecycleBinScreen({
             </View>
           </View>
           <View pointerEvents="none" style={styles.summaryBottomShadow} />
-        </View>
+        </Card>
       ) : null}
 
       {hasRecycleBinItems ? (
@@ -664,10 +650,7 @@ export function RecycleBinScreen({
           gridLayout={gridLayout}
         />
       ) : !hasHydrated && isHydrating ? (
-        <View style={styles.noticeCard} testID="recycle-bin-loading-state">
-          <Text style={styles.noticeTitle}>{copy.common.statusTitle}</Text>
-          <Text style={styles.noticeText}>{loadingLabel}</Text>
-        </View>
+        <RecycleBinSkeleton />
       ) : (
         <View style={styles.emptyContainer} testID="recycle-bin-empty-state">
           <View style={styles.emptyIconWrap}>
@@ -695,29 +678,45 @@ export function RecycleBinScreen({
       {hasRecycleBinItems && isSelectionMode ? (
         <View style={styles.actionBar}>
           <View style={styles.selectionActionsRow}>
-            <TouchSurface
+            <Button
               style={[styles.selectionActionButton, styles.selectionRestoreButton]}
-              pressedStyle={styles.selectionRestoreButtonPressed}
               onPress={() => void handleRestore()}
-              preset="pill"
+              variant="secondary"
+              theme={theme}
+              textStyle={[styles.selectionActionText, styles.selectionRestoreText]}
               hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
               testID="recycle-restore-selected-button"
             >
-              <Text style={[styles.selectionActionText, styles.selectionRestoreText]}>
-                {recycleBinCopy.keepAction}
-              </Text>
-            </TouchSurface>
-            <TouchSurface
+              {recycleBinCopy.keepAction}
+            </Button>
+            <Button
               style={[styles.selectionActionButton, styles.selectionDeleteButton]}
-              pressedStyle={styles.selectionDeleteButtonPressed}
               onPress={() => requestDeleteConfirmation()}
-              preset="pill"
+              variant="danger"
+              theme={theme}
+              textStyle={styles.selectionActionText}
               hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
               testID="recycle-delete-selected-button"
             >
-              <Text style={styles.selectionActionText}>{recycleBinCopy.cleanupAction}</Text>
-            </TouchSurface>
+              {recycleBinCopy.cleanupAction}
+            </Button>
           </View>
+        </View>
+      ) : null}
+
+      {previewCandidate ? (
+        <View style={styles.previewOverlay} testID="recycle-bin-detail-overlay">
+          <DetailScreen
+            candidate={previewCandidate}
+            browseCandidates={state.recycleBin}
+            duplicateCandidates={previewDuplicateCandidates}
+            language={language}
+            theme={theme}
+            mode="recycle"
+            onClose={handleClosePreview}
+            onPrimaryAction={(ids) => void handleRestore(ids)}
+            onHardDelete={(ids) => requestDeleteConfirmation(ids, 'detail')}
+          />
         </View>
       ) : null}
     </View>
@@ -748,6 +747,11 @@ function createStyles(
     container: {
       flex: 1,
       backgroundColor: theme.safeArea,
+    },
+    previewOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 20,
+      elevation: 20,
     },
     header: {
       paddingHorizontal: isCompact ? 20 : 24,
@@ -888,8 +892,8 @@ function createStyles(
       borderBottomRightRadius: 0,
       backgroundColor:
         theme.scheme === 'dark'
-          ? 'rgba(248, 250, 252, 0.16)'
-          : 'rgba(255, 255, 255, 0.92)',
+          ? RECYCLE_BIN_STYLE_TOKENS.color.summaryShadowDark
+          : RECYCLE_BIN_STYLE_TOKENS.color.summaryShadowLight,
       boxShadow: [
         {
           offsetX: 0,
@@ -898,8 +902,8 @@ function createStyles(
           spreadDistance: 0,
           color:
             theme.scheme === 'dark'
-              ? 'rgba(248, 250, 252, 0.16)'
-              : 'rgba(255, 255, 255, 0.92)',
+              ? RECYCLE_BIN_STYLE_TOKENS.color.summaryShadowDark
+              : RECYCLE_BIN_STYLE_TOKENS.color.summaryShadowLight,
         },
       ],
     },
@@ -972,6 +976,8 @@ function createStyles(
       minHeight: isCompact ? 30 : 40,
       minWidth: 0,
       paddingHorizontal: isCompact ? 6 : 8,
+      paddingVertical: 0,
+      borderWidth: 0,
       borderRadius: 999,
       alignItems: 'center',
       justifyContent: 'center',
@@ -979,9 +985,6 @@ function createStyles(
     },
     selectionToggleButtonTop: {
       alignSelf: 'flex-start',
-    },
-    selectionToggleButtonPressed: {
-      backgroundColor: theme.cardMutedBackground,
     },
     selectionToggleText: {
       color: theme.buttonPrimaryBackground,
@@ -996,6 +999,8 @@ function createStyles(
       flex: 1,
       minHeight: isCompact ? 48 : 58,
       borderRadius: isCompact ? 14 : 16,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
@@ -1011,17 +1016,12 @@ function createStyles(
       borderWidth: 1.5,
       borderColor: theme.buttonPrimaryBackground,
     },
-    selectionRestoreButtonPressed: {
-      backgroundColor: theme.cardMutedBackground,
-    },
     selectionDeleteButton: {
       backgroundColor: theme.buttonDangerBackground,
-    },
-    selectionDeleteButtonPressed: {
-      backgroundColor: theme.buttonDangerPressedBackground,
+      borderWidth: 0,
     },
     selectionActionText: {
-      color: '#ffffff',
+      color: theme.buttonPrimaryText,
       fontSize: isCompact ? 16 : 18,
       fontWeight: '800',
       letterSpacing: 0.2,

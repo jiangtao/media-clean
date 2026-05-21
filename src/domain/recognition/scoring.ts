@@ -7,6 +7,7 @@ import type {
   MediaType,
   VisualMetrics,
 } from './types';
+import { RECOGNITION_REASON } from './reasons';
 
 const ISSUE_PRIORITY: CleanupIssueType[] = ['duplicate', 'abnormal', 'accidental'];
 const DUPLICATE_EXACT_DISTANCE = 2;
@@ -94,34 +95,34 @@ function scoreAccidentalPhoto(asset: MediaAssetSnapshot, metrics: VisualMetrics)
   const candidate = createCandidate(asset, 'accidental');
 
   if (metrics.brightness < 0.18) {
-    pushReason(candidate, '画面明显过暗', 35);
+    pushReason(candidate, RECOGNITION_REASON.frameVeryDark, 35);
   } else if (metrics.brightness < 0.26 && (metrics.contrast < 0.14 || metrics.edgeDensity < 0.12)) {
-    pushReason(candidate, '画面明显过暗', 20);
+    pushReason(candidate, RECOGNITION_REASON.frameVeryDark, 20);
   }
 
   if (metrics.edgeDensity < 0.1) {
-    pushReason(candidate, '边缘信息很少', 25);
+    pushReason(candidate, RECOGNITION_REASON.lowEdgeDetail, 25);
   } else if (metrics.edgeDensity < 0.14 && metrics.contrast < 0.14) {
-    pushReason(candidate, '边缘信息很少', 15);
+    pushReason(candidate, RECOGNITION_REASON.lowEdgeDetail, 15);
   }
 
   if (asset.fileSize > 0 && asset.fileSize < 400_000) {
-    pushReason(candidate, '文件尺寸较小', 20);
+    pushReason(candidate, RECOGNITION_REASON.smallFile, 20);
   } else if (
     asset.fileSize > 0 &&
     asset.fileSize < 1_200_000 &&
     (metrics.edgeDensity < 0.12 || metrics.contrast < 0.12)
   ) {
-    pushReason(candidate, '文件尺寸较小', 10);
+    pushReason(candidate, RECOGNITION_REASON.smallFile, 10);
   }
 
   if (Math.max(asset.width, asset.height) < 1_440) {
-    pushReason(candidate, '分辨率较低', 10);
+    pushReason(candidate, RECOGNITION_REASON.lowResolution, 10);
   } else if (
     Math.max(asset.width, asset.height) < 2_000 &&
     (metrics.edgeDensity < 0.12 || metrics.contrast < 0.12)
   ) {
-    pushReason(candidate, '分辨率较低', 10);
+    pushReason(candidate, RECOGNITION_REASON.lowResolution, 10);
   }
 
   if (metrics.contrast < 0.1) {
@@ -137,21 +138,21 @@ function scoreAccidentalVideo(asset: MediaAssetSnapshot, metrics: VisualMetrics)
   const candidate = createCandidate(asset, 'accidental');
 
   if (asset.duration <= 2.5) {
-    pushReason(candidate, '视频时长极短', 45);
+    pushReason(candidate, RECOGNITION_REASON.videoExtremelyShort, 45);
   } else if (asset.duration <= 5) {
-    pushReason(candidate, '视频时长较短', 20);
+    pushReason(candidate, RECOGNITION_REASON.videoShort, 20);
   }
 
   if (metrics.brightness < 0.18) {
-    pushReason(candidate, '缩略图明显过暗', 25);
+    pushReason(candidate, RECOGNITION_REASON.thumbnailVeryDark, 25);
   }
 
   if (metrics.edgeDensity < 0.1) {
-    pushReason(candidate, '缩略图边缘信息很少', 10);
+    pushReason(candidate, RECOGNITION_REASON.thumbnailLowEdgeDetail, 10);
   }
 
   if (asset.fileSize > 0 && asset.fileSize < 5_000_000) {
-    pushReason(candidate, '视频文件较小', 10);
+    pushReason(candidate, RECOGNITION_REASON.smallVideoFile, 10);
   }
 
   return finalizeCandidate(candidate);
@@ -174,39 +175,39 @@ function scoreAbnormalPhoto(
   const candidate = createCandidate(asset, 'abnormal');
 
   if (analysisStatus === 'fallback') {
-    pushReason(candidate, '媒体内容分析失败', 55);
+    pushReason(candidate, RECOGNITION_REASON.mediaAnalysisFailed, 55);
   }
 
   if (asset.fileSize === 0) {
-    pushReason(candidate, '媒体文件为空', 40);
+    pushReason(candidate, RECOGNITION_REASON.emptyMediaFile, 40);
   }
 
   if (asset.width <= 0 || asset.height <= 0) {
-    pushReason(candidate, '媒体元数据异常', 40);
+    pushReason(candidate, RECOGNITION_REASON.invalidMediaMetadata, 40);
   }
 
   if (metrics.brightness < 0.08 || (metrics.brightness > 0.96 && metrics.contrast < 0.05)) {
-    pushReason(candidate, '画面接近全黑', 35);
+    pushReason(candidate, RECOGNITION_REASON.frameNearlyBlack, 35);
   }
 
   if (metrics.edgeDensity < 0.04 && metrics.contrast < 0.08) {
-    pushReason(candidate, '几乎没有可见内容', 35);
+    pushReason(candidate, RECOGNITION_REASON.noVisibleContent, 35);
   }
 
   if (metrics.contrast < 0.05 && metrics.edgeDensity < 0.06) {
-    pushReason(candidate, '画面层次异常单一', 20);
+    pushReason(candidate, RECOGNITION_REASON.flatFrameComposition, 20);
   }
 
   if (asset.fileSize > 0 && asset.fileSize < 120_000) {
-    pushReason(candidate, '媒体尺寸异常小', 20);
+    pushReason(candidate, RECOGNITION_REASON.tinyMediaFile, 20);
   }
 
   if (Math.max(asset.width, asset.height) < 720) {
-    pushReason(candidate, '分辨率异常低', 20);
+    pushReason(candidate, RECOGNITION_REASON.veryLowResolution, 20);
   }
 
   if (hasExtremeAspectRatio(asset)) {
-    pushReason(candidate, '画面比例异常', 20);
+    pushReason(candidate, RECOGNITION_REASON.unusualAspectRatio, 20);
   }
 
   return finalizeCandidate(candidate);
@@ -220,45 +221,45 @@ function scoreAbnormalVideo(
   const candidate = createCandidate(asset, 'abnormal');
 
   if (analysisStatus === 'fallback') {
-    pushReason(candidate, '媒体内容分析失败', 55);
+    pushReason(candidate, RECOGNITION_REASON.mediaAnalysisFailed, 55);
   }
 
   if (asset.fileSize === 0) {
-    pushReason(candidate, '媒体文件为空', 40);
+    pushReason(candidate, RECOGNITION_REASON.emptyMediaFile, 40);
   }
 
   if (asset.width <= 0 || asset.height <= 0) {
-    pushReason(candidate, '媒体元数据异常', 40);
+    pushReason(candidate, RECOGNITION_REASON.invalidMediaMetadata, 40);
   }
 
   if (asset.duration > 0 && asset.duration <= 1.2) {
-    pushReason(candidate, '媒体时长异常短', 45);
+    pushReason(candidate, RECOGNITION_REASON.mediaDurationTooShort, 45);
   } else if (asset.duration > 0 && asset.duration <= 2.5) {
-    pushReason(candidate, '媒体时长异常短', 25);
+    pushReason(candidate, RECOGNITION_REASON.mediaDurationTooShort, 25);
   }
 
   if (metrics.brightness < 0.08 || (metrics.brightness > 0.96 && metrics.contrast < 0.05)) {
-    pushReason(candidate, '缩略图接近全黑', 25);
+    pushReason(candidate, RECOGNITION_REASON.thumbnailNearlyBlack, 25);
   }
 
   if (metrics.edgeDensity < 0.04 && metrics.contrast < 0.08) {
-    pushReason(candidate, '缩略图几乎没有内容', 30);
+    pushReason(candidate, RECOGNITION_REASON.thumbnailNoVisibleContent, 30);
   }
 
   if (metrics.contrast < 0.05 && metrics.edgeDensity < 0.06) {
-    pushReason(candidate, '缩略图层次异常单一', 15);
+    pushReason(candidate, RECOGNITION_REASON.flatThumbnailComposition, 15);
   }
 
   if (asset.fileSize > 0 && asset.fileSize < 1_000_000) {
-    pushReason(candidate, '视频文件异常小', 15);
+    pushReason(candidate, RECOGNITION_REASON.tinyVideoFile, 15);
   }
 
   if (Math.max(asset.width, asset.height) < 720) {
-    pushReason(candidate, '分辨率异常低', 15);
+    pushReason(candidate, RECOGNITION_REASON.veryLowResolution, 15);
   }
 
   if (hasExtremeAspectRatio(asset)) {
-    pushReason(candidate, '画面比例异常', 15);
+    pushReason(candidate, RECOGNITION_REASON.unusualAspectRatio, 15);
   }
 
   return finalizeCandidate(candidate);
@@ -625,10 +626,12 @@ function buildDuplicateCandidates(items: AnalyzedMediaInput[]) {
       const candidate = createCandidate(item.asset, 'duplicate');
       pushReason(
         candidate,
-        similarity.relation === 'exact' ? '与其他媒体高度相似' : '与其他媒体内容近似',
+        similarity.relation === 'exact'
+          ? RECOGNITION_REASON.highlySimilar
+          : RECOGNITION_REASON.contentSimilar,
         similarity.relation === 'exact' ? 86 : 68,
       );
-      pushReason(candidate, '已保留一份更高质量副本', 0);
+      pushReason(candidate, RECOGNITION_REASON.higherQualityCopyKept, 0);
       candidate.duplicateGroup = {
         groupId,
         representativeId: representative.asset.id,

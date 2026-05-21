@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -66,6 +69,18 @@ vi.mock('react-native', () => {
     return ReactModule.createElement('Pressable', props, children);
   }
 
+  class AnimatedValue {
+    value: number;
+
+    constructor(value: number) {
+      this.value = value;
+    }
+
+    setValue(value: number) {
+      this.value = value;
+    }
+  }
+
   return {
     Alert: {
       alert: alertMock,
@@ -75,8 +90,33 @@ vi.mock('react-native', () => {
     View: 'View',
     Text: 'Text',
     Pressable,
+    Animated: {
+      Value: AnimatedValue,
+      View: 'Animated.View',
+      loop: () => ({
+        start: () => undefined,
+        stop: () => undefined,
+      }),
+      sequence: (animations: unknown[]) => animations,
+      timing: () => ({}),
+    },
+    Easing: {
+      ease: 'ease',
+      inOut: (easing: unknown) => easing,
+    },
+    Dimensions: {
+      get: () => ({ width: 375, height: 812, scale: 3, fontScale: 1 }),
+      addEventListener: () => ({ remove: vi.fn() }),
+    },
     useWindowDimensions: () => ({ width: 375, height: 812, scale: 3, fontScale: 1 }),
     StyleSheet: {
+      absoluteFill: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+      },
       create: (styles: Record<string, unknown>) => styles,
     },
   };
@@ -230,12 +270,16 @@ vi.mock('../DetailScreen', () => {
 
   function MockDetailScreen({
     candidate,
+    browseCandidates,
+    duplicateCandidates,
     mode,
     onClose,
     onPrimaryAction,
     onHardDelete,
   }: {
     candidate: CleanupCandidate | null;
+    browseCandidates?: CleanupCandidate[];
+    duplicateCandidates?: CleanupCandidate[];
     mode: 'suggestions' | 'recycle';
     onClose: () => void;
     onPrimaryAction: (ids?: string[]) => void | Promise<void>;
@@ -250,6 +294,16 @@ vi.mock('../DetailScreen', () => {
       { testID: 'mock-detail-screen' },
       ReactModule.createElement('Text', { testID: 'detail-mode' }, mode),
       ReactModule.createElement('Text', { testID: 'detail-candidate-id' }, candidate.id),
+      ReactModule.createElement(
+        'Text',
+        { testID: 'detail-browse-count' },
+        String(browseCandidates?.length ?? 0),
+      ),
+      ReactModule.createElement(
+        'Text',
+        { testID: 'detail-duplicate-count' },
+        String(duplicateCandidates?.length ?? 0),
+      ),
       ReactModule.createElement('Pressable', {
         testID: 'detail-primary-action',
         onPress: () => onPrimaryAction([candidate.id]),
@@ -410,6 +464,26 @@ describe('RecycleBinScreen', () => {
     hardwareBackApi.reset();
   });
 
+  it('keeps the high-risk RecycleBin boundary markers in the screen source', () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../RecycleBinScreen.tsx'),
+      'utf8',
+    );
+
+    expect(source).toContain('createInitialCleanupState');
+    expect(source).toContain('applyCleanupAction');
+    expect(source).toContain('RecycleBinSkeleton');
+    expect(source).toContain('DetailScreen');
+    expect(source).toContain("BackHandler.addEventListener('hardwareBackPress'");
+    expect(source).toContain('ensureMediaLibraryDeletePermissionsAsync');
+    expect(source).toContain('MediaLibrary.deleteAssetsAsync');
+    expect(source).toContain('requestDeleteConfirmation');
+    expect(source).toContain('handleRestore');
+    expect(source).toContain('onSelectionChange={handleSelectionChange}');
+    expect(source).toContain('recycle-restore-selected-button');
+    expect(source).toContain('recycle-delete-selected-button');
+  });
+
   it('uses English recycle-bin copy from the shared app copy', () => {
     const copy = {
       screens: {
@@ -523,8 +597,13 @@ describe('RecycleBinScreen', () => {
     loadRecycleBinIdsMock.mockReturnValueOnce(idsDeferred.promise);
     const loadingRenderer = await renderRecycleBinScreen();
 
-    expect(loadingRenderer.root.findByProps({ testID: 'recycle-bin-loading-state' })).toBeTruthy();
-    expect(findTextNode(loadingRenderer, '加载保留和清理…')).toBeTruthy();
+    expect(loadingRenderer.root.findByProps({ testID: 'recycle-bin-skeleton' })).toBeTruthy();
+    expect(
+      loadingRenderer.root.findByProps({ testID: 'recycle-bin-skeleton-summary-title' }).props
+        .accessibilityLabel,
+    ).toBe('正在加载回收站');
+    expect(loadingRenderer.root.findAllByProps({ testID: 'recycle-bin-loading-state' })).toHaveLength(0);
+    expect(findTextNode(loadingRenderer, '加载保留和清理…')).toBeUndefined();
     expect(loadingRenderer.root.findAllByProps({ testID: 'recycle-bin-loading-fallback' })).toHaveLength(0);
 
     await act(async () => {
@@ -539,6 +618,7 @@ describe('RecycleBinScreen', () => {
     expect(emptyRenderer.root.findByProps({ testID: 'recycle-bin-empty-title' }).props.children).toBe(
       '这里还没有待最终处理的项目',
     );
+    expect(emptyRenderer.root.findAllByProps({ testID: 'recycle-bin-skeleton' })).toHaveLength(0);
   });
 
   it('shows cleanup history under the empty-state icon when the recycle bin is empty', async () => {
@@ -776,6 +856,7 @@ describe('RecycleBinScreen', () => {
     expect(renderer.root.findByProps({ testID: 'mock-detail-screen' })).toBeTruthy();
     expect(findTextNode(renderer, 'recycle')).toBeTruthy();
     expect(findTextNode(renderer, 'recycle-1')).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'detail-browse-count' }).props.children).toBe('2');
 
     await act(async () => {
       renderer.root.findByProps({ testID: 'detail-close' }).props.onPress();
@@ -789,6 +870,37 @@ describe('RecycleBinScreen', () => {
     expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selection-mode' }).props.children).toBe('true');
     expect(renderer.root.findByProps({ testID: 'mock-photo-grid-selected-count' }).props.children).toBe('1');
     expect(findTextNode(renderer, '全选')).toBeTruthy();
+  });
+
+  it('lets recycle-bin detail browse the full recycle-bin list, not only duplicate groups', async () => {
+    const first = {
+      ...createCandidate('recycle-1'),
+      duplicateGroup: undefined,
+      primaryIssueType: 'abnormal' as const,
+      issueTypes: ['abnormal' as const],
+      kind: 'abnormal-photo' as const,
+    };
+    const second = createCandidate('recycle-2');
+    const third = createCandidate('recycle-3');
+    loadRecycleBinIdsMock.mockResolvedValueOnce(['recycle-1', 'recycle-2', 'recycle-3']);
+    scanMediaLibraryMock.mockResolvedValueOnce(createScanResult([first, second, third]));
+
+    const renderer = await renderRecycleBinScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'candidate-press-recycle-1' }).props.onPress();
+    });
+
+    expect(renderer.root.findByProps({ testID: 'detail-browse-count' }).props.children).toBe('3');
+    expect(renderer.root.findByProps({ testID: 'detail-duplicate-count' }).props.children).toBe('0');
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'detail-primary-action' }).props.onPress();
+    });
+
+    expect(renderer.root.findAllByProps({ testID: 'mock-detail-screen' })).toHaveLength(1);
+    expect(renderer.root.findByProps({ testID: 'detail-candidate-id' }).props.children).toBe('recycle-2');
+    expect(renderer.root.findByProps({ testID: 'detail-browse-count' }).props.children).toBe('2');
   });
 
   it('applies restore and hard-delete from detail to the current recycle-bin item', async () => {
@@ -807,7 +919,7 @@ describe('RecycleBinScreen', () => {
     });
 
     expect(() => renderer.root.findByProps({ testID: 'candidate-label-recycle-1' })).toThrow();
-    expect(renderer.root.findByProps({ testID: 'candidate-label-recycle-2' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'detail-candidate-id' }).props.children).toBe('recycle-2');
     expect(saveRecycleBinSnapshotCacheMock).toHaveBeenCalledWith(
       expect.objectContaining({
         ids: ['recycle-2'],
@@ -815,9 +927,6 @@ describe('RecycleBinScreen', () => {
       }),
     );
 
-    await act(async () => {
-      renderer.root.findByProps({ testID: 'candidate-press-recycle-2' }).props.onPress();
-    });
     await act(async () => {
       renderer.root.findByProps({ testID: 'detail-hard-delete' }).props.onPress();
     });
@@ -1040,7 +1149,9 @@ describe('RecycleBinScreen', () => {
       renderer.root.findByProps({ testID: 'candidate-press-recycle-1' }).props.onPress();
     });
 
+    expect(renderer.root.findByProps({ testID: 'recycle-bin-detail-overlay' })).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'mock-detail-screen' })).toBeTruthy();
+    expect(renderer.root.findByProps({ testID: 'mock-photo-grid' })).toBeTruthy();
 
     await act(async () => {
       renderer.root.findByProps({ testID: 'detail-close' }).props.onPress();

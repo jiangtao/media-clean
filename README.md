@@ -237,9 +237,10 @@ curl -sSI http://127.0.0.1:4173/
 4. Maestro 验收契约：[docs/release/maestro.md](./docs/release/maestro.md)，英文版 [docs/release/maestro.en.md](./docs/release/maestro.en.md)。
 5. Vercel 发布契约：[docs/release/vercel.md](./docs/release/vercel.md)，英文版 [docs/release/vercel.en.md](./docs/release/vercel.en.md)。
 6. Android 扫描与识别设计：[design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md)，英文版 [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md)。
-7. 执行标准：[docs/standards/execution-standards.md](./docs/standards/execution-standards.md)，英文版 [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md)。
-8. 团队模式标准：[docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md)，英文版 [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md)。
-9. 发布页目录说明：[page/README.md](./page/README.md)，英文版 [page/README.en.md](./page/README.en.md)。
+7. Android 产品交互人工冒烟用例：[docs/testing/android-manual-product-smoke.md](./docs/testing/android-manual-product-smoke.md)。
+8. 执行标准：[docs/standards/execution-standards.md](./docs/standards/execution-standards.md)，英文版 [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md)。
+9. 团队模式标准：[docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md)，英文版 [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md)。
+10. 发布页目录说明：[page/README.md](./page/README.md)，英文版 [page/README.en.md](./page/README.en.md)。
 
 Android 设备观测 workflow：
 

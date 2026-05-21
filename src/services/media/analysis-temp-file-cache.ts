@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system/src/legacy';
 
 const GENERATED_ANALYSIS_CACHE_DIR_NAMES = [
   'ImageManipulator',

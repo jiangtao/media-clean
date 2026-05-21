@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -86,6 +89,7 @@ vi.mock('react-native', () => {
   return {
     ActivityIndicator: 'ActivityIndicator',
     View: 'View',
+    ScrollView: 'ScrollView',
     Text: 'Text',
     Pressable: 'Pressable',
     Platform: {
@@ -112,8 +116,16 @@ vi.mock('react-native', () => {
       sequence: () => animation,
       loop: () => animation,
     },
+    Easing: {
+      ease: 'ease',
+      inOut: (value: unknown) => value,
+    },
     PixelRatio: {
       get: () => 1,
+    },
+    Dimensions: {
+      get: () => ({ width: 375, height: 812, scale: 3, fontScale: 1 }),
+      addEventListener: () => ({ remove: vi.fn() }),
     },
     useWindowDimensions: () => ({ width: 375, height: 812, scale: 3, fontScale: 1 }),
     TurboModuleRegistry: {
@@ -193,37 +205,61 @@ const reminderRuntimeApi = vi.hoisted(() => ({
 const photoScanSessionRuntimeApi = vi.hoisted(() => {
   const state = {
     snapshot: null as any,
+    source: 'runtime' as 'runtime' | 'startup',
   };
 
   return {
     getPhotoScanSessionRuntimeSnapshot: vi.fn(() => state.snapshot),
+    getPhotoScanSessionRuntimeSnapshotSource: vi.fn(() =>
+      state.snapshot ? state.source : null,
+    ),
     hydratePhotoScanSessionRuntimeSnapshot: vi.fn(async () => state.snapshot),
     persistPhotoScanSessionRuntimeSnapshot: vi.fn(async (snapshot) => {
       state.snapshot = snapshot;
+      state.source = 'runtime';
     }),
     stagePhotoScanSessionRuntimeSnapshot: vi.fn((snapshot) => {
       state.snapshot = snapshot;
+      state.source = 'runtime';
+    }),
+    stageStartupPhotoScanSessionRuntimeSnapshot: vi.fn((snapshot) => {
+      state.snapshot = snapshot;
+      state.source = 'startup';
     }),
     clearPhotoScanSessionRuntimeSnapshot: vi.fn(async () => {
       state.snapshot = null;
+      state.source = 'runtime';
     }),
     reset() {
       state.snapshot = null;
+      state.source = 'runtime';
       this.getPhotoScanSessionRuntimeSnapshot.mockReset();
       this.getPhotoScanSessionRuntimeSnapshot.mockImplementation(() => state.snapshot);
+      this.getPhotoScanSessionRuntimeSnapshotSource.mockReset();
+      this.getPhotoScanSessionRuntimeSnapshotSource.mockImplementation(() =>
+        state.snapshot ? state.source : null,
+      );
       this.hydratePhotoScanSessionRuntimeSnapshot.mockReset();
       this.hydratePhotoScanSessionRuntimeSnapshot.mockImplementation(async () => state.snapshot);
       this.persistPhotoScanSessionRuntimeSnapshot.mockReset();
       this.persistPhotoScanSessionRuntimeSnapshot.mockImplementation(async (snapshot) => {
         state.snapshot = snapshot;
+        state.source = 'runtime';
       });
       this.stagePhotoScanSessionRuntimeSnapshot.mockReset();
       this.stagePhotoScanSessionRuntimeSnapshot.mockImplementation((snapshot) => {
         state.snapshot = snapshot;
+        state.source = 'runtime';
+      });
+      this.stageStartupPhotoScanSessionRuntimeSnapshot.mockReset();
+      this.stageStartupPhotoScanSessionRuntimeSnapshot.mockImplementation((snapshot) => {
+        state.snapshot = snapshot;
+        state.source = 'startup';
       });
       this.clearPhotoScanSessionRuntimeSnapshot.mockReset();
       this.clearPhotoScanSessionRuntimeSnapshot.mockImplementation(async () => {
         state.snapshot = null;
+        state.source = 'runtime';
       });
     },
   };
@@ -279,6 +315,7 @@ const appPreferencesState = vi.hoisted(() => ({
     buttonDangerBackground: '#b34f2f',
     buttonDangerText: '#ffffff',
     shadowColor: '#0f172a',
+    scheme: 'light',
   },
   copy: {
     common: {
@@ -316,6 +353,7 @@ const appPreferencesState = vi.hoisted(() => ({
         filterPhoto: '照片',
         filterVideo: '视频',
         permissionChecking: '正在检查权限...',
+        skeletonLabel: '正在加载照片网格',
         scanPromptTitle: '本地扫描',
         scanPromptBody: '最近媒体会在本地分批做模糊、重复、近相似、误触和差质检查，结果直接留在本页。',
         startScan: '开始扫描',
@@ -324,6 +362,7 @@ const appPreferencesState = vi.hoisted(() => ({
         scanProgressTitle: '本地扫描',
         scanProgressValue: (current: number, total: number) => `${current}/${total}`,
         scanProgressFootnote: '模糊、重复、近相似、误触和差质候选会持续留在下方，正常媒体会逐步退场。',
+        scanEarliestMediaLabel: '最早媒体',
         scanCurrentBatchRange: (start: string, end: string) => `当前扫描批次：${start} - ${end}`,
         scanBatchRange: (start: string, end: string) => `已扫描范围：${start} - ${end}`,
         scanCompleteTitle: '本地扫描',
@@ -337,6 +376,17 @@ const appPreferencesState = vi.hoisted(() => ({
         selectedItems: (count: number) => `已选 ${count} 项`,
         cleanupSelected: '清理所选',
         keepSelected: '保留',
+        workspaceTitleWithCount: (title: string, count: number) => `${title} (${count})`,
+        workspaceSelectedSize: (formattedSize: string) => `已选 ${formattedSize}`,
+        workspaceEmptyIssueTitle: '暂无该类型媒体',
+        stateReadyBody: '识别重复、模糊与相似内容，结果留在当前页面继续判断。',
+        stateScanningTitle: '正在扫描照片',
+        stateScanningBody: '正在分析相册中的媒体文件，结果会按本地规则逐步回填到当前会话。',
+        stateRecognizingTitle: '识别中',
+        stateRecognizingBody: '扫描进度已完成，正在整理重复、模糊与相似分类结果。',
+        stateResultTitle: '扫描完成，发现异常结果',
+        stateResultBody: (count: number) => `共识别 ${count} 个媒体`,
+        autoResumeScanNotice: '检测到 Android 本地扫描仍在继续，已自动接回当前批次。',
       },
     },
     reminder: {
@@ -1163,6 +1213,25 @@ describe('PhotoGridScreen', () => {
     photoScanSessionRuntimeApi.reset();
   });
 
+  it('keeps the high-risk PhotoGrid boundary markers in the screen source', () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../PhotoGridScreen.tsx'),
+      'utf8',
+    );
+
+    expect(source).toContain('usePhotoGridSessionController');
+    expect(source).toContain('PhotoGridSkeleton');
+    expect(source).toContain('PhotoGridDetailFlow');
+    expect(source).toContain('PhotoGridWorkspace');
+    expect(source).toContain("BackHandler.addEventListener('hardwareBackPress'");
+    expect(source).toContain('onSelectionChange={handleSelectionChange}');
+    expect(source).toContain('handleCleanupSelected');
+    expect(source).toContain('handleKeepSelected');
+    expect(source).toContain('photo-selection-toggle-button');
+    expect(source).toContain('cleanup-selected-button');
+    expect(source).toContain('keep-selected-button');
+  });
+
   it('uses English filter labels from the shared app copy', () => {
     const copy = getAppCopy('en-US');
 
@@ -1568,6 +1637,59 @@ describe('PhotoGridScreen', () => {
     );
   });
 
+  it('renders the PhotoGrid skeleton only when permission status is still unresolved', async () => {
+    const pendingPermission = createDeferred<{ granted: boolean }>();
+    mockGetPermissionsAsync.mockReturnValueOnce(pendingPermission.promise);
+
+    const renderer = await renderScreen();
+
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-skeleton' })).toHaveLength(1);
+    expect(
+      renderer.root.findAllByProps({ testID: 'photo-grid-skeleton-entry-permissionChecking' })
+        .length,
+    ).toBeGreaterThan(0);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-entry-card' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-skeleton-grid' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'mock-photo-grid' })).toHaveLength(0);
+
+    await act(async () => {
+      pendingPermission.resolve({ granted: true });
+      await flushPromises();
+    });
+  });
+
+  it('keeps the granted scan-ready surface stable while authorized media is hydrating', async () => {
+    const pendingAssets = createDeferred<{
+      assets: Array<ReturnType<typeof createAsset>>;
+      hasNextPage: boolean;
+      endCursor: undefined;
+    }>();
+    mockGetPermissionsAsync.mockResolvedValueOnce({ granted: true });
+    mockGetAssetsAsync.mockReturnValueOnce(pendingAssets.promise);
+
+    const renderer = await renderScreen();
+
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-skeleton' })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-ready-surface' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-start-scan-button' })).toHaveLength(1);
+    expect(collectRenderedTexts(renderer)).not.toContain(appPreferencesState.copy.permission.title);
+
+    await act(async () => {
+      pendingAssets.resolve({
+        assets: [
+          createAsset('photo-1', mediaLibraryApi.MediaType.photo),
+          createAsset('video-1', mediaLibraryApi.MediaType.video),
+        ],
+        hasNextPage: false,
+        endCursor: undefined,
+      });
+      await flushPromises();
+    });
+
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-skeleton' })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ testID: 'mock-photo-grid' })).toHaveLength(1);
+  });
+
   it('does not show an extra permission-granted state before starting a scan', async () => {
     mockGetPermissionsAsync.mockResolvedValueOnce({ granted: true });
 
@@ -1579,6 +1701,9 @@ describe('PhotoGridScreen', () => {
     expect(texts).not.toContain('准备开始扫描');
     expect(texts).not.toContain('授权已完成');
     expect(texts).not.toContain('可开始扫描相册');
+    expect(renderer.root.findAllByProps({ testID: 'photo-grid-skeleton' })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ testID: 'mock-photo-grid' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'photo-library-grid' })).toHaveLength(1);
   });
 
   it('left-aligns ready-state support icons in one vertical column', async () => {
@@ -3413,6 +3538,58 @@ describe('PhotoGridScreen', () => {
     expect(renderedTexts).toContain('grid-count:3');
   });
 
+  it('keeps a usable persisted completed snapshot on cold start when only the scope summary drifted', async () => {
+    photoScanSessionRuntimeApi.getPhotoScanSessionRuntimeSnapshot.mockReturnValue(null);
+    photoScanSessionRuntimeApi.hydratePhotoScanSessionRuntimeSnapshot.mockResolvedValue({
+      permissionState: 'granted',
+      phase: 'completed',
+      authorizedCandidates: [
+        createCleanupCandidate('photo-1'),
+        createCleanupCandidate('photo-2'),
+        createCleanupCandidate('video-1', 'video'),
+      ],
+      visibleCandidates: [
+        createCleanupCandidate('flagged-1'),
+        createCleanupCandidate('flagged-2'),
+      ],
+      scanResultsCount: 2,
+      scanProgress: {
+        current: 8,
+        total: 8,
+        currentFileName: null,
+      },
+      scanScopeSelection: {
+        total: 2,
+        photo: 2,
+        video: 0,
+      },
+      scanBatchRange: {
+        startAt: 1_709_000_000_000,
+        endAt: 1_710_000_000_000,
+      },
+      summary: {
+        scannedAt: 1_710_000_000_000,
+        scannedCount: 8,
+        recycleBinCount: 0,
+      },
+      hasCompletedFullScan: false,
+      errorMessage: null,
+      updatedAt: Date.now(),
+    });
+
+    const renderer = await renderScreen();
+    await act(async () => {
+      await flushPromises();
+      await flushPromises();
+    });
+    const renderedTexts = collectRenderedTexts(renderer);
+
+    expect(photoScanSessionRuntimeApi.clearPhotoScanSessionRuntimeSnapshot).not.toHaveBeenCalled();
+    expect(renderedTexts).toContain('扫描完成，发现异常结果');
+    expect(renderedTexts).toContain('grid-count:2');
+    expect(renderedTexts).not.toContain(appPreferencesState.copy.permission.title);
+  });
+
   it('ignores a stale completed scan cache when current authorized media exceeds its denominator', async () => {
     setPlatformOS('android');
     const assets = [
@@ -4790,6 +4967,7 @@ describe('PhotoGridScreen', () => {
 
     await pressByTestId(renderer, 'mock-photo-grid-press-photo-1');
 
+    expect(renderer.root.findByProps({ testID: 'photo-grid-detail-overlay' })).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'mock-detail-screen' })).toBeTruthy();
     expect(collectRenderedTexts(renderer)).toContain('detail:photo-1');
     expect(collectRenderedTexts(renderer)).toContain('detail-scope:1');
@@ -4995,6 +5173,7 @@ describe('PhotoGridScreen', () => {
     await pressByTestId(renderer, 'photo-grid-result-breakdown-duplicate');
     await pressByTestId(renderer, 'mock-photo-grid-press-duplicate-1');
 
+    expect(renderer.root.findByProps({ testID: 'photo-grid-workspace-title' })).toBeTruthy();
     expect(collectRenderedTexts(renderer)).toContain('detail:duplicate-1');
     expect(collectRenderedTexts(renderer)).toContain('detail-scope:2');
   });

@@ -7,6 +7,7 @@ export interface MediaAssetSnapshot {
   mediaType: MediaType;
   width: number;
   height: number;
+  orientation?: number | null;
   duration: number;
   fileSize: number;
   creationTime: number;

@@ -1,19 +1,23 @@
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { CleanupCandidate } from '../../domain/recognition/types';
 import type { AppLanguage } from '../../i18n/app-language';
 import { getAppCopy, getDetailViewerTags } from '../../i18n/app-copy';
 import type { AppThemePalette } from '../../theme/app-theme';
+import { COMPONENT_TOKENS } from '../../theme/generated/component-tokens.generated';
 import { ActionSwitch } from '../components/ActionSwitch';
 import { DuplicateCarousel } from '../components/DuplicateCarousel';
 import { buildSizedImageSource } from '../components/image-source';
-import { TouchSurface } from '../components/TouchSurface';
 import { AppIcon } from '../icons/AppIcon';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { ZoomableImage } from '../components/ZoomableImage';
+import { IconButton, Text } from '../primitives';
+import { DetailSkeleton } from '../skeletons';
+
+const DETAIL_STYLE_TOKENS = COMPONENT_TOKENS.detail;
 
 interface DetailScreenProps {
   candidate: CleanupCandidate | null;
@@ -56,28 +60,15 @@ function buildDetailCandidates(
   return Array.from(new Map(entries.map((entry) => [entry.id, entry])).values());
 }
 
-function resolveTagTone(label: string) {
-  const normalizedLabel = label.toLowerCase();
-
-  if (
-    normalizedLabel.includes('重复') ||
-    normalizedLabel.includes('exact') ||
-    normalizedLabel.includes('duplicate')
-  ) {
+function resolveTagTone(candidate: CleanupCandidate) {
+  if (candidate.duplicateGroup?.relation === 'exact' || candidate.primaryIssueType === 'duplicate') {
     return 'danger' as const;
   }
 
   if (
-    normalizedLabel.includes('相似') ||
-    normalizedLabel.includes('similar') ||
-    normalizedLabel.includes('%') ||
-    normalizedLabel.includes('低质量') ||
-    normalizedLabel.includes('模糊') ||
-    normalizedLabel.includes('过暗') ||
-    normalizedLabel.includes('曝光') ||
-    normalizedLabel.includes('dark') ||
-    normalizedLabel.includes('blur') ||
-    normalizedLabel.includes('quality')
+    candidate.duplicateGroup?.relation === 'near' ||
+    candidate.primaryIssueType === 'accidental' ||
+    candidate.primaryIssueType === 'abnormal'
   ) {
     return 'warning' as const;
   }
@@ -171,7 +162,7 @@ export function DetailScreen({
   }, [candidate?.id]);
 
   if (!candidate) {
-    return null;
+    return <DetailSkeleton language={language} theme={theme} />;
   }
 
   const viewerCandidates = detailCandidates.length > 0 ? detailCandidates : [candidate];
@@ -240,17 +231,17 @@ export function DetailScreen({
         <Text style={styles.indexText} testID="detail-viewer-index">
           {activeCandidateIndex + 1} / {viewerCandidates.length}
         </Text>
-        <TouchSurface
+        <IconButton
           onPress={onClose}
+          variant="overlay"
+          size={44}
           style={styles.closeButton}
           pressedStyle={styles.closeButtonPressed}
-          preset="icon"
-          accessibilityRole="button"
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           testID="detail-close-button"
         >
-          <AppIcon name="close" size={16} color="#ffffff" />
-        </TouchSurface>
+          <AppIcon name="close" size={16} color={DETAIL_STYLE_TOKENS.color.indicator} />
+        </IconButton>
       </View>
 
       <View
@@ -290,6 +281,7 @@ export function DetailScreen({
               uri={activeDetailCandidate.asset.uri}
               width={stageSize.width}
               height={stageSize.height}
+              orientation={activeDetailCandidate.asset.orientation}
               maxScale={3}
               minScale={1}
               doubleTapReset
@@ -300,7 +292,7 @@ export function DetailScreen({
           <View style={styles.footerMainRow}>
             <View style={styles.tagRow} testID="detail-tag-row">
               {viewerTags.map((tag) => {
-                const tone = resolveTagTone(tag);
+                const tone = resolveTagTone(activeDetailCandidate);
 
                 return (
                   <View
@@ -349,7 +341,7 @@ function createStyles(insets: { top: number; bottom: number; left: number; right
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: '#000000',
+      backgroundColor: DETAIL_STYLE_TOKENS.color.background,
       paddingTop: Math.max(insets.top, 16),
       paddingBottom: Math.max(insets.bottom, 18),
     },
@@ -365,7 +357,7 @@ function createStyles(insets: { top: number; bottom: number; left: number; right
       elevation: 10,
     },
     indexText: {
-      color: '#ffffff',
+      color: DETAIL_STYLE_TOKENS.color.indicator,
       fontSize: 13,
       fontWeight: '800',
       letterSpacing: 0.2,
@@ -376,12 +368,12 @@ function createStyles(insets: { top: number; bottom: number; left: number; right
       borderRadius: 22,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: 'rgba(255, 255, 255, 0.14)',
+      backgroundColor: DETAIL_STYLE_TOKENS.color.closeButtonBackground,
       zIndex: 11,
       elevation: 11,
     },
     closeButtonPressed: {
-      backgroundColor: 'rgba(255, 255, 255, 0.22)',
+      backgroundColor: DETAIL_STYLE_TOKENS.color.closeButtonPressedBackground,
     },
     stageWrap: {
       flex: 1,
@@ -431,16 +423,16 @@ function createStyles(insets: { top: number; bottom: number; left: number; right
       borderRadius: 11,
     },
     tagPillDanger: {
-      backgroundColor: '#ff3b30',
+      backgroundColor: DETAIL_STYLE_TOKENS.color.tagDanger,
     },
     tagPillWarning: {
-      backgroundColor: '#ffb800',
+      backgroundColor: DETAIL_STYLE_TOKENS.color.tagWarning,
     },
     tagPillNeutral: {
-      backgroundColor: '#6b7280',
+      backgroundColor: DETAIL_STYLE_TOKENS.color.tagNeutral,
     },
     tagText: {
-      color: '#ffffff',
+      color: DETAIL_STYLE_TOKENS.color.tagText,
       fontSize: 8,
       fontWeight: '800',
     },

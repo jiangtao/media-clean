@@ -7,6 +7,7 @@ import './shims/websocket-shim';
 import './shims/window-shim';
 import './shims/performance-shim';
 import './src/features/reminders/reminder-background-task';
+import './global.css';
 
 import { registerRootComponent } from 'expo';
 

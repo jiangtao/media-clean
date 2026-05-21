@@ -49,11 +49,36 @@ vi.mock('@expo/vector-icons', () => ({
 }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  Animated: {
+    View: 'Animated.View',
+    Value: class {
+      value: number;
+
+      constructor(value: number) {
+        this.value = value;
+      }
+
+      setValue(value: number) {
+        this.value = value;
+      }
+    },
+    loop: () => ({ start: vi.fn(), stop: vi.fn() }),
+    sequence: () => ({}),
+    timing: () => ({}),
+  },
+  Easing: {
+    ease: 'ease',
+    inOut: (value: unknown) => value,
+  },
   View: 'View',
   Text: 'Text',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
+  Dimensions: {
+    get: () => ({ width: 375, height: 812, scale: 3, fontScale: 1 }),
+    addEventListener: () => ({ remove: vi.fn() }),
+  },
   useWindowDimensions: () => ({ width: 375, height: 812, scale: 3, fontScale: 1 }),
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
@@ -144,6 +169,48 @@ function collectRenderedTexts(renderer: ReturnType<typeof ReactTestRenderer.crea
     .filter(Boolean);
 }
 
+function flattenStyle(style: unknown): Record<string, unknown> {
+  if (Array.isArray(style)) {
+    return style.reduce<Record<string, unknown>>(
+      (mergedStyle, stylePart) => ({
+        ...mergedStyle,
+        ...flattenStyle(stylePart),
+      }),
+      {},
+    );
+  }
+
+  if (style && typeof style === 'object') {
+    return style as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+function findHostPressableByTestID(
+  renderer: ReturnType<typeof ReactTestRenderer.create>,
+  testID: string,
+) {
+  return (
+    renderer.root
+      .findAllByProps({ testID })
+      .find((node: { type: unknown }) => node.type === 'Pressable') ??
+    renderer.root.findByProps({ testID })
+  );
+}
+
+function findHostViewByTestID(
+  renderer: ReturnType<typeof ReactTestRenderer.create>,
+  testID: string,
+) {
+  return (
+    renderer.root
+      .findAllByProps({ testID })
+      .find((node: { type: unknown }) => node.type === 'View') ??
+    renderer.root.findByProps({ testID })
+  );
+}
+
 function expectRenderedTextContaining(
   renderer: ReturnType<typeof ReactTestRenderer.create>,
   expected: string,
@@ -190,6 +257,9 @@ describe('SettingsScreen', () => {
   it('loads persisted scan state and reminder runtime on focus', async () => {
     const renderer = await renderScreen();
     const renderedTexts = collectRenderedTexts(renderer);
+    const activeScanRangeStyle = flattenStyle(
+      findHostPressableByTestID(renderer, 'scan-range-option-3').props.style,
+    );
 
     expect(mockLoadScanRange).toHaveBeenCalled();
     expect(mockLoadLastScanMeta).toHaveBeenCalled();
@@ -201,6 +271,8 @@ describe('SettingsScreen', () => {
     expect(renderedTexts).toContain('24');
     expect(renderer.root.findAllByProps({ testID: 'scan-range-option-all-disabled' })).toHaveLength(0);
     expect(renderedTexts).toContain('每周一 20:30 提醒你检查识别结果');
+    expect(activeScanRangeStyle.backgroundColor).toBe('#dfe8ff');
+    expect(activeScanRangeStyle.borderColor).toBe('#d7e3ff');
   });
 
   it('renders the settings page immediately while persisted settings are loading', () => {
@@ -230,9 +302,35 @@ describe('SettingsScreen', () => {
 
     expect(renderer.root.findByProps({ testID: 'settings-scroll-view' })).toBeTruthy();
     expect(renderer.root.findByProps({ testID: 'settings-header' })).toBeTruthy();
+    expect(renderer.root.findAllByProps({ testID: 'settings-skeleton' })).toHaveLength(0);
     expect(renderer.root.findAllByProps({ testID: 'settings-loading-fallback' })).toHaveLength(0);
 
     renderer.unmount();
+  });
+
+  it('shows the settings skeleton only while app preferences are not ready', async () => {
+    mockUseAppPreferences.mockReturnValue({
+      isReady: false,
+      language: 'zh-CN',
+      languagePreference: 'zh-CN',
+      themePreference: 'system',
+      resolvedThemeScheme: 'light',
+      theme: getAppTheme('light'),
+      copy: getAppCopy('zh-CN'),
+      setLanguage: mockSetLanguage,
+      setThemePreference: mockSetThemePreference,
+    });
+
+    const renderer = await renderScreen();
+
+    expect(renderer.root.findByProps({ testID: 'settings-skeleton' })).toBeTruthy();
+    expect(renderer.root.findAllByProps({ testID: 'settings-scroll-view' })).toHaveLength(0);
+    expect(findHostViewByTestID(renderer, 'settings-skeleton-header').props)
+      .toMatchObject({
+        accessibilityLabel: '正在加载设置',
+        accessibilityRole: 'progressbar',
+        accessibilityState: { busy: true },
+      });
   });
 
   it('shows the never-scanned copy when no scan history exists', async () => {
@@ -284,6 +382,10 @@ describe('SettingsScreen', () => {
     expect(collectRenderedTexts(renderer)).toContain('缓存数据');
     expect(collectRenderedTexts(renderer)).toContain('5.0 MB');
     expect(collectRenderedTexts(renderer)).toContain('清除');
+    expect(
+      flattenStyle(findHostPressableByTestID(renderer, 'clear-persistent-scan-cache-button').props.style)
+        .backgroundColor,
+    ).toBe('#ffe8eb');
   });
 
   it('includes generated analysis file cache bytes in the clear-cache estimate', async () => {

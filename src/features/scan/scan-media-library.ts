@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system/src/legacy';
 import * as MediaLibrary from 'expo-media-library';
 
 import {
@@ -7,6 +7,7 @@ import {
   sortCandidatesByScore,
   type AnalyzedMediaInput,
 } from '../../domain/recognition/scoring';
+import { normalizeMediaDimensionsForOrientation } from '../../domain/recognition/media-orientation';
 import type { CleanupCandidate, MediaAssetSnapshot, MediaType } from '../../domain/recognition/types';
 import type { CleanupState } from '../cleanup/cleanup-state';
 import { analyzeVisualsForAsset } from '../../services/media/analyze-visuals';
@@ -76,6 +77,8 @@ export interface ScanMediaLibraryOptions {
   createdBefore?: number | null;
 }
 
+type GetAssetsAsyncOptions = NonNullable<Parameters<typeof MediaLibrary.getAssetsAsync>[0]>;
+
 function normalizeMediaType(value: MediaLibrary.MediaTypeValue): MediaType | null {
   if (value === MediaLibrary.MediaType.photo) {
     return 'photo';
@@ -86,6 +89,32 @@ function normalizeMediaType(value: MediaLibrary.MediaTypeValue): MediaType | nul
   }
 
   return null;
+}
+
+function isMissingAccessMediaLocationError(error: unknown) {
+  const code =
+    error && typeof error === 'object' && 'code' in error
+      ? String((error as { code?: unknown }).code)
+      : '';
+  const message = error instanceof Error ? error.message : String(error ?? '');
+
+  return message.includes('ACCESS_MEDIA_LOCATION') && (code === '' || code === 'ERR_PERMISSIONS');
+}
+
+async function getAssetsAsyncWithFullInfoFallback(options: GetAssetsAsyncOptions) {
+  try {
+    return await MediaLibrary.getAssetsAsync({
+      ...options,
+      resolveWithFullInfo: true,
+    });
+  } catch (error) {
+    if (!isMissingAccessMediaLocationError(error)) {
+      throw error;
+    }
+
+    const { resolveWithFullInfo: _resolveWithFullInfo, ...fallbackOptions } = options;
+    return MediaLibrary.getAssetsAsync(fallbackOptions);
+  }
 }
 
 async function mapWithConcurrency<T, R>(
@@ -148,7 +177,7 @@ export async function loadRecentScanAssets(options?: {
 
   while (!reachedWindowBoundary && (limit === null || assets.length < limit)) {
     const remaining = limit === null ? PAGE_SIZE : Math.max(limit - assets.length, 0);
-    const page = await MediaLibrary.getAssetsAsync({
+    const page = await getAssetsAsyncWithFullInfoFallback({
       first: Math.max(1, Math.min(PAGE_SIZE, remaining)),
       after: cursor,
       mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
@@ -248,8 +277,9 @@ function buildAnalysisCacheSignature(
   asset: MediaLibrary.Asset,
   mediaType: MediaType,
   fileSize: number,
+  orientation: number | null,
 ) {
-  return [
+  const baseSignature = [
     ANALYSIS_CACHE_SIGNATURE_VERSION,
     mediaType,
     asset.creationTime,
@@ -257,7 +287,27 @@ function buildAnalysisCacheSignature(
     asset.height,
     Math.round((asset.duration ?? 0) * 1000),
     fileSize,
-  ].join(':');
+  ];
+
+  if (!orientation) {
+    return baseSignature.join(':');
+  }
+
+  return [...baseSignature, `orientation=${orientation}`].join(':');
+}
+
+function resolveAssetOrientation(
+  assetInfo: MediaLibrary.AssetInfo | null,
+  asset: MediaLibrary.Asset,
+): number | null {
+  const orientation =
+    typeof assetInfo?.orientation === 'number'
+      ? assetInfo.orientation
+      : typeof (asset as { orientation?: unknown }).orientation === 'number'
+        ? (asset as { orientation?: number }).orientation
+        : null;
+
+  return typeof orientation === 'number' && Number.isFinite(orientation) ? orientation : null;
 }
 
 interface AssetAnalysisContext {
@@ -288,12 +338,19 @@ async function buildAssetAnalysisContext(
   }
 
   const fileInfo = await readFileInfo(localUri);
+  const orientation = resolveAssetOrientation(assetInfo, asset);
+  const dimensions = normalizeMediaDimensionsForOrientation(
+    assetInfo?.width ?? asset.width,
+    assetInfo?.height ?? asset.height,
+    orientation,
+  );
   const snapshot: MediaAssetSnapshot = {
     id: asset.id,
     uri: localUri,
     mediaType,
-    width: asset.width,
-    height: asset.height,
+    width: dimensions.width,
+    height: dimensions.height,
+    orientation,
     duration: asset.duration ?? 0,
     fileSize: fileInfo.size,
     creationTime: asset.creationTime,
@@ -305,7 +362,7 @@ async function buildAssetAnalysisContext(
     fileSize: fileInfo.size,
     contentHash: fileInfo.md5,
     snapshot,
-    signature: buildAnalysisCacheSignature(asset, mediaType, fileInfo.size),
+    signature: buildAnalysisCacheSignature(asset, mediaType, fileInfo.size, orientation),
   };
 }
 
@@ -644,7 +701,12 @@ export async function scanMediaLibrary(
 
       const nextCacheEntry = buildMediaAnalysisCacheEntry(
         analyzedInput,
-        buildAnalysisCacheSignature(asset, analyzedInput.asset.mediaType, analyzedInput.asset.fileSize),
+        buildAnalysisCacheSignature(
+          asset,
+          analyzedInput.asset.mediaType,
+          analyzedInput.asset.fileSize,
+          analyzedInput.asset.orientation ?? null,
+        ),
       );
 
       if (!areAnalysisCacheEntriesEqual(analysisCache[asset.id], nextCacheEntry)) {

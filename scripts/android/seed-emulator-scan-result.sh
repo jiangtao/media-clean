@@ -14,7 +14,7 @@ RK_REMOTE_TMP_PATH="/data/local/tmp/RKStorage"
 MEDIASTORE_DUMP_PATH="${TMP_DIR}/mediastore-media-clean-seed.txt"
 
 SERIAL="${ANDROID_SERIAL:-}"
-APP_ID="com.jt.mistapmediacleaner"
+APP_ID="${ANDROID_APP_ID:-com.jt.mistapmediacleaner}"
 APP_DATA_DIR="/data/user/0/${APP_ID}"
 TARGET_ASSET_ID="${TARGET_ASSET_ID:-}"
 TARGET_BUCKET_NAME="${TARGET_BUCKET_NAME:-MediaCleanSeed}"

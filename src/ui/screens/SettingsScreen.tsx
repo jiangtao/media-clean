@@ -16,6 +16,7 @@ import {
   type AppThemePreference,
   APP_THEME_PREFERENCES,
 } from '../../theme/app-theme';
+import { COMPONENT_TOKENS } from '../../theme/generated/component-tokens.generated';
 import type { AppLanguage, AppLanguagePreference } from '../../i18n/app-language';
 import {
   buildReminderSummary,
@@ -53,6 +54,10 @@ import {
 import { formatLocalizedSize } from '../../i18n/app-copy';
 import { AppIcon } from '../icons/AppIcon';
 import { DesignIcon } from '../icons/DesignIcon';
+import { Button, Text as PrimitiveText } from '../primitives';
+import { SettingsSkeleton } from '../skeletons';
+
+const SETTINGS_STYLE_TOKENS = COMPONENT_TOKENS.settings;
 
 const LIGHT_THEME_PREVIEW = getAppTheme('light');
 const DARK_THEME_PREVIEW = getAppTheme('dark');
@@ -183,6 +188,7 @@ export function SettingsScreen() {
     [dimensions, insets],
   );
   const {
+    isReady,
     language,
     languagePreference,
     themePreference,
@@ -549,11 +555,57 @@ export function SettingsScreen() {
   const settingsIconSize = layout.isSELike ? 14 : 21;
   const scanIconSize = layout.isSELike ? 15 : 24;
   const footerIconSize = layout.isSELike ? 14 : 22;
-  const compactSystemLabel = language === 'zh-CN' ? '系统' : 'System';
+  const compactSystemLabel = settingsCopy.compactSystemLabel;
   const reminderPrimaryLabel =
     layout.isSELike && !reminderSettings.enabled
       ? copy.reminder.disabled
       : reminderSummary;
+  const renderChip = ({
+    key,
+    label,
+    active,
+    onPress,
+    testID,
+    style,
+    activeStyle,
+    activeTextStyle,
+    minimumFontScale = 0.82,
+  }: {
+    key?: React.Key;
+    label: string | number;
+    active: boolean;
+    onPress: () => void;
+    testID: string;
+    style?: object;
+    activeStyle: object;
+    activeTextStyle: object;
+    minimumFontScale?: number;
+  }) => (
+    <Button
+      key={key}
+      variant="secondary"
+      theme={theme}
+      onPress={onPress}
+      style={[styles.chip, style, active && activeStyle]}
+      contentStyle={styles.chipContent}
+      testID={testID}
+    >
+      <PrimitiveText
+        variant="label"
+        theme={theme}
+        style={[styles.chipText, active && activeTextStyle]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={minimumFontScale}
+      >
+        {label}
+      </PrimitiveText>
+    </Button>
+  );
+
+  if (!isReady) {
+    return <SettingsSkeleton />;
+  }
 
   return (
     <ScrollView
@@ -593,21 +645,15 @@ export function SettingsScreen() {
             {SETTINGS_SCAN_RANGE_OPTIONS.map((range) => {
               const active = scanRange === range;
               return (
-                <Pressable
-                  key={range}
-                  onPress={() => void handleScanRangeChange(range)}
-                  style={[styles.chip, active && styles.scanChipActive]}
-                  testID={`scan-range-option-${range}`}
-                >
-                  <Text
-                    style={[styles.chipText, active && styles.scanChipTextActive]}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.82}
-                  >
-                    {range}
-                  </Text>
-                </Pressable>
+                renderChip({
+                  key: range,
+                  label: range,
+                  active,
+                  onPress: () => void handleScanRangeChange(range),
+                  testID: `scan-range-option-${range}`,
+                  activeStyle: styles.scanChipActive,
+                  activeTextStyle: styles.scanChipTextActive,
+                })
               );
             })}
           </View>
@@ -645,132 +691,60 @@ export function SettingsScreen() {
             </Text>
           </View>
           <View style={styles.compactChipRow}>
-            <Pressable
-              onPress={() => void handleReminderToggle()}
-              style={[
-                styles.chip,
-                reminderSettings.enabled && styles.reminderChipActive,
-              ]}
-              testID="reminder-settings-toggle"
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  reminderSettings.enabled && styles.reminderChipTextActive,
-                ]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.82}
-              >
-                {reminderToggleLabel}
-              </Text>
-            </Pressable>
+            {renderChip({
+              label: reminderToggleLabel,
+              active: reminderSettings.enabled,
+              onPress: () => void handleReminderToggle(),
+              testID: 'reminder-settings-toggle',
+              activeStyle: styles.reminderChipActive,
+              activeTextStyle: styles.reminderChipTextActive,
+            })}
             {dailyReminderOption ? (
-              <Pressable
-                onPress={() => void handleReminderFrequencyChange('daily')}
-                style={[
-                  styles.chip,
-                  reminderSettings.frequency === 'daily' && styles.reminderChipActive,
-                ]}
-                testID="reminder-frequency-daily"
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    reminderSettings.frequency === 'daily' && styles.reminderChipTextActive,
-                  ]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.82}
-              >
-                {dailyReminderOption.label}
-                </Text>
-              </Pressable>
+              renderChip({
+                label: dailyReminderOption.label,
+                active: reminderSettings.frequency === 'daily',
+                onPress: () => void handleReminderFrequencyChange('daily'),
+                testID: 'reminder-frequency-daily',
+                activeStyle: styles.reminderChipActive,
+                activeTextStyle: styles.reminderChipTextActive,
+              })
             ) : null}
             {weeklyReminderOption ? (
-              <Pressable
-                onPress={() => void handleReminderFrequencyChange('weekly')}
-                style={[
-                  styles.chip,
-                  reminderSettings.frequency === 'weekly' && styles.reminderChipActive,
-                ]}
-                testID="reminder-frequency-weekly"
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    reminderSettings.frequency === 'weekly' && styles.reminderChipTextActive,
-                  ]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.82}
-              >
-                {weeklyReminderOption.label}
-                </Text>
-              </Pressable>
+              renderChip({
+                label: weeklyReminderOption.label,
+                active: reminderSettings.frequency === 'weekly',
+                onPress: () => void handleReminderFrequencyChange('weekly'),
+                testID: 'reminder-frequency-weekly',
+                activeStyle: styles.reminderChipActive,
+                activeTextStyle: styles.reminderChipTextActive,
+              })
             ) : null}
             {mondayOption && reminderSettings.frequency === 'weekly' ? (
-              <Pressable
-                onPress={() => void handleReminderWeekdayChange(1)}
-                style={[
-                  styles.chip,
-                  reminderSettings.weekday === 1 && styles.reminderChipActive,
-                ]}
-                testID="reminder-weekday-monday"
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    reminderSettings.weekday === 1 && styles.reminderChipTextActive,
-                  ]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.82}
-              >
-                {mondayOption.label}
-                </Text>
-              </Pressable>
+              renderChip({
+                label: mondayOption.label,
+                active: reminderSettings.weekday === 1,
+                onPress: () => void handleReminderWeekdayChange(1),
+                testID: 'reminder-weekday-monday',
+                activeStyle: styles.reminderChipActive,
+                activeTextStyle: styles.reminderChipTextActive,
+              })
             ) : null}
-            <Pressable
-              onPress={() => void handleReminderTimeSet(8, 30)}
-              style={[
-                styles.chip,
-                reminderSettings.hour === 8 && reminderSettings.minute === 30 && styles.reminderChipActive,
-              ]}
-              testID="reminder-time-0830"
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  reminderSettings.hour === 8 && reminderSettings.minute === 30 && styles.reminderChipTextActive,
-                ]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.82}
-              >
-                08:30
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => void handleReminderTimeSet(20, 30)}
-              style={[
-                styles.chip,
-                reminderSettings.hour === 20 && reminderSettings.minute === 30 && styles.reminderChipActive,
-              ]}
-              testID="reminder-time-2030"
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  reminderSettings.hour === 20 && reminderSettings.minute === 30 && styles.reminderChipTextActive,
-                ]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.82}
-              >
-                20:30
-              </Text>
-            </Pressable>
+            {renderChip({
+              label: '08:30',
+              active: reminderSettings.hour === 8 && reminderSettings.minute === 30,
+              onPress: () => void handleReminderTimeSet(8, 30),
+              testID: 'reminder-time-0830',
+              activeStyle: styles.reminderChipActive,
+              activeTextStyle: styles.reminderChipTextActive,
+            })}
+            {renderChip({
+              label: '20:30',
+              active: reminderSettings.hour === 20 && reminderSettings.minute === 30,
+              onPress: () => void handleReminderTimeSet(20, 30),
+              testID: 'reminder-time-2030',
+              activeStyle: styles.reminderChipActive,
+              activeTextStyle: styles.reminderChipTextActive,
+            })}
           </View>
         </View>
       </View>
@@ -794,21 +768,17 @@ export function SettingsScreen() {
             {languageOptions.map((option) => {
               const active = languagePreference === option.value;
               return (
-                <Pressable
-                  key={option.value}
-                  onPress={() => void handleLanguageChange(option.value)}
-                  style={[styles.chip, styles.preferenceChip, active && styles.languageChipActive]}
-                  testID={`language-option-${option.value}`}
-                >
-                  <Text
-                    style={[styles.chipText, active && styles.languageChipTextActive]}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.72}
-                  >
-                    {layout.isSELike && option.value === 'system' ? compactSystemLabel : option.label}
-                  </Text>
-                </Pressable>
+                renderChip({
+                  key: option.value,
+                  label: layout.isSELike && option.value === 'system' ? compactSystemLabel : option.label,
+                  active,
+                  onPress: () => void handleLanguageChange(option.value),
+                  testID: `language-option-${option.value}`,
+                  style: styles.preferenceChip,
+                  activeStyle: styles.languageChipActive,
+                  activeTextStyle: styles.languageChipTextActive,
+                  minimumFontScale: 0.72,
+                })
               );
             })}
           </View>
@@ -820,21 +790,17 @@ export function SettingsScreen() {
             {APP_THEME_PREFERENCES.map((pref) => {
               const active = themePreference === pref;
               return (
-                <Pressable
-                  key={pref}
-                  onPress={() => void handleThemeChange(pref)}
-                  style={[styles.chip, styles.preferenceChip, active && styles.languageChipActive]}
-                  testID={`theme-option-${pref}`}
-                >
-                  <Text
-                    style={[styles.chipText, active && styles.languageChipTextActive]}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.72}
-                  >
-                    {layout.isSELike && pref === 'system' ? compactSystemLabel : getThemeLabel(pref)}
-                  </Text>
-                </Pressable>
+                renderChip({
+                  key: pref,
+                  label: layout.isSELike && pref === 'system' ? compactSystemLabel : getThemeLabel(pref),
+                  active,
+                  onPress: () => void handleThemeChange(pref),
+                  testID: `theme-option-${pref}`,
+                  style: styles.preferenceChip,
+                  activeStyle: styles.languageChipActive,
+                  activeTextStyle: styles.languageChipTextActive,
+                  minimumFontScale: 0.72,
+                })
               );
             })}
           </View>
@@ -872,17 +838,19 @@ export function SettingsScreen() {
               {cacheMetaText}
             </Text>
           </View>
-          <Pressable
+          <Button
             testID="clear-persistent-scan-cache-button"
             onPress={() => void handleClearPersistentScanCache()}
             disabled={isClearingPersistentCache}
-            style={({ pressed }) => [
-              styles.clearButton,
-              (pressed || isClearingPersistentCache) && styles.clearButtonPressed,
-            ]}
+            variant="secondary"
+            theme={theme}
+            style={[styles.clearButton, isClearingPersistentCache && styles.clearButtonPressed]}
+            contentStyle={styles.clearButtonContent}
           >
-            <Text style={styles.clearButtonText}>{getPersistentCacheActionLabel()}</Text>
-          </Pressable>
+            <PrimitiveText variant="button" theme={theme} style={styles.clearButtonText}>
+              {getPersistentCacheActionLabel()}
+            </PrimitiveText>
+          </Button>
         </View>
       </View>
 
@@ -906,8 +874,11 @@ function createStyles(
   layout: SettingsScreenLayout,
 ) {
   const isCompact = layout.isSELike;
-  const screenBackground = theme.scheme === 'light' ? '#f7f9fd' : theme.safeArea;
-  const cardBorder = theme.scheme === 'light' ? '#edf2fa' : theme.cardBorder;
+  const isDark = theme.scheme === 'dark';
+  const screenBackground = isDark
+    ? theme.safeArea
+    : SETTINGS_STYLE_TOKENS.color.screenBackgroundLight;
+  const cardBorder = isDark ? theme.cardBorder : SETTINGS_STYLE_TOKENS.color.cardBorderLight;
 
   return StyleSheet.create({
     container: {
@@ -964,7 +935,9 @@ function createStyles(
       borderColor: cardBorder,
       shadowColor: theme.shadowColor,
       shadowOffset: { width: 0, height: isCompact ? 5 : 14 },
-      shadowOpacity: theme.scheme === 'dark' ? 0.14 : 0.045,
+      shadowOpacity: isDark
+        ? SETTINGS_STYLE_TOKENS.opacity.cardShadowDark
+        : SETTINGS_STYLE_TOKENS.opacity.cardShadowLight,
       shadowRadius: isCompact ? 14 : 28,
       elevation: isCompact ? 1 : 3,
     },
@@ -982,16 +955,24 @@ function createStyles(
       justifyContent: 'center',
     },
     scanIcon: {
-      backgroundColor: theme.scheme === 'dark' ? '#1a2a4f' : '#e9efff',
+      backgroundColor: isDark
+        ? SETTINGS_STYLE_TOKENS.color.scanIconDark
+        : SETTINGS_STYLE_TOKENS.color.scanIconLight,
     },
     reminderIcon: {
-      backgroundColor: theme.scheme === 'dark' ? '#103c33' : '#e3f8f1',
+      backgroundColor: isDark
+        ? SETTINGS_STYLE_TOKENS.color.reminderIconDark
+        : SETTINGS_STYLE_TOKENS.color.reminderIconLight,
     },
     languageIcon: {
-      backgroundColor: theme.scheme === 'dark' ? '#2c2249' : '#efe8ff',
+      backgroundColor: isDark
+        ? SETTINGS_STYLE_TOKENS.color.languageIconDark
+        : SETTINGS_STYLE_TOKENS.color.languageIconLight,
     },
     cacheIcon: {
-      backgroundColor: theme.scheme === 'dark' ? '#3b2028' : '#ffe8eb',
+      backgroundColor: isDark
+        ? SETTINGS_STYLE_TOKENS.color.cacheIconDark
+        : SETTINGS_STYLE_TOKENS.color.cacheIconLight,
     },
     cardTitle: {
       fontSize: isCompact ? 13 : 22,
@@ -1036,6 +1017,9 @@ function createStyles(
       borderWidth: 1,
       borderColor: theme.cardMutedBorder,
     },
+    chipContent: {
+      minHeight: 0,
+    },
     chipText: {
       fontSize: isCompact ? 11 : 18,
       lineHeight: isCompact ? 15 : 24,
@@ -1043,11 +1027,15 @@ function createStyles(
       fontWeight: '500',
     },
     scanChipActive: {
-      backgroundColor: theme.scheme === 'dark' ? '#1d3671' : '#dfe8ff',
-      borderColor: theme.scheme === 'dark' ? '#274a98' : '#d7e3ff',
+      backgroundColor: isDark
+        ? SETTINGS_STYLE_TOKENS.color.scanChipActiveBackgroundDark
+        : SETTINGS_STYLE_TOKENS.color.scanChipActiveBackgroundLight,
+      borderColor: isDark
+        ? SETTINGS_STYLE_TOKENS.color.scanChipActiveBorderDark
+        : SETTINGS_STYLE_TOKENS.color.scanChipActiveBorderLight,
     },
     scanChipTextActive: {
-      color: '#4f7cff',
+      color: SETTINGS_STYLE_TOKENS.color.scanChipActiveText,
       fontWeight: '800',
     },
     chipDisabled: {
@@ -1061,8 +1049,12 @@ function createStyles(
       gap: isCompact ? 4 : 8,
     },
     reminderChipActive: {
-      backgroundColor: theme.scheme === 'dark' ? '#174b3f' : '#dcf7ec',
-      borderColor: theme.scheme === 'dark' ? '#1d694f' : '#c9f0e2',
+      backgroundColor: isDark
+        ? SETTINGS_STYLE_TOKENS.color.reminderChipActiveBackgroundDark
+        : SETTINGS_STYLE_TOKENS.color.reminderChipActiveBackgroundLight,
+      borderColor: isDark
+        ? SETTINGS_STYLE_TOKENS.color.reminderChipActiveBorderDark
+        : SETTINGS_STYLE_TOKENS.color.reminderChipActiveBorderLight,
     },
     reminderChipTextActive: {
       color: theme.buttonSuccessBackground,
@@ -1090,11 +1082,17 @@ function createStyles(
       minWidth: isCompact ? 52 : 112,
     },
     languageChipActive: {
-      backgroundColor: theme.scheme === 'dark' ? '#34274d' : '#efe6ff',
-      borderColor: theme.scheme === 'dark' ? '#4b3a72' : '#e4d7ff',
+      backgroundColor: isDark
+        ? SETTINGS_STYLE_TOKENS.color.languageChipActiveBackgroundDark
+        : SETTINGS_STYLE_TOKENS.color.languageChipActiveBackgroundLight,
+      borderColor: isDark
+        ? SETTINGS_STYLE_TOKENS.color.languageChipActiveBorderDark
+        : SETTINGS_STYLE_TOKENS.color.languageChipActiveBorderLight,
     },
     languageChipTextActive: {
-      color: theme.scheme === 'dark' ? '#b99cff' : '#765fff',
+      color: isDark
+        ? SETTINGS_STYLE_TOKENS.color.languageChipActiveTextDark
+        : SETTINGS_STYLE_TOKENS.color.languageChipActiveTextLight,
       fontWeight: '800',
     },
     cacheMetricGroup: {
@@ -1113,7 +1111,12 @@ function createStyles(
       borderRadius: 27,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.scheme === 'dark' ? '#4a242c' : '#ffe8eb',
+      backgroundColor: isDark
+        ? SETTINGS_STYLE_TOKENS.color.clearButtonBackgroundDark
+        : SETTINGS_STYLE_TOKENS.color.clearButtonBackgroundLight,
+    },
+    clearButtonContent: {
+      minHeight: 0,
     },
     clearButtonPressed: {
       opacity: 0.72,
@@ -1121,7 +1124,9 @@ function createStyles(
     clearButtonText: {
       fontSize: isCompact ? 11 : 18,
       lineHeight: isCompact ? 15 : 24,
-      color: theme.scheme === 'dark' ? '#ff8790' : '#ff6570',
+      color: isDark
+        ? SETTINGS_STYLE_TOKENS.color.clearButtonTextDark
+        : SETTINGS_STYLE_TOKENS.color.clearButtonTextLight,
       fontWeight: '800',
     },
     localOnlyFooter: {
@@ -1150,7 +1155,9 @@ function createStyles(
       borderColor: theme.cardBorder,
       shadowColor: theme.shadowColor,
       shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: theme.scheme === 'dark' ? 0.16 : 0.08,
+      shadowOpacity: isDark
+        ? SETTINGS_STYLE_TOKENS.opacity.overviewShadowDark
+        : SETTINGS_STYLE_TOKENS.opacity.overviewShadowLight,
       shadowRadius: 18,
       elevation: 3,
     },

@@ -1,6 +1,13 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+
+import { getAppCopy } from '../../i18n/app-copy';
+import { normalizeAppLanguage } from '../../i18n/app-language';
 import type { AppThemePalette } from '../../theme/app-theme';
+import { COMPONENT_TOKENS } from '../../theme/generated/component-tokens.generated';
+import { Button, Text } from '../primitives';
+
+export const SELECTION_BAR_STYLE_TOKENS = COMPONENT_TOKENS.selectionBar;
 
 interface SelectionBarProps {
   selectedCount: number;
@@ -28,52 +35,57 @@ export function SelectionBar({
   }
 
   const styles = createStyles(theme);
-  const isEnglish = locale === 'en-US';
+  const copy = getAppCopy(normalizeAppLanguage(locale)).components.selectionBar;
   const hasSelection = selectedCount > 0;
-
-  const selectionText = isEnglish
-    ? `${selectedCount} selected`
-    : `已选择 ${selectedCount} 张`;
+  const selectionText = copy.selectedItems(selectedCount);
 
   return (
     <View style={styles.container} testID="selection-bar">
-      <Text style={styles.countText} testID="selection-count">
+      <Text
+        variant="body"
+        theme={theme}
+        style={styles.countText}
+        testID="selection-count"
+      >
         {selectionText}
       </Text>
 
       <View style={styles.buttonGroup}>
         {hasSelection ? (
-          <TouchableOpacity
+          <Button
+            variant="secondary"
+            theme={theme}
             style={styles.button}
+            textStyle={styles.buttonText}
             onPress={onDeselectAll}
             testID="deselect-all-button"
           >
-            <Text style={styles.buttonText}>
-              {isEnglish ? 'Deselect All' : '取消全选'}
-            </Text>
-          </TouchableOpacity>
+            {copy.deselectAll}
+          </Button>
         ) : (
-          <TouchableOpacity
+          <Button
+            variant="secondary"
+            theme={theme}
             style={styles.button}
+            textStyle={styles.buttonText}
             onPress={onSelectAll}
             testID="select-all-button"
           >
-            <Text style={styles.buttonText}>
-              {isEnglish ? 'Select All' : '全选'}
-            </Text>
-          </TouchableOpacity>
+            {copy.selectAll}
+          </Button>
         )}
 
-        <TouchableOpacity
+        <Button
+          variant="danger"
+          theme={theme}
           style={[styles.button, styles.cleanButton, !hasSelection && styles.disabledButton]}
+          textStyle={[styles.buttonText, styles.cleanButtonText]}
           onPress={onClean}
           disabled={!hasSelection}
           testID="clean-button"
         >
-          <Text style={[styles.buttonText, styles.cleanButtonText]}>
-            {isEnglish ? 'Clean' : '清理'}
-          </Text>
-        </TouchableOpacity>
+          {copy.clean}
+        </Button>
       </View>
     </View>
   );
@@ -85,32 +97,33 @@ function createStyles(theme: AppThemePalette) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
+      paddingHorizontal: SELECTION_BAR_STYLE_TOKENS.spacing.horizontal,
+      paddingVertical: SELECTION_BAR_STYLE_TOKENS.spacing.vertical,
       backgroundColor: theme.cardBackground,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: theme.cardBorder,
     },
     countText: {
-      fontSize: 16,
-      fontWeight: '600',
+      fontSize: SELECTION_BAR_STYLE_TOKENS.typography.countSize,
+      fontWeight: SELECTION_BAR_STYLE_TOKENS.typography.countWeight,
       color: theme.pageTextPrimary,
     },
     buttonGroup: {
       flexDirection: 'row',
-      gap: 12,
+      gap: SELECTION_BAR_STYLE_TOKENS.spacing.buttonGap,
     },
     button: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      borderRadius: 8,
+      minHeight: SELECTION_BAR_STYLE_TOKENS.size.buttonMinHeight,
+      paddingHorizontal: SELECTION_BAR_STYLE_TOKENS.spacing.buttonHorizontal,
+      paddingVertical: SELECTION_BAR_STYLE_TOKENS.spacing.buttonVertical,
+      borderRadius: SELECTION_BAR_STYLE_TOKENS.radius.button,
       backgroundColor: theme.cardMutedBackground,
-      borderWidth: 1,
+      borderWidth: SELECTION_BAR_STYLE_TOKENS.border.buttonWidth,
       borderColor: theme.cardBorder,
     },
     buttonText: {
-      fontSize: 14,
-      fontWeight: '500',
+      fontSize: SELECTION_BAR_STYLE_TOKENS.typography.buttonSize,
+      fontWeight: SELECTION_BAR_STYLE_TOKENS.typography.buttonWeight,
       color: theme.pageTextPrimary,
     },
     cleanButton: {
@@ -121,7 +134,7 @@ function createStyles(theme: AppThemePalette) {
       color: theme.buttonDangerText,
     },
     disabledButton: {
-      opacity: 0.5,
+      opacity: SELECTION_BAR_STYLE_TOKENS.state.disabledOpacity,
     },
   });
 }

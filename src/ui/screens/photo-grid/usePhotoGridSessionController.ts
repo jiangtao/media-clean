@@ -4,6 +4,7 @@ import { AppState, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import type { CleanupCandidate } from '../../../domain/recognition/types';
+import { normalizeMediaDimensionsForOrientation } from '../../../domain/recognition/media-orientation';
 import {
   buildCleanupCandidates,
   createFallbackCandidate,
@@ -69,6 +70,7 @@ import {
 import {
   clearPhotoScanSessionRuntimeSnapshot,
   getPhotoScanSessionRuntimeSnapshot,
+  getPhotoScanSessionRuntimeSnapshotSource,
   hydratePhotoScanSessionRuntimeSnapshot,
   persistPhotoScanSessionRuntimeSnapshot,
   stagePhotoScanSessionRuntimeSnapshot,
@@ -108,6 +110,11 @@ interface PhotoGridControllerCopy {
     scanFailed: string;
     deleteFailedBody: string;
   };
+  screens: {
+    photoGrid: {
+      autoResumeScanNotice: string;
+    };
+  };
   reminder: {
     channelName: string;
     channelDescription: string;
@@ -123,14 +130,6 @@ interface UsePhotoGridSessionControllerOptions {
 
 function buildPhotoScanJobId(scanToken: number, startedAt: number) {
   return `photo-scan-${startedAt}-${scanToken}`;
-}
-
-function buildAutoResumeScanNotice(language: string) {
-  if (language === 'zh-CN') {
-    return '检测到 Android 本地扫描仍在继续，已自动接回当前批次。';
-  }
-
-  return 'Detected that the Android local scan is still running. The current batch has been reattached automatically.';
 }
 
 function isResumablePhotoScanBatchPhase(phase: PhotoScanBatchRecord['phase']) {
@@ -235,13 +234,24 @@ function createAuthorizedMediaCandidate(asset: MediaLibrary.Asset): CleanupCandi
     return null;
   }
 
+  const orientation =
+    typeof (asset as { orientation?: unknown }).orientation === 'number'
+      ? (asset as { orientation?: number }).orientation
+      : null;
+  const dimensions = normalizeMediaDimensionsForOrientation(
+    asset.width ?? 0,
+    asset.height ?? 0,
+    orientation,
+  );
+
   return createFallbackCandidate({
     id: asset.id,
     uri: asset.uri,
     previewUri: asset.uri,
     mediaType: asset.mediaType === MediaLibrary.MediaType.video ? 'video' : 'photo',
-    width: asset.width ?? 0,
-    height: asset.height ?? 0,
+    width: dimensions.width,
+    height: dimensions.height,
+    orientation,
     duration: asset.duration ?? 0,
     fileSize: 0,
     creationTime: asset.creationTime ?? 0,
@@ -251,13 +261,20 @@ function createAuthorizedMediaCandidate(asset: MediaLibrary.Asset): CleanupCandi
 function createAuthorizedMediaCandidateFromAndroidMediaStoreAsset(
   asset: AndroidMediaStoreAssetMetadata,
 ): CleanupCandidate {
+  const dimensions = normalizeMediaDimensionsForOrientation(
+    asset.width,
+    asset.height,
+    asset.orientation,
+  );
+
   return createFallbackCandidate({
     id: asset.assetId,
     uri: asset.contentUri,
     previewUri: asset.contentUri,
     mediaType: asset.mediaType,
-    width: asset.width,
-    height: asset.height,
+    width: dimensions.width,
+    height: dimensions.height,
+    orientation: asset.orientation,
     duration: Math.max(0, asset.durationMs),
     fileSize: Math.max(0, asset.fileSizeBytes),
     creationTime: asset.dateTaken ?? asset.dateModified ?? 0,
@@ -295,21 +312,26 @@ function matchesPhotoScanSessionScopeSelection(
   );
 }
 
+function isUsableCompletedPhotoScanSessionSnapshot(snapshot: PhotoScanSessionSnapshot) {
+  return (
+    snapshot.permissionState === 'granted' &&
+    snapshot.phase === 'completed' &&
+    snapshot.scanProgress.current === snapshot.scanProgress.total &&
+    snapshot.summary.scannedCount === snapshot.scanProgress.total &&
+    snapshot.scanProgress.total >= snapshot.visibleCandidates.length &&
+    snapshot.scanResultsCount === snapshot.visibleCandidates.length
+  );
+}
+
 function isRestorablePersistedPhotoScanSessionSnapshot(snapshot: PhotoScanSessionSnapshot) {
-  if (snapshot.permissionState !== 'granted') {
-    return false;
-  }
-
-  if (!matchesPhotoScanSessionScopeSelection(snapshot)) {
-    return false;
-  }
-
   if (snapshot.phase === 'completed') {
+    if (!isUsableCompletedPhotoScanSessionSnapshot(snapshot)) {
+      return false;
+    }
+
     return (
-      snapshot.scanProgress.current === snapshot.scanProgress.total &&
-      snapshot.summary.scannedCount === snapshot.scanProgress.total &&
-      snapshot.scanProgress.total === snapshot.authorizedCandidates.length &&
-      snapshot.scanResultsCount === snapshot.visibleCandidates.length
+      matchesPhotoScanSessionScopeSelection(snapshot) ||
+      snapshot.scanProgress.total >= snapshot.authorizedCandidates.length
     );
   }
 
@@ -920,8 +942,8 @@ function buildDirtyCandidatesFromManifestEntries(
         uri: entry.contentUri,
         previewUri: entry.contentUri,
         mediaType: entry.mediaType === 'video' ? 'video' : 'photo',
-        width: entry.width,
-        height: entry.height,
+        ...normalizeMediaDimensionsForOrientation(entry.width, entry.height, entry.orientation),
+        orientation: entry.orientation,
         duration: entry.durationMs,
         fileSize: entry.fileSizeBytes ?? 0,
         creationTime: entry.dateTaken ?? entry.dateModified ?? 0,
@@ -1117,6 +1139,7 @@ export function usePhotoGridSessionController({
   );
   const [resumeMessage, setResumeMessage] = useState<string | null>(null);
   const [resumeScanNonce, setResumeScanNonce] = useState(0);
+  const [isHydratingAuthorizedMedia, setIsHydratingAuthorizedMedia] = useState(false);
   const [isScanning, setIsScanning] = useState(initialIsScanning);
   const [hasCompletedScan, setHasCompletedScan] = useState(initialHasCompletedScan);
   const [hasCompletedFullScan, setHasCompletedFullScan] = useState(initialHasCompletedFullScan);
@@ -1618,6 +1641,7 @@ export function usePhotoGridSessionController({
       let isActive = true;
 
       async function refreshAuthorizedState() {
+        setIsHydratingAuthorizedMedia(true);
         try {
           if (!isActive) {
             return;
@@ -1635,11 +1659,16 @@ export function usePhotoGridSessionController({
             setHasCompletedScan(false);
             setHasCompletedFullScan(false);
           }
+        } finally {
+          if (isActive) {
+            setIsHydratingAuthorizedMedia(false);
+          }
         }
       }
 
       async function restorePendingScanIfNeeded() {
         const runtimeSnapshot = getPhotoScanSessionRuntimeSnapshot();
+        const runtimeSnapshotSource = getPhotoScanSessionRuntimeSnapshotSource();
         const [persistedSession, pendingScanJob, nativeRuntimeSnapshot, latestScanBatch] =
           await Promise.all([
             hydratePhotoScanSessionRuntimeSnapshot(),
@@ -1727,7 +1756,7 @@ export function usePhotoGridSessionController({
             lastError: null,
             updatedAt: nativeRuntimeSnapshot.status.updatedAt,
           };
-          setResumeMessage(buildAutoResumeScanNotice(language));
+          setResumeMessage(copy.screens.photoGrid.autoResumeScanNotice);
           setResumeScanNonce((value) => value + 1);
           return true;
         }
@@ -1749,20 +1778,43 @@ export function usePhotoGridSessionController({
           effectivePersistedSession &&
           effectivePersistedSession.phase !== 'idle'
         ) {
-          const [falsePositiveIds, recycleBinCandidateCache] = await Promise.all([
-            loadFalsePositiveCandidateIds(),
-            loadRecycleBinCandidateCache(),
-          ]);
+          const shouldPreferAndroidCheckpointRecovery =
+            Platform.OS === 'android' &&
+            runtimeSnapshotSource === 'startup' &&
+            effectivePersistedSession.phase === 'scanning' &&
+            !nativeRuntimeSnapshot &&
+            (effectivePendingScanJob?.phase === 'running' ||
+              Boolean(
+                effectivePendingScanBatch &&
+                  isResumablePhotoScanBatchPhase(effectivePendingScanBatch.phase),
+              ));
 
-          falsePositiveIdsRef.current = falsePositiveIds;
-          recycleBinCandidateCacheRef.current = recycleBinCandidateCache;
+          if (shouldPreferAndroidCheckpointRecovery) {
+            if (SHOULD_LOG_ANDROID_ENUMERATION_PROBE) {
+              console.info('[photo-grid] prefer Android checkpoint recovery over startup scan snapshot', {
+                hasPendingScanJob: effectivePendingScanJob?.phase === 'running',
+                hasPendingScanBatch: Boolean(
+                  effectivePendingScanBatch &&
+                    isResumablePhotoScanBatchPhase(effectivePendingScanBatch.phase),
+                ),
+              });
+            }
+          } else {
+            const [falsePositiveIds, recycleBinCandidateCache] = await Promise.all([
+              loadFalsePositiveCandidateIds(),
+              loadRecycleBinCandidateCache(),
+            ]);
 
-          if (!isActive) {
+            falsePositiveIdsRef.current = falsePositiveIds;
+            recycleBinCandidateCacheRef.current = recycleBinCandidateCache;
+
+            if (!isActive) {
+              return true;
+            }
+
+            applySessionSnapshot(effectivePersistedSession);
             return true;
           }
-
-          applySessionSnapshot(effectivePersistedSession);
-          return true;
         }
 
         if (effectivePendingScanJob?.phase === 'running') {
@@ -1800,7 +1852,7 @@ export function usePhotoGridSessionController({
                   endAt: latestScanBatch.rangeEndAt,
                 }
               : null;
-          setResumeMessage(buildAutoResumeScanNotice(language));
+          setResumeMessage(copy.screens.photoGrid.autoResumeScanNotice);
           setResumeScanNonce((value) => value + 1);
           return true;
         }
@@ -1843,7 +1895,7 @@ export function usePhotoGridSessionController({
             startAt: effectivePendingScanBatch.rangeStartAt,
             endAt: effectivePendingScanBatch.rangeEndAt,
           };
-          setResumeMessage(buildAutoResumeScanNotice(language));
+          setResumeMessage(copy.screens.photoGrid.autoResumeScanNotice);
           setResumeScanNonce((value) => value + 1);
           return true;
         }
@@ -1881,6 +1933,7 @@ export function usePhotoGridSessionController({
             shouldPreserveGrantedActiveSnapshot(stagedSnapshot);
 
           if (permission.granted) {
+            setPermissionState('granted');
             const didRestorePendingState = await restorePendingScanIfNeeded();
             if (!isActive) {
               return;
@@ -2194,7 +2247,12 @@ export function usePhotoGridSessionController({
       setResumeMessage(null);
 
       if (permission.granted) {
-        return await hydrateAuthorizedState();
+        setIsHydratingAuthorizedMedia(true);
+        try {
+          return await hydrateAuthorizedState();
+        } finally {
+          setIsHydratingAuthorizedMedia(false);
+        }
       } else {
         setAuthorizedCandidates([]);
         setCandidates([]);
@@ -2261,7 +2319,7 @@ export function usePhotoGridSessionController({
       const analyzedInputsById = new Map<string, AnalyzedMediaInput>();
       deferredPreviewScanStateRef.current = null;
       setErrorMessage(null);
-      setResumeMessage(recoveryCheckpoint ? buildAutoResumeScanNotice(language) : null);
+      setResumeMessage(recoveryCheckpoint ? copy.screens.photoGrid.autoResumeScanNotice : null);
       setIsScanning(true);
       setHasCompletedScan(false);
       setHasCompletedFullScan(false);
@@ -2552,7 +2610,7 @@ export function usePhotoGridSessionController({
         const resumedProcessedCount = scanProgressContract.resumedProcessedCount;
         const displayProgressCurrent = scanProgressContract.progressCurrent;
 
-        setResumeMessage(recoveryCheckpoint ? buildAutoResumeScanNotice(language) : null);
+        setResumeMessage(recoveryCheckpoint ? copy.screens.photoGrid.autoResumeScanNotice : null);
         setIsScanning(true);
         setHasCompletedScan(false);
         setHasCompletedFullScan(false);
@@ -3570,6 +3628,7 @@ export function usePhotoGridSessionController({
     errorMessage,
     resumeMessage,
     isScanning,
+    isHydratingAuthorizedMedia,
     hasCompletedScan,
     hasCompletedFullScan,
     scanResultsCount,

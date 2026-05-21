@@ -1,0 +1,140 @@
+{
+  "languageLabel": "Language",
+  "languageOptions": [
+    {
+      "value": "zh-CN",
+      "label": "简体中文"
+    },
+    {
+      "value": "en-US",
+      "label": "English"
+    }
+  ],
+  "appearance": {
+    "title": "Appearance",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "deleteConfirm": "Delete",
+    "unknownSize": "Unknown size",
+    "neverScanned": "Not scanned yet",
+    "notScheduled": "Not scheduled",
+    "statusTitle": "Current status"
+  },
+  "appErrorBoundary": {
+    "title": "The app hit a rendering error",
+    "body": "Remote monitoring is not enabled in this build. Try again, or reopen the app later.",
+    "retry": "Retry"
+  },
+  "skeleton": {
+    "loadingLabel": "Loading content"
+  },
+  "hero": {
+    "kicker": "Cross-platform local cleanup",
+    "title": "Media Cleanup Suggestions",
+    "description": "Scan the whole library locally in batches, find duplicate, blurry, and similar photos, and clean safely through an app-level recycle bin.",
+    "lastScan": "Last scan",
+    "autoCleanupHint": "Auto cleanup only performs soft delete, and risky actions always require a second confirmation."
+  },
+  "summary": {
+    "scannedLabel": "Scanned",
+    "scannedCaption": "recent media checked",
+    "candidatesLabel": "Recognition results",
+    "candidatesCaption": "ready for review",
+    "blurryLabel": "Blurry photos",
+    "duplicateLabel": "Duplicate photos",
+    "similarLabel": "Similar photos",
+    "suggestedCleanupLabel": "Suggested cleanup",
+    "suggestedCleanupCaption": "review first",
+    "recycleLabel": "Keep & clean",
+    "recycleCaption": "final decision zone"
+  },
+  "controls": {
+    "rescan": "Scan again",
+    "scanning": "Scanning...",
+    "autoCleanup": "Auto cleanup"
+  },
+  "info": {
+    "title": "MVP Detection Notes",
+    "firstLine": "The current MVP scans the whole library and also keeps app-level recycle-bin entries visible. Detection stays fully on-device: blurry and similar items use local heuristic scoring, while duplicate media uses image thumbnail fingerprints plus duration-adaptive multi-frame video thumbnails and metadata similarity. Scanning advances in batches to keep memory usage and device heat under control.",
+    "secondLine": "The recycle bin is an app-level soft-delete concept, not the system recycle bin. If the app is uninstalled or local storage is cleared, those records may be lost."
+  },
+  "reminder": {
+    "title": "Recurring Cleanup Readiness",
+    "genericTitle": "Cleanup Reminder",
+    "defaultSummary": "Regularly review recent photos and videos, prioritizing duplicate, blurry, and similar media.",
+    "disabledSummary": "Recurring cleanup reminder is off",
+    "weekly": "Weekly",
+    "daily": "Daily",
+    "weekdays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "weekdayShorts": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "themePreview": "Notification title",
+    "frequencyLabel": "Reminder frequency",
+    "weekdayLabel": "Reminder day",
+    "timeLabel": "Reminder time",
+    "hourMinus": "Hour -1",
+    "hourPlus": "Hour +1",
+    "minuteMinus": "Minute -15",
+    "minutePlus": "Minute +15",
+    "themePlaceholder": "Reminder title",
+    "saveTheme": "Save reminder title",
+    "footnote": "System notifications only remind you to reopen the app. They do not scan photos or videos in the background.",
+    "permissionLabel": "Notification permission",
+    "permissionOn": "On",
+    "permissionOff": "Off",
+    "scheduled": "Scheduled",
+    "pending": "Pending",
+    "disabled": "Off",
+    "unauthorized": "Unauthorized",
+    "channelName": "Cleanup reminders",
+    "channelDescription": "Reminds you to reopen the app, rescan recent media, and clean duplicate, blurry, and similar media.",
+    "nextReminder": "Next reminder",
+    "estimatedReminder": "Estimated next reminder",
+    "plannedReminder": "Planned reminder time",
+    "noScanSummary": "There is no recent scan yet. Open the app and finish one local scan before starting recurring cleanup.",
+    "noScanDetail": "Keep both scanning and reminders local so photos and videos never have to be uploaded to the cloud.",
+    "eligibilityHint": "Only triggers when new media exists within the last {{months}} month{{monthPluralSuffix}}.",
+    "scheduleDaily": "{{daily}} at {{time}} to review recognition results",
+    "scheduleWeekly": "{{weekly}} {{weekdayLabel}} at {{time}} to review recognition results",
+    "recentScanFoundSummary": "The last scan found {{candidateCount}} recognition results to review. Check again at {{time}}.",
+    "recentScanEmptySummary": "The last scan found no obvious items to handle. Check the library again at {{time}}.",
+    "recentScanDetail": "This scan checked {{scannedCount}} media items: {{highConfidenceCount}} suggested for cleanup, {{mediumConfidenceCount}} suggested for review, and {{recycleBinCount}} still waiting in keep & clean."
+  },
+  "permission": {
+    "title": "Media permission required",
+    "body": "The MVP reads photo and video metadata and generates thumbnails locally for lightweight analysis. Nothing is uploaded to the cloud.",
+    "action": "Grant access and start scanning"
+  },
+  "tabs": {
+    "suggestions": "Recognition results",
+    "recycle": "Recycle bin",
+    "photos": "Photos",
+    "settings": "Settings"
+  },
+  "splash": {
+    "brand": "Media Clean",
+    "title": "Smart Album Manager",
+    "subtitle": "Detect duplicate, blurry, and similar media",
+    "body": "Scan and review duplicate, blurry, and similar items locally."
+  }
+}

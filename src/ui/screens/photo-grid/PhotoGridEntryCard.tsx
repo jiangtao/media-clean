@@ -1,10 +1,13 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 
 import { AppIcon } from '../../icons/AppIcon';
 import { DesignIcon, SvgProcessRing, type DesignIconName } from '../../icons/DesignIcon';
-import type { AppThemePalette } from '../../../theme/app-theme';
+import { getAppTheme, type AppThemePalette } from '../../../theme/app-theme';
+import { COMPONENT_TOKENS } from '../../../theme/generated/component-tokens.generated';
 import type { AppLanguage } from '../../../i18n/app-language';
+import { getAppCopy } from '../../../i18n/app-copy';
+import { Text } from '../../primitives';
 
 type PhotoGridEntryCardVariant =
   | 'loading'
@@ -49,6 +52,9 @@ interface PhotoGridEntryCardProps {
   compact?: boolean;
 }
 
+const DEFAULT_ENTRY_CARD_THEME = getAppTheme('light');
+export const PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS = COMPONENT_TOKENS.photoGrid.entryCard;
+
 export function PhotoGridEntryCard({
   variant,
   eyebrow,
@@ -68,10 +74,12 @@ export function PhotoGridEntryCard({
   onResultBreakdownPress,
   compact = false,
 }: PhotoGridEntryCardProps) {
+  const resolvedTheme = theme ?? DEFAULT_ENTRY_CARD_THEME;
   const metrics = useMemo(() => createCardMetrics(compact), [compact]);
-  const styles = useMemo(() => createCardStyles(theme, metrics), [metrics, theme]);
-  const copy = useMemo(() => getChromeCopy(language), [language]);
-  const accentColor = theme?.buttonPrimaryBackground ?? '#2f80ff';
+  const styles = useMemo(() => createCardStyles(resolvedTheme, metrics), [metrics, resolvedTheme]);
+  const copy = useMemo(() => getAppCopy(language).screens.photoGrid, [language]);
+  const accentColor = resolvedTheme.buttonPrimaryBackground;
+  const successColor = resolvedTheme.buttonSuccessBackground;
   const progressPercent =
     progress && progress.total > 0
       ? Math.min(Math.round((progress.current / progress.total) * 100), 100)
@@ -83,7 +91,7 @@ export function PhotoGridEntryCard({
   if (variant === 'scanResult') {
     return (
       <View style={styles.wrapper} testID={rootTestID}>
-        <StageFade stageKey={variant} styles={styles} style={styles.resultShell}>
+        <StageFrame styles={styles} style={styles.resultShell}>
           <View style={styles.resultHero}>
             <View style={[styles.sparkle, styles.sparkleLeftTop]} />
             <View style={[styles.sparkle, styles.sparkleRightTop]} />
@@ -94,16 +102,16 @@ export function PhotoGridEntryCard({
                 name="check"
                 width={metrics.resultBadgeIcon}
                 height={metrics.resultBadgeIcon}
-                color="#23b58f"
+                color={successColor}
                 testID="photo-grid-result-check-icon"
               />
             </View>
           </View>
 
           <View style={styles.resultCopy}>
-            <Text style={styles.resultTitle} testID={titleTestID}>
+            <RNText style={styles.resultTitle} testID={titleTestID}>
               {title}
-            </Text>
+            </RNText>
             {body ? <Text style={styles.resultSubtitle}>{body}</Text> : null}
           </View>
 
@@ -131,17 +139,17 @@ export function PhotoGridEntryCard({
                       width={metrics.breakdownIcon}
                       height={metrics.breakdownIcon}
                       color={resolveBreakdownColor(item.key)}
-                      secondaryColor="#FFFFFF"
+                      secondaryColor={resolvedTheme.buttonPrimaryText}
                     />
                   </View>
                   <View style={styles.breakdownCopy}>
                     <Text style={styles.breakdownLabel}>{item.label}</Text>
-                    <Text style={styles.breakdownCount}>{`${item.count} ${copy.unit}`}</Text>
+                    <Text style={styles.breakdownCount}>{`${item.count} ${copy.entryUnit}`}</Text>
                   </View>
                   <AppIcon
                     name="chevron-forward"
                     size={metrics.chevronIcon}
-                    color={theme?.pageTextMuted ?? '#94a3b8'}
+                    color={resolvedTheme.pageTextMuted}
                   />
                 </CardComponent>
               );
@@ -165,7 +173,7 @@ export function PhotoGridEntryCard({
               <Text style={styles.supportText}>{note}</Text>
             </View>
           ) : null}
-        </StageFade>
+        </StageFrame>
       </View>
     );
   }
@@ -173,19 +181,19 @@ export function PhotoGridEntryCard({
   if (variant === 'scanning' || variant === 'recognizing') {
     return (
       <View style={styles.wrapper} testID={rootTestID}>
-        <StageFade stageKey={variant} styles={styles}>
+        <StageFrame styles={styles}>
           <View style={styles.statusCard}>
           <View style={styles.statusIconShell}>
             <DesignIcon
               name="check"
               width={metrics.statusIcon}
               height={metrics.statusIcon}
-              color="#23b58f"
+              color={successColor}
             />
           </View>
           <View style={styles.statusCopy}>
-            <Text style={styles.statusTitle}>{copy.permissionGrantedTitle}</Text>
-            <Text style={styles.statusSubtitle}>{copy.permissionGrantedBody}</Text>
+            <Text style={styles.statusTitle}>{copy.entryPermissionGrantedTitle}</Text>
+            <Text style={styles.statusSubtitle}>{copy.entryPermissionGrantedBody}</Text>
           </View>
           </View>
 
@@ -195,7 +203,11 @@ export function PhotoGridEntryCard({
               size={metrics.progressCircleSize}
               progress={progressPercent}
               color={accentColor}
-              trackColor={theme?.scheme === 'dark' ? '#1e3769' : '#d8e6ff'}
+              trackColor={
+                resolvedTheme.scheme === 'dark'
+                  ? PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.color.progressTrackDark
+                  : PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.color.progressTrackLight
+              }
               strokeWidth={metrics.progressCircleBorder}
               testID="photo-grid-circular-progress"
             >
@@ -211,9 +223,9 @@ export function PhotoGridEntryCard({
             </SvgProcessRing>
           </View>
 
-          <Text style={styles.progressTitle} testID={titleTestID}>
+          <RNText style={styles.progressTitle} testID={titleTestID}>
             {title}
-          </Text>
+          </RNText>
           {body ? <Text style={styles.progressBody}>{body}</Text> : null}
 
           <View style={styles.supportList} testID="photo-grid-support-list">
@@ -231,7 +243,7 @@ export function PhotoGridEntryCard({
                   secondaryColor={accentColor}
                 />
               </View>
-              <Text style={styles.supportRowText}>{copy.localOnly}</Text>
+              <Text style={styles.supportRowText}>{copy.entryLocalOnly}</Text>
             </View>
             <View style={styles.supportRow}>
               <View
@@ -246,7 +258,7 @@ export function PhotoGridEntryCard({
                   color={accentColor}
                 />
               </View>
-              <Text style={styles.supportRowText}>{copy.supportsPhotosAndVideos}</Text>
+              <Text style={styles.supportRowText}>{copy.entrySupportsPhotosAndVideos}</Text>
             </View>
             <View style={styles.supportRow}>
               <View
@@ -261,7 +273,7 @@ export function PhotoGridEntryCard({
                   color={accentColor}
                 />
               </View>
-              <Text style={styles.supportRowText}>{note ?? copy.fastLocalScan}</Text>
+              <Text style={styles.supportRowText}>{note ?? copy.entryFastLocalScan}</Text>
             </View>
           </View>
 
@@ -279,10 +291,10 @@ export function PhotoGridEntryCard({
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
           >
-            {language === 'zh-CN' ? '扫描中' : 'Scanning'}
+            {copy.entryScanningInstrumentationLabel}
           </Text>
           </View>
-        </StageFade>
+        </StageFrame>
       </View>
     );
   }
@@ -292,13 +304,13 @@ export function PhotoGridEntryCard({
     const statusTitle = isPermissionDenied
       ? title
       : variant === 'loading'
-        ? copy.loadingTitle
-        : copy.permissionGrantedTitle;
+        ? copy.entryLoadingTitle
+        : copy.entryPermissionGrantedTitle;
     const statusBody = isPermissionDenied
-      ? (body ?? copy.loadingBody)
+      ? (body ?? copy.entryLoadingBody)
       : variant === 'loading'
-        ? copy.loadingBody
-        : copy.permissionGrantedBody;
+        ? copy.entryLoadingBody
+        : copy.entryPermissionGrantedBody;
     const heroTitle = isPermissionDenied ? title : title;
     const heroBody = isPermissionDenied ? body : body;
     const heroIconName: DesignIconName = isPermissionDenied ? 'check' : 'stack';
@@ -306,7 +318,7 @@ export function PhotoGridEntryCard({
 
     return (
       <View style={styles.wrapper} testID={rootTestID}>
-        <StageFade stageKey={variant} styles={styles}>
+        <StageFrame styles={styles}>
           {variant !== 'scanReady' ? (
             <View
               style={styles.statusCard}
@@ -320,8 +332,8 @@ export function PhotoGridEntryCard({
                   name={isPermissionDenied ? 'scan' : 'check'}
                   width={metrics.statusIcon}
                   height={metrics.statusIcon}
-                  color={isPermissionDenied ? accentColor : '#23b58f'}
-                  secondaryColor={theme?.cardMutedBackground ?? '#EFF6FF'}
+                  color={isPermissionDenied ? accentColor : successColor}
+                  secondaryColor={resolvedTheme.cardMutedBackground}
                 />
               </View>
               <View style={styles.statusCopy}>
@@ -348,15 +360,15 @@ export function PhotoGridEntryCard({
               width={heroIconSize}
               height={heroIconSize}
               color={accentColor}
-              secondaryColor={theme?.buttonSecondaryBackground ?? '#BFDBFE'}
+              secondaryColor={resolvedTheme.buttonSecondaryBackground}
               testID={variant === 'scanReady' ? 'photo-grid-ready-static-file-icon' : undefined}
             />
           </View>
 
           {heroTitle ? (
-            <Text style={styles.entryTitle} testID={titleTestID}>
+            <RNText style={styles.entryTitle} testID={titleTestID}>
               {heroTitle}
-            </Text>
+            </RNText>
           ) : null}
           {heroBody ? <Text style={styles.entryBody}>{heroBody}</Text> : null}
 
@@ -371,7 +383,7 @@ export function PhotoGridEntryCard({
                 name={primaryIconName}
                 width={metrics.primaryActionIcon}
                 height={metrics.primaryActionIcon}
-                color="#ffffff"
+                color={resolvedTheme.buttonPrimaryText}
                 secondaryColor={accentColor}
               />
               <Text style={styles.primaryActionText}>{actionLabel}</Text>
@@ -392,7 +404,7 @@ export function PhotoGridEntryCard({
               />
             </View>
             <Text style={styles.supportText}>
-              {note ?? (isPermissionDenied ? copy.readyHint : copy.readyHint)}
+              {note ?? copy.entryReadyHint}
             </Text>
           </View>
 
@@ -413,8 +425,8 @@ export function PhotoGridEntryCard({
                 />
               </View>
               <View style={styles.supportRowCopy}>
-                <Text style={styles.supportRowTitle}>{copy.localOnly}</Text>
-                <Text style={styles.supportRowCaption}>{copy.localOnlyCaption}</Text>
+                <Text style={styles.supportRowTitle}>{copy.entryLocalOnly}</Text>
+                <Text style={styles.supportRowCaption}>{copy.entryLocalOnlyCaption}</Text>
               </View>
             </View>
             <View style={styles.supportRow}>
@@ -431,13 +443,13 @@ export function PhotoGridEntryCard({
                 />
               </View>
               <View style={styles.supportRowCopy}>
-                <Text style={styles.supportRowTitle}>{copy.supportsPhotosAndVideos}</Text>
-                <Text style={styles.supportRowCaption}>{copy.supportsPhotosAndVideosCaption}</Text>
+                <Text style={styles.supportRowTitle}>{copy.entrySupportsPhotosAndVideos}</Text>
+                <Text style={styles.supportRowCaption}>{copy.entrySupportsPhotosAndVideosCaption}</Text>
               </View>
             </View>
           </View>
           </View>
-        </StageFade>
+        </StageFrame>
       </View>
     );
   }
@@ -459,12 +471,12 @@ export function PhotoGridEntryCard({
             width={metrics.genericIcon}
             height={metrics.genericIcon}
             color={accentColor}
-            secondaryColor={theme?.cardMutedBackground ?? '#EFF6FF'}
+            secondaryColor={resolvedTheme.cardMutedBackground}
           />
         </View>
-        <Text style={styles.genericTitle} testID={titleTestID}>
+        <RNText style={styles.genericTitle} testID={titleTestID}>
           {title}
-        </Text>
+        </RNText>
         {body ? <Text style={styles.genericBody}>{body}</Text> : null}
         {actionLabel ? (
           <Pressable
@@ -484,26 +496,26 @@ export function PhotoGridEntryCard({
 
 function resolveBreakdownColor(key: ResultBreakdownItem['key']) {
   if (key === 'duplicate') {
-    return '#ff9f2e';
+    return PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.color.breakdownDuplicate;
   }
 
   if (key === 'blurry') {
-    return '#ff5b4d';
+    return PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.color.breakdownBlurry;
   }
 
-  return '#6b4dff';
+  return PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.color.breakdownSimilar;
 }
 
 function resolveBreakdownIconBackground(key: ResultBreakdownItem['key']) {
   if (key === 'duplicate') {
-    return '#fff3e1';
+    return PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.color.breakdownDuplicateBackground;
   }
 
   if (key === 'blurry') {
-    return '#fff0f2';
+    return PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.color.breakdownBlurryBackground;
   }
 
-  return '#f1eaff';
+  return PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.color.breakdownSimilarBackground;
 }
 
 function resolveBreakdownIcon(key: ResultBreakdownItem['key']): DesignIconName {
@@ -516,38 +528,6 @@ function resolveBreakdownIcon(key: ResultBreakdownItem['key']): DesignIconName {
   }
 
   return 'similar-people';
-}
-
-function getChromeCopy(language: AppLanguage) {
-  if (language === 'en-US') {
-    return {
-      unit: 'items',
-      permissionGrantedTitle: 'Permission granted',
-      permissionGrantedBody: 'The library is ready for local scanning',
-      loadingTitle: 'Preparing access',
-      loadingBody: 'Reading local media and staging the next session',
-      readyHint: 'Photos and videos stay local during scan and cleanup review',
-      localOnly: 'Processed locally, no media is uploaded',
-      localOnlyCaption: 'Every recognition and cleanup step stays on the device',
-      supportsPhotosAndVideos: 'Supports both photos and videos',
-      supportsPhotosAndVideosCaption: 'Duplicate, blurry, and similar items are reviewed together',
-      fastLocalScan: 'Return to the page to reattach to the current batch progress',
-    };
-  }
-
-  return {
-    unit: '项',
-    permissionGrantedTitle: '授权已完成',
-    permissionGrantedBody: '可开始扫描相册',
-    loadingTitle: '正在准备访问',
-    loadingBody: '读取本地媒体并恢复当前工作台',
-    readyHint: '即将扫描照片与视频，结果会直接留在当前页面',
-    localOnly: '仅在本地分析，不上传任何数据',
-    localOnlyCaption: '所有识别与清理操作均在本地完成',
-    supportsPhotosAndVideos: '支持照片与视频',
-    supportsPhotosAndVideosCaption: '重复、模糊与相似内容会统一进入后续判断',
-    fastLocalScan: '离开后再回到页面，会自动接回当前批次进度',
-  };
 }
 
 function createCardMetrics(compact: boolean) {
@@ -658,57 +638,27 @@ function createCardMetrics(compact: boolean) {
 type PhotoGridEntryCardMetrics = ReturnType<typeof createCardMetrics>;
 type PhotoGridEntryCardStyles = ReturnType<typeof createCardStyles>;
 
-interface StageFadeProps {
-  stageKey: string;
+interface StageFrameProps {
   styles: PhotoGridEntryCardStyles;
   style?: object;
   children: React.ReactNode;
 }
 
-function StageFade({ stageKey, styles, style, children }: StageFadeProps) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const offset = useRef(new Animated.Value(8)).current;
-
-  useEffect(() => {
-    opacity.setValue(0);
-    offset.setValue(8);
-    const opacityAnimation = Animated.timing(opacity, {
-      toValue: 1,
-      duration: 260,
-      useNativeDriver: true,
-    });
-    const offsetAnimation = Animated.timing(offset, {
-      toValue: 0,
-      duration: 260,
-      useNativeDriver: true,
-    });
-
-    if (Animated.parallel) {
-      Animated.parallel([opacityAnimation, offsetAnimation]).start();
-      return;
-    }
-
-    opacityAnimation.start();
-    offsetAnimation.start();
-  }, [offset, opacity, stageKey]);
-
-  return (
-    <Animated.View style={[styles.stageFade, style, { opacity, transform: [{ translateY: offset }] }]}>
-      {children}
-    </Animated.View>
-  );
+function StageFrame({ styles, style, children }: StageFrameProps) {
+  return <View style={[styles.stageFrame, style]}>{children}</View>;
 }
 
-function createCardStyles(theme: AppThemePalette | undefined, metrics: PhotoGridEntryCardMetrics) {
-  const accent = theme?.buttonPrimaryBackground ?? '#2f80ff';
-  const background = theme?.cardBackground ?? '#ffffff';
-  const border = theme?.cardBorder ?? '#e2e8f0';
-  const pageTextPrimary = theme?.pageTextPrimary ?? '#0f172a';
-  const pageTextSecondary = theme?.pageTextSecondary ?? '#64748b';
-  const pageTextMuted = theme?.pageTextMuted ?? '#94a3b8';
-  const surface = theme?.cardMutedBackground ?? '#f8fafc';
-  const halo = theme?.heroAccent ?? '#e6efff';
-  const shadowColor = theme?.shadowColor ?? '#0f172a';
+function createCardStyles(theme: AppThemePalette, metrics: PhotoGridEntryCardMetrics) {
+  const accent = theme.buttonPrimaryBackground;
+  const background = theme.cardBackground;
+  const border = theme.cardBorder;
+  const pageTextPrimary = theme.pageTextPrimary;
+  const pageTextSecondary = theme.pageTextSecondary;
+  const pageTextMuted = theme.pageTextMuted;
+  const surface = theme.cardMutedBackground;
+  const halo = theme.heroAccent;
+  const shadowColor = theme.shadowColor;
+  const isDark = theme.scheme === 'dark';
 
   return StyleSheet.create({
     wrapper: {
@@ -719,7 +669,7 @@ function createCardStyles(theme: AppThemePalette | undefined, metrics: PhotoGrid
       alignSelf: metrics.wrapperMaxWidth ? 'center' : 'stretch',
       gap: 12,
     },
-    stageFade: {
+    stageFrame: {
       width: '100%',
     },
     statusCard: {
@@ -823,7 +773,7 @@ function createCardStyles(theme: AppThemePalette | undefined, metrics: PhotoGrid
     primaryActionText: {
       fontSize: metrics.primaryActionTextSize,
       fontWeight: '800',
-      color: '#ffffff',
+      color: theme.buttonPrimaryText,
     },
     secondaryAction: {
       alignSelf: 'stretch',
@@ -934,7 +884,9 @@ function createCardStyles(theme: AppThemePalette | undefined, metrics: PhotoGrid
       bottom: 0,
       borderRadius: metrics.progressCircleSize / 2,
       borderWidth: metrics.progressCircleBorder,
-      borderColor: theme?.scheme === 'dark' ? '#1e3769' : '#d8e6ff',
+      borderColor: isDark
+        ? PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.color.progressTrackDark
+        : PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.color.progressTrackLight,
     },
     progressCircleSegment: {
       position: 'absolute',
@@ -946,7 +898,9 @@ function createCardStyles(theme: AppThemePalette | undefined, metrics: PhotoGrid
       backgroundColor: accent,
       shadowColor: accent,
       shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: theme?.scheme === 'dark' ? 0.36 : 0.2,
+      shadowOpacity: isDark
+        ? PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.opacity.progressAccentShadowDark
+        : PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.opacity.progressAccentShadowLight,
       shadowRadius: 3,
       elevation: 2,
     },
@@ -1021,8 +975,8 @@ function createCardStyles(theme: AppThemePalette | undefined, metrics: PhotoGrid
       width: 18,
       height: 18,
       borderRadius: 9,
-      backgroundColor: '#dce8ff',
-      opacity: 0.9,
+      backgroundColor: PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.color.sparklePrimary,
+      opacity: PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.opacity.sparkle,
     },
     sparkleLeftTop: {
       left: 58,
@@ -1031,7 +985,7 @@ function createCardStyles(theme: AppThemePalette | undefined, metrics: PhotoGrid
     sparkleRightTop: {
       right: 62,
       top: 0,
-      backgroundColor: '#e7d9ff',
+      backgroundColor: PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.color.sparkleSecondary,
     },
     sparkleLeftBottom: {
       left: 96,
@@ -1043,7 +997,7 @@ function createCardStyles(theme: AppThemePalette | undefined, metrics: PhotoGrid
     sparkleRightBottom: {
       right: 100,
       bottom: 14,
-      backgroundColor: '#dce8ff',
+      backgroundColor: PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.color.sparklePrimary,
       width: 12,
       height: 12,
       borderRadius: 6,
@@ -1118,7 +1072,9 @@ function createCardStyles(theme: AppThemePalette | undefined, metrics: PhotoGrid
       borderColor: border,
       shadowColor,
       shadowOffset: { width: 0, height: 12 },
-      shadowOpacity: theme?.scheme === 'dark' ? 0.24 : 0.08,
+      shadowOpacity: isDark
+        ? PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.opacity.genericShadowDark
+        : PHOTO_GRID_ENTRY_CARD_STYLE_TOKENS.opacity.genericShadowLight,
       shadowRadius: 22,
       elevation: 4,
       alignItems: 'center',

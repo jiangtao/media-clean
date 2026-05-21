@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import type { CleanupCandidate } from '../domain/recognition/types';
 import type { AppLanguage } from '../i18n/app-language';
@@ -15,7 +15,11 @@ import {
   translateRiskReason,
 } from '../i18n/app-copy';
 import type { AppThemePalette } from '../theme/app-theme';
-import { buildSizedImageSource } from './components/image-source';
+import { COMPONENT_TOKENS } from '../theme/generated/component-tokens.generated';
+import { buildOrientedImageFrameStyle, buildSizedImageSource } from './components/image-source';
+import { Badge, Button, Card, Text, TouchSurface } from './primitives';
+
+export const CANDIDATE_CARD_STYLE_TOKENS = COMPONENT_TOKENS.candidateCard;
 
 interface CandidateCardProps {
   candidate: CleanupCandidate;
@@ -42,31 +46,51 @@ export function CandidateCard({
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
-    <View style={[styles.card, mode === 'recycle' && styles.recycleCard]}>
-      <Pressable onPress={onOpen} style={styles.hero}>
+    <Card
+      variant={mode === 'recycle' ? 'muted' : 'default'}
+      theme={theme}
+      style={[styles.card, mode === 'recycle' && styles.recycleCard]}
+      testID="candidate-card"
+    >
+      <TouchSurface onPress={onOpen} preset="tile" style={styles.hero} testID="candidate-card-hero">
         <Image
-          source={buildSizedImageSource(candidate.asset.previewUri ?? candidate.asset.uri, 92, 92)}
-          style={styles.thumbnail}
+          source={buildSizedImageSource(
+            candidate.asset.previewUri ?? candidate.asset.uri,
+            CANDIDATE_CARD_STYLE_TOKENS.layout.thumbnailSize,
+            CANDIDATE_CARD_STYLE_TOKENS.layout.thumbnailSize,
+          )}
+          style={[
+            styles.thumbnail,
+            buildOrientedImageFrameStyle(
+              CANDIDATE_CARD_STYLE_TOKENS.layout.thumbnailSize,
+              CANDIDATE_CARD_STYLE_TOKENS.layout.thumbnailSize,
+              candidate.asset.orientation,
+            ),
+          ]}
           contentFit="cover"
           allowDownscaling
           decodeFormat="rgb"
+          testID="candidate-card-thumbnail"
         />
         <View style={styles.body}>
           <View style={styles.headerRow}>
             <View style={styles.headerText}>
-              <Text style={styles.title}>{title}</Text>
-              <Text style={styles.subtitle}>
+              <Text variant="title" theme={theme} style={styles.title}>{title}</Text>
+              <Text variant="caption" theme={theme} style={styles.subtitle}>
                 {getConfidenceLabel(candidate.confidence, language)} · {candidate.score}{' '}
                 {copy.candidate.scoreUnit}
               </Text>
             </View>
-            <View style={[styles.scoreBadge, selected && styles.scoreBadgeSelected]}>
-              <Text style={[styles.scoreBadgeText, selected && styles.scoreBadgeTextSelected]}>
-                {selected ? copy.candidate.selected : copy.candidate.actionable}
-              </Text>
-            </View>
+            <Badge
+              variant="secondary"
+              theme={theme}
+              style={[styles.scoreBadge, selected && styles.scoreBadgeSelected]}
+              textStyle={[styles.scoreBadgeText, selected && styles.scoreBadgeTextSelected]}
+            >
+              {selected ? copy.candidate.selected : copy.candidate.actionable}
+            </Badge>
           </View>
-          <Text style={styles.meta}>
+          <Text variant="caption" theme={theme} style={styles.meta}>
             {candidate.asset.mediaType === 'video'
               ? formatLocalizedDuration(candidate.asset.duration, language)
               : `${candidate.asset.width} × ${candidate.asset.height}`}{' '}
@@ -74,183 +98,206 @@ export function CandidateCard({
           </Text>
           <View style={styles.issueWrap}>
             {candidate.issueTypes.map((issueType) => (
-              <View key={issueType} style={styles.issuePill}>
-                <Text style={styles.issueText}>{getIssueTypeLabel(issueType, language)}</Text>
-              </View>
+              <Badge
+                key={issueType}
+                variant="secondary"
+                theme={theme}
+                style={styles.issuePill}
+                textStyle={styles.issueText}
+              >
+                {getIssueTypeLabel(issueType, language)}
+              </Badge>
             ))}
           </View>
           <View style={styles.reasonWrap}>
             {candidate.reasons.length > 0 ? (
-              candidate.reasons.slice(0, 3).map((reason) => (
-                <View key={reason} style={styles.reasonPill}>
-                  <Text style={styles.reasonText}>{translateRiskReason(reason, language)}</Text>
-                </View>
+              candidate.reasons.slice(0, CANDIDATE_CARD_STYLE_TOKENS.layout.reasonLimit).map((reason) => (
+                <Badge
+                  key={reason}
+                  variant="secondary"
+                  theme={theme}
+                  style={styles.reasonPill}
+                  textStyle={styles.reasonText}
+                >
+                  {translateRiskReason(reason, language)}
+                </Badge>
               ))
             ) : (
-              <View style={styles.reasonPill}>
-                <Text style={styles.reasonText}>{copy.candidate.noRisk}</Text>
-              </View>
+              <Badge
+                variant="secondary"
+                theme={theme}
+                style={styles.reasonPill}
+                textStyle={styles.reasonText}
+              >
+                {copy.candidate.noRisk}
+              </Badge>
             )}
           </View>
           {duplicateSummary ? (
-            <Text style={styles.duplicateSummaryText}>{duplicateSummary}</Text>
+            <Text variant="caption" theme={theme} style={styles.duplicateSummaryText}>{duplicateSummary}</Text>
           ) : null}
         </View>
-      </Pressable>
+      </TouchSurface>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>
+        <Text variant="caption" theme={theme} style={styles.footerText}>
           {mode === 'recycle' ? copy.candidate.recycleHint : copy.candidate.previewHint}
         </Text>
-        <Pressable
+        <Button
+          variant={selected ? 'primary' : 'secondary'}
+          theme={theme}
           onPress={onToggleSelect}
           style={[styles.actionButton, selected && styles.actionButtonSelected]}
+          textStyle={[styles.actionButtonText, selected && styles.actionButtonTextSelected]}
+          testID="candidate-card-action"
         >
-          <Text style={[styles.actionButtonText, selected && styles.actionButtonTextSelected]}>
-            {selected ? copy.candidate.unselect : copy.candidate.addAction}
-          </Text>
-        </Pressable>
+          {selected ? copy.candidate.unselect : copy.candidate.addAction}
+        </Button>
       </View>
-    </View>
+    </Card>
   );
 }
 
 function createStyles(theme: AppThemePalette) {
   return StyleSheet.create({
     card: {
-    borderRadius: 28,
-    backgroundColor: theme.cardBackground,
-    borderWidth: 1,
-    borderColor: theme.cardBorder,
-    padding: 16,
-    gap: 14,
-    shadowColor: theme.shadowColor,
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 4,
-  },
-  recycleCard: {
-    backgroundColor: theme.cardMutedBackground,
-    borderColor: theme.cardMutedBorder,
-  },
-  hero: {
-    flexDirection: 'row',
-    gap: 14,
-  },
-  thumbnail: {
-    width: 92,
-    height: 92,
-    borderRadius: 22,
-    backgroundColor: theme.thumbnailBackground,
-  },
-  body: {
-    flex: 1,
-    gap: 10,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  headerText: {
-    flex: 1,
-    gap: 4,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: theme.pageTextPrimary,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: theme.pageTextSecondary,
-  },
-  scoreBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: theme.chipBackground,
-  },
-  scoreBadgeSelected: {
-    backgroundColor: theme.chipActiveBackground,
-  },
-  scoreBadgeText: {
-    color: theme.chipText,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  scoreBadgeTextSelected: {
-    color: theme.chipActiveText,
-  },
-  meta: {
-    fontSize: 12,
-    color: theme.pageTextMuted,
-  },
-  reasonWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  issueWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  issuePill: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: theme.chipActiveBackground,
-  },
-  issueText: {
-    color: theme.chipActiveText,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  reasonPill: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: theme.chipBackground,
-  },
-  reasonText: {
-    color: theme.chipText,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  duplicateSummaryText: {
-    fontSize: 12,
-    lineHeight: 18,
-    color: theme.pageTextSecondary,
-    fontWeight: '600',
-  },
-  footer: {
-    gap: 10,
-  },
-  footerText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: theme.pageTextSecondary,
-  },
-  actionButton: {
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: theme.buttonSecondaryBackground,
-  },
-  actionButtonSelected: {
-    backgroundColor: theme.buttonPrimaryBackground,
-  },
-  actionButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.buttonSecondaryText,
-  },
-  actionButtonTextSelected: {
-    color: theme.buttonPrimaryText,
-  },
+      borderRadius: CANDIDATE_CARD_STYLE_TOKENS.layout.cardRadius,
+      backgroundColor: theme.cardBackground,
+      borderWidth: CANDIDATE_CARD_STYLE_TOKENS.layout.cardBorderWidth,
+      borderColor: theme.cardBorder,
+      padding: CANDIDATE_CARD_STYLE_TOKENS.layout.cardPadding,
+      gap: CANDIDATE_CARD_STYLE_TOKENS.layout.cardGap,
+      shadowColor: theme.shadowColor,
+      shadowOpacity: CANDIDATE_CARD_STYLE_TOKENS.layout.shadowOpacity,
+      shadowRadius: CANDIDATE_CARD_STYLE_TOKENS.layout.shadowRadius,
+      shadowOffset: { width: 0, height: CANDIDATE_CARD_STYLE_TOKENS.layout.shadowOffsetY },
+      elevation: CANDIDATE_CARD_STYLE_TOKENS.layout.elevation,
+    },
+    recycleCard: {
+      backgroundColor: theme.cardMutedBackground,
+      borderColor: theme.cardMutedBorder,
+    },
+    hero: {
+      flexDirection: 'row',
+      gap: CANDIDATE_CARD_STYLE_TOKENS.layout.heroGap,
+    },
+    thumbnail: {
+      width: CANDIDATE_CARD_STYLE_TOKENS.layout.thumbnailSize,
+      height: CANDIDATE_CARD_STYLE_TOKENS.layout.thumbnailSize,
+      borderRadius: CANDIDATE_CARD_STYLE_TOKENS.layout.thumbnailRadius,
+      backgroundColor: theme.thumbnailBackground,
+    },
+    body: {
+      flex: 1,
+      gap: CANDIDATE_CARD_STYLE_TOKENS.layout.bodyGap,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: CANDIDATE_CARD_STYLE_TOKENS.layout.headerGap,
+    },
+    headerText: {
+      flex: 1,
+      gap: CANDIDATE_CARD_STYLE_TOKENS.layout.headerTextGap,
+    },
+    title: {
+      fontSize: CANDIDATE_CARD_STYLE_TOKENS.typography.titleSize,
+      fontWeight: CANDIDATE_CARD_STYLE_TOKENS.typography.titleWeight,
+      color: theme.pageTextPrimary,
+    },
+    subtitle: {
+      fontSize: CANDIDATE_CARD_STYLE_TOKENS.typography.subtitleSize,
+      color: theme.pageTextSecondary,
+    },
+    scoreBadge: {
+      alignSelf: 'flex-start',
+      borderRadius: CANDIDATE_CARD_STYLE_TOKENS.pill.radius,
+      paddingHorizontal: CANDIDATE_CARD_STYLE_TOKENS.pill.paddingHorizontal,
+      paddingVertical: CANDIDATE_CARD_STYLE_TOKENS.pill.paddingVertical,
+      backgroundColor: theme.chipBackground,
+      borderWidth: CANDIDATE_CARD_STYLE_TOKENS.pill.borderWidth,
+    },
+    scoreBadgeSelected: {
+      backgroundColor: theme.chipActiveBackground,
+    },
+    scoreBadgeText: {
+      color: theme.chipText,
+      fontSize: CANDIDATE_CARD_STYLE_TOKENS.typography.badgeSize,
+      fontWeight: CANDIDATE_CARD_STYLE_TOKENS.typography.badgeWeight,
+    },
+    scoreBadgeTextSelected: {
+      color: theme.chipActiveText,
+    },
+    meta: {
+      fontSize: CANDIDATE_CARD_STYLE_TOKENS.typography.metaSize,
+      color: theme.pageTextMuted,
+    },
+    reasonWrap: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: CANDIDATE_CARD_STYLE_TOKENS.layout.pillGap,
+    },
+    issueWrap: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: CANDIDATE_CARD_STYLE_TOKENS.layout.pillGap,
+    },
+    issuePill: {
+      borderRadius: CANDIDATE_CARD_STYLE_TOKENS.pill.radius,
+      paddingHorizontal: CANDIDATE_CARD_STYLE_TOKENS.pill.paddingHorizontal,
+      paddingVertical: CANDIDATE_CARD_STYLE_TOKENS.pill.paddingVertical,
+      backgroundColor: theme.chipActiveBackground,
+      borderWidth: CANDIDATE_CARD_STYLE_TOKENS.pill.borderWidth,
+    },
+    issueText: {
+      color: theme.chipActiveText,
+      fontSize: CANDIDATE_CARD_STYLE_TOKENS.typography.issueSize,
+      fontWeight: CANDIDATE_CARD_STYLE_TOKENS.typography.issueWeight,
+    },
+    reasonPill: {
+      borderRadius: CANDIDATE_CARD_STYLE_TOKENS.pill.radius,
+      paddingHorizontal: CANDIDATE_CARD_STYLE_TOKENS.pill.paddingHorizontal,
+      paddingVertical: CANDIDATE_CARD_STYLE_TOKENS.pill.paddingVertical,
+      backgroundColor: theme.chipBackground,
+      borderWidth: CANDIDATE_CARD_STYLE_TOKENS.pill.borderWidth,
+    },
+    reasonText: {
+      color: theme.chipText,
+      fontSize: CANDIDATE_CARD_STYLE_TOKENS.typography.reasonSize,
+      fontWeight: CANDIDATE_CARD_STYLE_TOKENS.typography.reasonWeight,
+    },
+    duplicateSummaryText: {
+      fontSize: CANDIDATE_CARD_STYLE_TOKENS.typography.duplicateSummarySize,
+      lineHeight: CANDIDATE_CARD_STYLE_TOKENS.typography.duplicateSummaryLineHeight,
+      color: theme.pageTextSecondary,
+      fontWeight: CANDIDATE_CARD_STYLE_TOKENS.typography.duplicateSummaryWeight,
+    },
+    footer: {
+      gap: CANDIDATE_CARD_STYLE_TOKENS.layout.footerGap,
+    },
+    footerText: {
+      fontSize: CANDIDATE_CARD_STYLE_TOKENS.typography.footerSize,
+      lineHeight: CANDIDATE_CARD_STYLE_TOKENS.typography.footerLineHeight,
+      color: theme.pageTextSecondary,
+    },
+    actionButton: {
+      alignSelf: 'flex-start',
+      minHeight: CANDIDATE_CARD_STYLE_TOKENS.actionButton.minHeight,
+      borderRadius: CANDIDATE_CARD_STYLE_TOKENS.actionButton.radius,
+      paddingHorizontal: CANDIDATE_CARD_STYLE_TOKENS.actionButton.paddingHorizontal,
+      paddingVertical: CANDIDATE_CARD_STYLE_TOKENS.actionButton.paddingVertical,
+      backgroundColor: theme.buttonSecondaryBackground,
+    },
+    actionButtonSelected: {
+      backgroundColor: theme.buttonPrimaryBackground,
+    },
+    actionButtonText: {
+      fontSize: CANDIDATE_CARD_STYLE_TOKENS.typography.actionSize,
+      fontWeight: CANDIDATE_CARD_STYLE_TOKENS.typography.actionWeight,
+      color: theme.buttonSecondaryText,
+    },
+    actionButtonTextSelected: {
+      color: theme.buttonPrimaryText,
+    },
   });
 }

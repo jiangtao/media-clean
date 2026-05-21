@@ -11,7 +11,6 @@ import {
   Switch,
   Text,
   TextInput,
-  useColorScheme,
   View,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -40,7 +39,6 @@ import {
 } from '../features/reminders/reminder-settings';
 import type { CleanupCandidate, CleanupIssueType } from '../domain/recognition/types';
 import type { AppLanguage } from '../i18n/app-language';
-import { detectPreferredAppLanguage } from '../i18n/app-language';
 import {
   formatLocalizedDateTime,
   getAppCopy,
@@ -60,21 +58,11 @@ import {
   reconcileCleanupReminderNotification,
   syncCleanupReminderNotification,
 } from '../services/notifications/cleanup-reminders';
-import { loadAppLanguage, saveAppLanguage } from '../services/storage/app-language-storage';
 import {
   loadReminderSettings,
   saveReminderSettings,
 } from '../services/storage/reminder-settings-storage';
-import {
-  loadThemePreference,
-  saveThemePreference,
-} from '../services/storage/theme-preference-storage';
-import {
-  getAppTheme,
-  resolveThemeScheme,
-  type AppThemePalette,
-  type AppThemePreference,
-} from '../theme/app-theme';
+import type { AppThemePalette } from '../theme/app-theme';
 import {
   ensureMediaLibraryDeletePermissionsAsync,
   getMediaLibraryPermissionsAsync,
@@ -82,6 +70,7 @@ import {
 } from '../services/media-library-permissions';
 import { CandidateCard } from '../ui/CandidateCard';
 import { PreviewModal } from '../ui/PreviewModal';
+import { useManagedAppPreferencesState } from './AppPreferencesContext';
 import {
   createSummaryFromState,
   derivePersistedRecycleBinIds,
@@ -93,6 +82,15 @@ type ViewMode = 'suggestions' | 'recycle';
 type RecognitionFilter = 'all' | CleanupIssueType;
 
 export function MediaCleanerApp() {
+  const {
+    isReady,
+    language: appLanguage,
+    themePreference,
+    theme,
+    copy,
+    setLanguage,
+    setThemePreference,
+  } = useManagedAppPreferencesState();
   const [permissionState, setPermissionState] = useState<PermissionState>('loading');
   const [isScanning, setIsScanning] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('suggestions');
@@ -101,8 +99,6 @@ export function MediaCleanerApp() {
   const [lastScanMeta, setLastScanMeta] = useState<LastScanMeta | null>(null);
   const [summary, setSummary] = useState<ScanSummary | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [appLanguage, setAppLanguage] = useState<AppLanguage>(detectPreferredAppLanguage);
-  const [themePreference, setThemePreference] = useState<AppThemePreference>('system');
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(
     createDefaultReminderSettings,
   );
@@ -115,7 +111,7 @@ export function MediaCleanerApp() {
   const recycleBinIdsRef = useRef<string[]>([]);
   const notificationPermissionGrantedRef = useRef(notificationPermissionGranted);
   const appLanguageRef = useRef(appLanguage);
-  const systemTheme = useColorScheme();
+  const hasBootstrappedRef = useRef(false);
 
   useEffect(() => {
     cleanupStateRef.current = cleanupState;
@@ -137,7 +133,6 @@ export function MediaCleanerApp() {
     appLanguageRef.current = appLanguage;
   }, [appLanguage]);
 
-  const copy = useMemo(() => getAppCopy(appLanguage), [appLanguage]);
   const reminderFrequencyOptions = useMemo(
     () => listReminderFrequencyOptions(appLanguage),
     [appLanguage],
@@ -146,11 +141,6 @@ export function MediaCleanerApp() {
     () => listReminderWeekdayOptions(appLanguage),
     [appLanguage],
   );
-  const resolvedThemeScheme = useMemo(
-    () => resolveThemeScheme(themePreference, systemTheme),
-    [systemTheme, themePreference],
-  );
-  const theme = useMemo(() => getAppTheme(resolvedThemeScheme), [resolvedThemeScheme]);
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const persistRecycleBin = useCallback(async (ids: string[]) => {
@@ -350,16 +340,12 @@ export function MediaCleanerApp() {
 
     try {
       const [
-        savedLanguage,
-        savedThemePreference,
         savedMeta,
         recycleBinIds,
         permission,
         savedReminderSettings,
         notificationPermission,
       ] = await Promise.all([
-        loadAppLanguage(),
-        loadThemePreference(),
         loadLastScanMeta(),
         loadRecycleBinIds(),
         getMediaLibraryPermissionsAsync(),
@@ -375,19 +361,17 @@ export function MediaCleanerApp() {
         savedReminderSettings,
         savedSummary,
         hasNotificationPermission,
-        savedLanguage,
+        appLanguage,
       );
 
-      setAppLanguage(savedLanguage);
-      setThemePreference(savedThemePreference);
-      appLanguageRef.current = savedLanguage;
+      appLanguageRef.current = appLanguage;
       setLastScanMeta(savedMeta);
       lastScanMetaRef.current = savedMeta;
       setSummary(savedSummary);
       recycleBinIdsRef.current = recycleBinIds;
       setReminderSettings(initialReminderSettings);
       reminderSettingsRef.current = initialReminderSettings;
-      setReminderSummaryDraft(resolveReminderSummary(initialReminderSettings.summary, savedLanguage));
+      setReminderSummaryDraft(resolveReminderSummary(initialReminderSettings.summary, appLanguage));
       setNotificationPermissionGranted(hasNotificationPermission);
       notificationPermissionGrantedRef.current = hasNotificationPermission;
 
@@ -401,11 +385,16 @@ export function MediaCleanerApp() {
       setPermissionState('denied');
       setErrorMessage(copy.alerts.initFailed);
     }
-  }, [copy.alerts.initFailed, hydrateFromScan, reconcileReminderState]);
+  }, [appLanguage, copy.alerts.initFailed, hydrateFromScan, reconcileReminderState]);
 
   useEffect(() => {
+    if (!isReady || hasBootstrappedRef.current) {
+      return;
+    }
+
+    hasBootstrappedRef.current = true;
     void bootstrap();
-  }, [bootstrap]);
+  }, [bootstrap, isReady]);
 
   const requestPermission = useCallback(async () => {
     const permission = await requestMediaLibraryPermissionsAsync();
@@ -734,12 +723,11 @@ export function MediaCleanerApp() {
                         return;
                       }
 
-                      setAppLanguage(option.value);
+                      void setLanguage(option.value);
                       appLanguageRef.current = option.value;
                       setReminderSummaryDraft(
                         resolveReminderSummary(reminderSettingsRef.current.summary, option.value),
                       );
-                      void saveAppLanguage(option.value);
                     }}
                     style={[styles.languageOption, active && styles.languageOptionActive]}
                   >
@@ -771,8 +759,7 @@ export function MediaCleanerApp() {
                         return;
                       }
 
-                      setThemePreference(option.value);
-                      void saveThemePreference(option.value);
+                      void setThemePreference(option.value);
                     }}
                     style={[styles.languageOption, active && styles.languageOptionActive]}
                   >

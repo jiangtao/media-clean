@@ -1,4 +1,5 @@
 import type { AppLanguage } from '../../i18n/app-language';
+import { buildAndroidBackgroundScanNotificationCopy } from '../../i18n/app-copy';
 import { NativeModules, Platform } from 'react-native';
 
 const MAX_FILE_NAME_LENGTH = 48;
@@ -49,23 +50,15 @@ export function buildAndroidBackgroundScanNotificationPayload(options: {
       : `${options.progressCurrent}`;
   const currentFileName = trimFileName(options.currentFileName);
 
-  if (options.language === 'zh-CN') {
-    return {
-      title: '扫描进行中',
-      body: currentFileName
-        ? `已处理 ${progressLabel}，当前：${currentFileName}`
-        : `已处理 ${progressLabel}，离开应用后仍会继续扫描。`,
-      currentFileName,
-      progressCurrent: options.progressCurrent,
-      progressTotal: options.progressTotal,
-    };
-  }
+  const copy = buildAndroidBackgroundScanNotificationCopy(
+    options.language,
+    progressLabel,
+    currentFileName,
+  );
 
   return {
-    title: 'Scanning in progress',
-    body: currentFileName
-      ? `Processed ${progressLabel}. Current: ${currentFileName}`
-      : `Processed ${progressLabel}. Scanning continues after leaving the app.`,
+    title: copy.title,
+    body: copy.body,
     currentFileName,
     progressCurrent: options.progressCurrent,
     progressTotal: options.progressTotal,

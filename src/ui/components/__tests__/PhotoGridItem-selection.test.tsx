@@ -61,7 +61,7 @@ vi.mock('@expo/vector-icons', () => ({
   }) => React.createElement('Ionicons', { name, color, size, testID }),
 }));
 
-import { PhotoGrid } from '../PhotoGrid';
+import { PhotoGrid, PHOTO_GRID_STYLE_TOKENS } from '../PhotoGrid';
 import type { CleanupCandidate } from '../../../domain/recognition/types';
 import type { AppThemePalette } from '../../../theme/app-theme';
 
@@ -192,12 +192,12 @@ describe('PhotoGridItem selection visuals', () => {
     const emptyIndicator = renderer.root.findByProps({ testID: 'selection-indicator-empty' });
 
     expect(flattenStyle(emptyIndicator.props.style)).toMatchObject({
-      width: 18,
-      height: 18,
-      top: 7,
-      right: 7,
-      backgroundColor: 'rgba(15, 23, 42, 0.08)',
-      borderColor: 'rgba(255, 255, 255, 0.98)',
+      width: PHOTO_GRID_STYLE_TOKENS.selection.sizeCompact,
+      height: PHOTO_GRID_STYLE_TOKENS.selection.sizeCompact,
+      top: PHOTO_GRID_STYLE_TOKENS.selection.offsetCompact,
+      right: PHOTO_GRID_STYLE_TOKENS.selection.offsetCompact,
+      backgroundColor: PHOTO_GRID_STYLE_TOKENS.selection.emptyBackgroundCompact,
+      borderColor: PHOTO_GRID_STYLE_TOKENS.selection.borderColorCompact,
     });
   });
 
@@ -221,14 +221,14 @@ describe('PhotoGridItem selection visuals', () => {
     const checkmarkIcon = renderer.root.findByProps({ testID: 'selection-checkmark-icon' });
 
     expect(flattenStyle(filledIndicator.props.style)).toMatchObject({
-      width: 18,
-      height: 18,
-      top: 7,
-      right: 7,
-      backgroundColor: '#2f80ff',
-      borderColor: 'rgba(255, 255, 255, 0.98)',
+      width: PHOTO_GRID_STYLE_TOKENS.selection.sizeCompact,
+      height: PHOTO_GRID_STYLE_TOKENS.selection.sizeCompact,
+      top: PHOTO_GRID_STYLE_TOKENS.selection.offsetCompact,
+      right: PHOTO_GRID_STYLE_TOKENS.selection.offsetCompact,
+      backgroundColor: PHOTO_GRID_STYLE_TOKENS.selection.filledBackground,
+      borderColor: PHOTO_GRID_STYLE_TOKENS.selection.borderColorCompact,
     });
     expect(checkmarkIcon.props.name).toBe('checkmark');
-    expect(checkmarkIcon.props.color).toBe('#ffffff');
+    expect(checkmarkIcon.props.color).toBe(PHOTO_GRID_STYLE_TOKENS.selection.foreground);
   });
 });

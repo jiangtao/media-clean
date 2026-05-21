@@ -1,0 +1,20 @@
+{
+  "selectionBar": {
+    "selectedItems": "已选择 {{count}} 张",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "clean": "清理"
+  },
+  "scanCounter": {
+    "complete": "识别完成",
+    "scanning": "识别中... {{counterText}}"
+  },
+  "scanProgress": {
+    "scanning": "扫描中",
+    "preparing": "扫描准备中",
+    "complete": "扫描完成",
+    "cancel": "取消",
+    "pendingCount": "0/0",
+    "completedResults": "发现 {{count}} 个待处理媒体"
+  }
+}

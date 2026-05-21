@@ -3,7 +3,7 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { getAppTheme } from '../../../theme/app-theme';
-import { ScanProgress } from '../ScanProgress';
+import { ScanProgress, SCAN_PROGRESS_STYLE_TOKENS } from '../ScanProgress';
 
 const theme = getAppTheme('light');
 const darkTheme = getAppTheme('dark');
@@ -178,6 +178,32 @@ describe('ScanProgress', () => {
     expect(badgeStyle.backgroundColor).toBe(darkTheme.noticeBackground);
     expect(badgeStyle.borderColor).toBe(darkTheme.noticeBorder);
     expect(badgeTextStyle.color).toBe(darkTheme.noticeTitle);
+  });
+
+  it('uses file-backed component tokens for the inline pipeline visual contract', () => {
+    const renderer = renderScanProgress();
+    const root = renderer.root.findByProps({ testID: 'scan-progress-inline' });
+    const track = renderer.root.findByProps({ testID: 'scan-progress-track' });
+    const wake = renderer.root.findByProps({ testID: 'scan-progress-wake' });
+    const shimmer = renderer.root.findByProps({ testID: 'scan-progress-shimmer' });
+    const texts = renderer.root.findAllByType('Text');
+    const statusStyle = flattenStyle(texts[0].props.style);
+    const rootStyle = flattenStyle(root.props.style);
+    const trackStyle = flattenStyle(track.props.trackStyle ?? track.props.style);
+    const wakeStyle = flattenStyle(wake.props.style);
+    const shimmerStyle = flattenStyle(shimmer.props.style);
+
+    expect(rootStyle.paddingHorizontal).toBe(
+      SCAN_PROGRESS_STYLE_TOKENS.layout.containerPaddingHorizontal,
+    );
+    expect(rootStyle.borderRadius).toBe(SCAN_PROGRESS_STYLE_TOKENS.radius.card);
+    expect(statusStyle.fontSize).toBe(SCAN_PROGRESS_STYLE_TOKENS.typography.statusSize);
+    expect(statusStyle.letterSpacing).toBe(
+      SCAN_PROGRESS_STYLE_TOKENS.typography.statusLetterSpacing,
+    );
+    expect(trackStyle.height).toBe(SCAN_PROGRESS_STYLE_TOKENS.pipeline.height);
+    expect(wakeStyle.width).toBe(SCAN_PROGRESS_STYLE_TOKENS.pipeline.wakeWidth);
+    expect(shimmerStyle.width).toBe(SCAN_PROGRESS_STYLE_TOKENS.pipeline.segmentWidth);
   });
 
   it('calls onCancel from the inline action button', () => {

@@ -1,0 +1,14 @@
+{
+  "scanCompletion": {
+    "channelName": "Scan completion alerts",
+    "channelDescription": "Notifies you when a local scan finishes while the app is not in the foreground.",
+    "title": "Scan complete",
+    "bodyWithResults": "Checked {{scannedCount}} media items and found {{resultCount}} flagged results.",
+    "bodyEmpty": "Checked {{scannedCount}} media items. This batch is fully processed."
+  },
+  "androidBackgroundScan": {
+    "title": "Scanning in progress",
+    "bodyWithFile": "Processed {{progressLabel}}. Current: {{currentFileName}}",
+    "bodyWithoutFile": "Processed {{progressLabel}}. Scanning continues after leaving the app."
+  }
+}

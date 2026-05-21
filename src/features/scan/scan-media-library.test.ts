@@ -27,7 +27,7 @@ const appStorageApi = vi.hoisted(() => ({
 }));
 
 vi.mock('expo-media-library', () => mediaLibraryApi);
-vi.mock('expo-file-system/legacy', () => fileSystemApi);
+vi.mock('expo-file-system/src/legacy', () => fileSystemApi);
 vi.mock('../../services/media/analyze-visuals', () => visualAnalysisApi);
 vi.mock('../../services/storage/app-storage', () => appStorageApi);
 
@@ -173,6 +173,7 @@ describe('scanMediaLibrary', () => {
       expect.objectContaining({
         first: 60,
         after: undefined,
+        resolveWithFullInfo: true,
       }),
     );
     expect(mediaLibraryApi.getAssetsAsync).toHaveBeenNthCalledWith(
@@ -180,11 +181,47 @@ describe('scanMediaLibrary', () => {
       expect.objectContaining({
         first: 60,
         after: 'cursor-1',
+        resolveWithFullInfo: true,
       }),
     );
     expect(assets).toHaveLength(85);
     expect(assets[0]?.id).toBe('page-1-1');
     expect(assets[84]?.id).toBe('page-2-25');
+  });
+
+  it('falls back to regular asset listing when full info requires media location permission', async () => {
+    mediaLibraryApi.getAssetsAsync
+      .mockRejectedValueOnce(
+        Object.assign(
+          new Error(
+            "Call to function 'ExpoMediaLibrary.getAssetsAsync' has been rejected. → Caused by: Cannot access ExifInterface because of missing ACCESS_MEDIA_LOCATION permission",
+          ),
+          { code: 'ERR_PERMISSIONS' },
+        ),
+      )
+      .mockResolvedValueOnce({
+        assets: [createAsset('fallback-photo')],
+        hasNextPage: false,
+        endCursor: undefined,
+      });
+
+    const assets = await loadRecentScanAssets({ createdAfter: null });
+
+    expect(mediaLibraryApi.getAssetsAsync).toHaveBeenCalledTimes(2);
+    expect(mediaLibraryApi.getAssetsAsync).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        first: 60,
+        resolveWithFullInfo: true,
+      }),
+    );
+    expect(mediaLibraryApi.getAssetsAsync).toHaveBeenNthCalledWith(
+      2,
+      expect.not.objectContaining({
+        resolveWithFullInfo: true,
+      }),
+    );
+    expect(assets.map((asset) => asset.id)).toEqual(['fallback-photo']);
   });
 
   it('merges recent assets and recycle-bin recovery by id without duplicating counts', async () => {
@@ -700,9 +737,7 @@ describe('scanMediaLibrary', () => {
     expect(result.state.activeCandidates).toHaveLength(1);
     expect(result.state.activeCandidates[0]?.issueTypes).toContain('duplicate');
     expect(result.state.activeCandidates[0]?.duplicateGroup?.size).toBe(2);
-    expect(
-      result.state.activeCandidates[0]?.reasons.some((reason) => reason.includes('近似')),
-    ).toBe(true);
+    expect(result.state.activeCandidates[0]?.reasons).toContain('content-similar');
   });
 
   it('BDD: Given 两张不同风景图仅在平均色调上接近, when 扫描, then 不应被识别为重复或相似组', async () => {
@@ -867,6 +902,54 @@ describe('scanMediaLibrary', () => {
     expect(result.state.activeCandidates.map((candidate) => candidate.id)).toEqual(['fresh-photo']);
     expect(result.state.recycleBin.map((candidate) => candidate.id)).toEqual(['recycle-photo']);
     expect(result.summary.candidateCount).toBe(2);
+  });
+
+  it('preserves explicit orientation metadata and normalizes display dimensions', async () => {
+    const onProgress = vi.fn();
+    mediaLibraryApi.getAssetsAsync.mockResolvedValueOnce({
+      assets: [
+        createAsset('rotated-photo', {
+          width: 4032,
+          height: 3024,
+          orientation: 90,
+        }),
+      ],
+      hasNextPage: false,
+      endCursor: undefined,
+    });
+    mediaLibraryApi.getAssetInfoAsync.mockImplementation(async (asset: {
+      id: string;
+      uri: string;
+      orientation?: number;
+    }) => ({
+      ...asset,
+      localUri: asset.uri,
+      width: 4032,
+      height: 3024,
+      orientation: 90,
+    }));
+    visualAnalysisApi.analyzeVisualsForAsset.mockResolvedValueOnce(
+      createVisualAnalysisResult(null, {
+        metrics: {
+          brightness: 0.08,
+          contrast: 0.05,
+          edgeDensity: 0.04,
+        },
+      }),
+    );
+
+    await scanMediaLibrary([], onProgress);
+
+    const analyzedInput = onProgress.mock.calls
+      .map(([progress]) => progress.analyzedInput)
+      .find(Boolean);
+
+    expect(analyzedInput.asset).toMatchObject({
+      id: 'rotated-photo',
+      width: 3024,
+      height: 4032,
+      orientation: 90,
+    });
   });
 
   it('skips previously kept assets when filling the default 360-item scan window so newer candidates can enter later pages', async () => {

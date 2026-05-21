@@ -1,0 +1,1785 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://app-cleaner.local/schemas/app-tokens.schema.json",
+  "title": "App Cleaner theme tokens",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "metadata", "primitives", "components", "themes"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "description"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "primitives": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["radius", "spacing", "skeleton", "interaction", "typography"],
+      "properties": {
+        "radius": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["button", "card", "iconButton", "media", "separator", "switchTrack", "switchThumb"],
+          "properties": {
+            "button": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "card": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "iconButton": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "media": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "separator": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "switchTrack": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "switchThumb": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            }
+          }
+        },
+        "spacing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "buttonPaddingHorizontal",
+            "buttonPaddingVertical",
+            "badgeMinHeight",
+            "badgePaddingHorizontal",
+            "badgePaddingVertical",
+            "badgeBorderWidth",
+            "cardPadding",
+            "iconButtonSize",
+            "progressHeight",
+            "progressBorderWidth",
+            "separatorThickness",
+            "switchWidth",
+            "switchHeight",
+            "switchThumbSize",
+            "switchThumbInset"
+          ],
+          "properties": {
+            "buttonPaddingHorizontal": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "buttonPaddingVertical": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "badgeMinHeight": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "badgePaddingHorizontal": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "badgePaddingVertical": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "badgeBorderWidth": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "cardPadding": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "iconButtonSize": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "progressHeight": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "progressBorderWidth": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "separatorThickness": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "switchWidth": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "switchHeight": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "switchThumbSize": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "switchThumbInset": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            }
+          }
+        },
+        "skeleton": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "blockRadius",
+            "blockGap",
+            "blockPadding",
+            "defaultHeight",
+            "animationDurationMs",
+            "minOpacity",
+            "maxOpacity"
+          ],
+          "properties": {
+            "blockRadius": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "blockGap": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "blockPadding": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "defaultHeight": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "animationDurationMs": {
+              "$ref": "#/$defs/nonNegativeNumber"
+            },
+            "minOpacity": {
+              "$ref": "#/$defs/opacity"
+            },
+            "maxOpacity": {
+              "$ref": "#/$defs/opacity"
+            }
+          }
+        },
+        "interaction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pressRetentionOffset", "touchSurfacePressed"],
+          "properties": {
+            "pressRetentionOffset": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["top", "bottom", "left", "right"],
+              "properties": {
+                "top": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "bottom": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "left": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "right": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                }
+              }
+            },
+            "touchSurfacePressed": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "iconScale",
+                "iconOpacity",
+                "tileScale",
+                "tileOpacity",
+                "tabScale",
+                "tabOpacity",
+                "pillScale",
+                "pillOpacity"
+              ],
+              "properties": {
+                "iconScale": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "iconOpacity": {
+                  "$ref": "#/$defs/opacity"
+                },
+                "tileScale": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "tileOpacity": {
+                  "$ref": "#/$defs/opacity"
+                },
+                "tabScale": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "tabOpacity": {
+                  "$ref": "#/$defs/opacity"
+                },
+                "pillScale": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "pillOpacity": {
+                  "$ref": "#/$defs/opacity"
+                }
+              }
+            }
+          }
+        },
+        "typography": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title", "body", "caption", "label", "button"],
+          "properties": {
+            "title": {
+              "$ref": "#/$defs/textStyle"
+            },
+            "body": {
+              "$ref": "#/$defs/textStyle"
+            },
+            "caption": {
+              "$ref": "#/$defs/textStyle"
+            },
+            "label": {
+              "$ref": "#/$defs/textStyle"
+            },
+            "button": {
+              "$ref": "#/$defs/textStyle"
+            }
+          }
+        }
+      }
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "activityLoadingFallback",
+        "candidateCard",
+        "previewModal",
+        "mediaViewer",
+        "duplicateCarousel",
+        "photoGrid",
+        "actionSwitch",
+        "segmentedControl",
+        "scanCounter",
+        "selectionBar",
+        "tabBar",
+        "scanProgress"
+      ],
+      "properties": {
+        "activityLoadingFallback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["color", "skeleton"],
+          "properties": {
+            "color": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["detailBackground", "detailIndicator"],
+              "properties": {
+                "detailBackground": { "$ref": "#/$defs/colorString" },
+                "detailIndicator": { "$ref": "#/$defs/colorString" }
+              }
+            },
+            "skeleton": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["screenHeight", "screenWidth", "detailHeight", "detailWidth"],
+              "properties": {
+                "screenHeight": { "$ref": "#/$defs/nonNegativeNumber" },
+                "screenWidth": { "$ref": "#/$defs/nonNegativeNumber" },
+                "detailHeight": { "$ref": "#/$defs/nonNegativeNumber" },
+                "detailWidth": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            }
+          }
+        },
+        "candidateCard": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["layout", "pill", "actionButton", "typography"],
+          "properties": {
+            "layout": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cardRadius",
+                "cardBorderWidth",
+                "cardPadding",
+                "cardGap",
+                "shadowOpacity",
+                "shadowRadius",
+                "shadowOffsetY",
+                "elevation",
+                "heroGap",
+                "thumbnailSize",
+                "thumbnailRadius",
+                "bodyGap",
+                "headerGap",
+                "headerTextGap",
+                "pillGap",
+                "footerGap",
+                "reasonLimit"
+              ],
+              "properties": {
+                "cardRadius": { "$ref": "#/$defs/nonNegativeNumber" },
+                "cardBorderWidth": { "$ref": "#/$defs/nonNegativeNumber" },
+                "cardPadding": { "$ref": "#/$defs/nonNegativeNumber" },
+                "cardGap": { "$ref": "#/$defs/nonNegativeNumber" },
+                "shadowOpacity": { "$ref": "#/$defs/opacity" },
+                "shadowRadius": { "$ref": "#/$defs/nonNegativeNumber" },
+                "shadowOffsetY": { "$ref": "#/$defs/nonNegativeNumber" },
+                "elevation": { "$ref": "#/$defs/nonNegativeNumber" },
+                "heroGap": { "$ref": "#/$defs/nonNegativeNumber" },
+                "thumbnailSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "thumbnailRadius": { "$ref": "#/$defs/nonNegativeNumber" },
+                "bodyGap": { "$ref": "#/$defs/nonNegativeNumber" },
+                "headerGap": { "$ref": "#/$defs/nonNegativeNumber" },
+                "headerTextGap": { "$ref": "#/$defs/nonNegativeNumber" },
+                "pillGap": { "$ref": "#/$defs/nonNegativeNumber" },
+                "footerGap": { "$ref": "#/$defs/nonNegativeNumber" },
+                "reasonLimit": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "pill": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["radius", "paddingHorizontal", "paddingVertical", "borderWidth"],
+              "properties": {
+                "radius": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingVertical": { "$ref": "#/$defs/nonNegativeNumber" },
+                "borderWidth": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "actionButton": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["minHeight", "radius", "paddingHorizontal", "paddingVertical"],
+              "properties": {
+                "minHeight": { "$ref": "#/$defs/nonNegativeNumber" },
+                "radius": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingVertical": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "typography": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "titleSize",
+                "titleWeight",
+                "subtitleSize",
+                "badgeSize",
+                "badgeWeight",
+                "metaSize",
+                "issueSize",
+                "issueWeight",
+                "reasonSize",
+                "reasonWeight",
+                "duplicateSummarySize",
+                "duplicateSummaryLineHeight",
+                "duplicateSummaryWeight",
+                "footerSize",
+                "footerLineHeight",
+                "actionSize",
+                "actionWeight"
+              ],
+              "properties": {
+                "titleSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "titleWeight": { "$ref": "#/$defs/fontWeight" },
+                "subtitleSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "badgeSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "badgeWeight": { "$ref": "#/$defs/fontWeight" },
+                "metaSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "issueSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "issueWeight": { "$ref": "#/$defs/fontWeight" },
+                "reasonSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "reasonWeight": { "$ref": "#/$defs/fontWeight" },
+                "duplicateSummarySize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "duplicateSummaryLineHeight": { "$ref": "#/$defs/nonNegativeNumber" },
+                "duplicateSummaryWeight": { "$ref": "#/$defs/fontWeight" },
+                "footerSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "footerLineHeight": { "$ref": "#/$defs/nonNegativeNumber" },
+                "actionSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "actionWeight": { "$ref": "#/$defs/fontWeight" }
+              }
+            }
+          }
+        },
+        "previewModal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "layout",
+            "radius",
+            "border",
+            "pill",
+            "duplicateStrip",
+            "button",
+            "typography"
+          ],
+          "properties": {
+            "layout": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "previewHorizontalInset",
+                "previewMinSize",
+                "previewAspectRatio",
+                "headerPaddingHorizontal",
+                "headerPaddingTop",
+                "headerPaddingBottom",
+                "headerSubtitleMarginTop",
+                "contentPadding",
+                "contentGap",
+                "panelPadding",
+                "panelGap",
+                "issueGap",
+                "reasonGap",
+                "statGap",
+                "actionGap"
+              ],
+              "properties": {
+                "previewHorizontalInset": { "$ref": "#/$defs/nonNegativeNumber" },
+                "previewMinSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "previewAspectRatio": { "$ref": "#/$defs/nonNegativeNumber" },
+                "headerPaddingHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "headerPaddingTop": { "$ref": "#/$defs/nonNegativeNumber" },
+                "headerPaddingBottom": { "$ref": "#/$defs/nonNegativeNumber" },
+                "headerSubtitleMarginTop": { "$ref": "#/$defs/nonNegativeNumber" },
+                "contentPadding": { "$ref": "#/$defs/nonNegativeNumber" },
+                "contentGap": { "$ref": "#/$defs/nonNegativeNumber" },
+                "panelPadding": { "$ref": "#/$defs/nonNegativeNumber" },
+                "panelGap": { "$ref": "#/$defs/nonNegativeNumber" },
+                "issueGap": { "$ref": "#/$defs/nonNegativeNumber" },
+                "reasonGap": { "$ref": "#/$defs/nonNegativeNumber" },
+                "statGap": { "$ref": "#/$defs/nonNegativeNumber" },
+                "actionGap": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "radius": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["button", "media", "panel", "duplicateStrip", "pill"],
+              "properties": {
+                "button": { "$ref": "#/$defs/nonNegativeNumber" },
+                "media": { "$ref": "#/$defs/nonNegativeNumber" },
+                "panel": { "$ref": "#/$defs/nonNegativeNumber" },
+                "duplicateStrip": { "$ref": "#/$defs/nonNegativeNumber" },
+                "pill": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "border": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["panelWidth", "duplicateStripWidth"],
+              "properties": {
+                "panelWidth": { "$ref": "#/$defs/nonNegativeNumber" },
+                "duplicateStripWidth": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "pill": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["paddingHorizontal", "paddingVertical"],
+              "properties": {
+                "paddingHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingVertical": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "duplicateStrip": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["paddingHorizontal", "paddingVertical", "lineHeight"],
+              "properties": {
+                "paddingHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingVertical": { "$ref": "#/$defs/nonNegativeNumber" },
+                "lineHeight": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "button": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "closePaddingHorizontal",
+                "closePaddingVertical",
+                "actionPaddingHorizontal",
+                "actionPaddingVertical"
+              ],
+              "properties": {
+                "closePaddingHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "closePaddingVertical": { "$ref": "#/$defs/nonNegativeNumber" },
+                "actionPaddingHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "actionPaddingVertical": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "typography": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "headerTitleSize",
+                "headerTitleWeight",
+                "closeButtonWeight",
+                "panelTitleSize",
+                "panelTitleWeight",
+                "panelValueSize",
+                "panelValueWeight",
+                "pillSize",
+                "pillWeight",
+                "duplicateReasonWeight",
+                "statLabelSize",
+                "statValueWeight",
+                "actionWeight"
+              ],
+              "properties": {
+                "headerTitleSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "headerTitleWeight": { "$ref": "#/$defs/fontWeight" },
+                "closeButtonWeight": { "$ref": "#/$defs/fontWeight" },
+                "panelTitleSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "panelTitleWeight": { "$ref": "#/$defs/fontWeight" },
+                "panelValueSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "panelValueWeight": { "$ref": "#/$defs/fontWeight" },
+                "pillSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "pillWeight": { "$ref": "#/$defs/fontWeight" },
+                "duplicateReasonWeight": { "$ref": "#/$defs/fontWeight" },
+                "statLabelSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "statValueWeight": { "$ref": "#/$defs/fontWeight" },
+                "actionWeight": { "$ref": "#/$defs/fontWeight" }
+              }
+            }
+          }
+        },
+        "mediaViewer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["video", "zoom"],
+          "properties": {
+            "video": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["fallbackAspectRatio", "minAspectRatio"],
+              "properties": {
+                "fallbackAspectRatio": { "$ref": "#/$defs/nonNegativeNumber" },
+                "minAspectRatio": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "zoom": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "defaultMinScale",
+                "defaultMaxScale",
+                "underScaleFactor",
+                "overScaleFactor",
+                "clampDurationMs"
+              ],
+              "properties": {
+                "defaultMinScale": { "$ref": "#/$defs/nonNegativeNumber" },
+                "defaultMaxScale": { "$ref": "#/$defs/nonNegativeNumber" },
+                "underScaleFactor": { "$ref": "#/$defs/nonNegativeNumber" },
+                "overScaleFactor": { "$ref": "#/$defs/nonNegativeNumber" },
+                "clampDurationMs": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            }
+          }
+        },
+        "duplicateCarousel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["defaultStage", "windowing", "nav"],
+          "properties": {
+            "defaultStage": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["windowHorizontalInset", "minWidth", "heightRatio", "minHeight"],
+              "properties": {
+                "windowHorizontalInset": { "$ref": "#/$defs/nonNegativeNumber" },
+                "minWidth": { "$ref": "#/$defs/nonNegativeNumber" },
+                "heightRatio": { "$ref": "#/$defs/nonNegativeNumber" },
+                "minHeight": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "windowing": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["reuseSlotCount"],
+              "properties": {
+                "reuseSlotCount": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "nav": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "buttonSize",
+                "buttonInset",
+                "iconSize",
+                "background",
+                "pressedBackground"
+              ],
+              "properties": {
+                "buttonSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "buttonInset": { "$ref": "#/$defs/nonNegativeNumber" },
+                "iconSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "background": { "$ref": "#/$defs/colorString" },
+                "pressedBackground": { "$ref": "#/$defs/colorString" }
+              }
+            }
+          }
+        },
+        "photoGrid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["list", "item", "videoBadge", "duplicateBadge", "selection"],
+          "properties": {
+            "list": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["edgePadding"],
+              "properties": {
+                "edgePadding": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "item": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "radiusCompact",
+                "radiusRegular",
+                "darkBorderWidth",
+                "lightBorderColor",
+                "pressedShadowOffsetY",
+                "pressedShadowOpacityLight",
+                "pressedShadowOpacityDark",
+                "pressedShadowRadius",
+                "pressedElevation"
+              ],
+              "properties": {
+                "radiusCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "radiusRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "darkBorderWidth": { "$ref": "#/$defs/nonNegativeNumber" },
+                "lightBorderColor": { "$ref": "#/$defs/colorString" },
+                "pressedShadowOffsetY": { "$ref": "#/$defs/nonNegativeNumber" },
+                "pressedShadowOpacityLight": { "$ref": "#/$defs/opacity" },
+                "pressedShadowOpacityDark": { "$ref": "#/$defs/opacity" },
+                "pressedShadowRadius": { "$ref": "#/$defs/nonNegativeNumber" },
+                "pressedElevation": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "videoBadge": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "leftCompact",
+                "leftRegular",
+                "bottomCompact",
+                "bottomRegular",
+                "gapCompact",
+                "gapRegular",
+                "paddingLeftCompact",
+                "paddingLeftRegular",
+                "paddingRightCompact",
+                "paddingRightRegular",
+                "heightCompact",
+                "heightRegular",
+                "radius",
+                "background",
+                "foreground",
+                "iconWidthCompact",
+                "iconWidthRegular",
+                "iconHeightRatio",
+                "textSizeCompact",
+                "textSizeRegular",
+                "textLineHeightCompact",
+                "textLineHeightRegular",
+                "textWeight"
+              ],
+              "properties": {
+                "leftCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "leftRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "bottomCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "bottomRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "gapCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "gapRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingLeftCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingLeftRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingRightCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingRightRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "heightCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "heightRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "radius": { "$ref": "#/$defs/nonNegativeNumber" },
+                "background": { "$ref": "#/$defs/colorString" },
+                "foreground": { "$ref": "#/$defs/colorString" },
+                "iconWidthCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "iconWidthRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "iconHeightRatio": { "$ref": "#/$defs/nonNegativeNumber" },
+                "textSizeCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "textSizeRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "textLineHeightCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "textLineHeightRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "textWeight": { "$ref": "#/$defs/fontWeight" }
+              }
+            },
+            "duplicateBadge": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "bottom",
+                "right",
+                "minWidth",
+                "height",
+                "radius",
+                "paddingHorizontal",
+                "background",
+                "foreground",
+                "contentHeight",
+                "textSize",
+                "textWeight"
+              ],
+              "properties": {
+                "bottom": { "$ref": "#/$defs/nonNegativeNumber" },
+                "right": { "$ref": "#/$defs/nonNegativeNumber" },
+                "minWidth": { "$ref": "#/$defs/nonNegativeNumber" },
+                "height": { "$ref": "#/$defs/nonNegativeNumber" },
+                "radius": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "background": { "$ref": "#/$defs/colorString" },
+                "foreground": { "$ref": "#/$defs/colorString" },
+                "contentHeight": { "$ref": "#/$defs/nonNegativeNumber" },
+                "textSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "textWeight": { "$ref": "#/$defs/fontWeight" }
+              }
+            },
+            "selection": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sizeCompact",
+                "sizeRegular",
+                "offsetCompact",
+                "offsetRegular",
+                "borderWidthCompact",
+                "borderWidthRegular",
+                "emptyBackgroundCompact",
+                "emptyBackgroundRegular",
+                "borderColorCompact",
+                "borderColorRegular",
+                "filledBackground",
+                "foreground",
+                "shadowOffsetYCompact",
+                "shadowOffsetYRegular",
+                "shadowOpacityCompact",
+                "shadowOpacityDark",
+                "shadowOpacityLight",
+                "shadowRadiusCompact",
+                "shadowRadiusRegular",
+                "elevationCompact",
+                "elevationRegular",
+                "checkIconSizeCompact",
+                "checkIconSizeRegular"
+              ],
+              "properties": {
+                "sizeCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "sizeRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "offsetCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "offsetRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "borderWidthCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "borderWidthRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "emptyBackgroundCompact": { "$ref": "#/$defs/colorString" },
+                "emptyBackgroundRegular": { "$ref": "#/$defs/colorString" },
+                "borderColorCompact": { "$ref": "#/$defs/colorString" },
+                "borderColorRegular": { "$ref": "#/$defs/colorString" },
+                "filledBackground": { "$ref": "#/$defs/colorString" },
+                "foreground": { "$ref": "#/$defs/colorString" },
+                "shadowOffsetYCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "shadowOffsetYRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "shadowOpacityCompact": { "$ref": "#/$defs/opacity" },
+                "shadowOpacityDark": { "$ref": "#/$defs/opacity" },
+                "shadowOpacityLight": { "$ref": "#/$defs/opacity" },
+                "shadowRadiusCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "shadowRadiusRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "elevationCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "elevationRegular": { "$ref": "#/$defs/nonNegativeNumber" },
+                "checkIconSizeCompact": { "$ref": "#/$defs/nonNegativeNumber" },
+                "checkIconSizeRegular": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            }
+          }
+        },
+        "actionSwitch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["color", "radius", "gap", "size", "typography"],
+          "properties": {
+            "color": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "activeText",
+                "inactiveText",
+                "inactiveIcon",
+                "dangerBackground",
+                "keepBackground",
+                "neutralBackground"
+              ],
+              "properties": {
+                "activeText": {
+                  "$ref": "#/$defs/colorString"
+                },
+                "inactiveText": {
+                  "$ref": "#/$defs/colorString"
+                },
+                "inactiveIcon": {
+                  "$ref": "#/$defs/colorString"
+                },
+                "dangerBackground": {
+                  "$ref": "#/$defs/colorString"
+                },
+                "keepBackground": {
+                  "$ref": "#/$defs/colorString"
+                },
+                "neutralBackground": {
+                  "$ref": "#/$defs/colorString"
+                }
+              }
+            },
+            "radius": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["regular", "compact"],
+              "properties": {
+                "regular": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "compact": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                }
+              }
+            },
+            "gap": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["regular", "compact", "contentRegular", "contentCompact"],
+              "properties": {
+                "regular": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "compact": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "contentRegular": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "contentCompact": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                }
+              }
+            },
+            "size": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "iconRegular",
+                "iconCompact",
+                "segmentMinWidthRegular",
+                "segmentMinWidthCompact",
+                "segmentHeightRegular",
+                "segmentHeightCompact",
+                "segmentPaddingHorizontalRegular",
+                "segmentPaddingHorizontalCompact"
+              ],
+              "properties": {
+                "iconRegular": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "iconCompact": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "segmentMinWidthRegular": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "segmentMinWidthCompact": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "segmentHeightRegular": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "segmentHeightCompact": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "segmentPaddingHorizontalRegular": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "segmentPaddingHorizontalCompact": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                }
+              }
+            },
+            "typography": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "fontSizeRegular",
+                "fontSizeCompact",
+                "fontWeight",
+                "letterSpacingRegular",
+                "letterSpacingCompact"
+              ],
+              "properties": {
+                "fontSizeRegular": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "fontSizeCompact": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "fontWeight": {
+                  "$ref": "#/$defs/fontWeight"
+                },
+                "letterSpacingRegular": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "letterSpacingCompact": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                }
+              }
+            }
+          }
+        },
+        "segmentedControl": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["color", "radius", "gap", "size", "typography"],
+          "properties": {
+            "color": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["selectedCountText"],
+              "properties": {
+                "selectedCountText": {
+                  "$ref": "#/$defs/colorString"
+                }
+              }
+            },
+            "radius": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["button"],
+              "properties": {
+                "button": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                }
+              }
+            },
+            "gap": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["container", "buttonContent", "textGroup"],
+              "properties": {
+                "container": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "buttonContent": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "textGroup": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                }
+              }
+            },
+            "size": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "icon",
+                "buttonMinHeight",
+                "buttonPaddingHorizontal",
+                "buttonPaddingVertical",
+                "buttonBorderWidth"
+              ],
+              "properties": {
+                "icon": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "buttonMinHeight": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "buttonPaddingHorizontal": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "buttonPaddingVertical": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "buttonBorderWidth": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                }
+              }
+            },
+            "typography": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "labelFontSize",
+                "labelFontWeight",
+                "selectedLabelFontWeight",
+                "countFontSize",
+                "countFontWeight"
+              ],
+              "properties": {
+                "labelFontSize": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "labelFontWeight": {
+                  "$ref": "#/$defs/fontWeight"
+                },
+                "selectedLabelFontWeight": {
+                  "$ref": "#/$defs/fontWeight"
+                },
+                "countFontSize": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "countFontWeight": {
+                  "$ref": "#/$defs/fontWeight"
+                }
+              }
+            }
+          }
+        },
+        "scanCounter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["typography"],
+          "properties": {
+            "typography": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["statusSize", "statusWeight"],
+              "properties": {
+                "statusSize": {
+                  "$ref": "#/$defs/nonNegativeNumber"
+                },
+                "statusWeight": {
+                  "$ref": "#/$defs/fontWeight"
+                }
+              }
+            }
+          }
+        },
+        "selectionBar": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["spacing", "radius", "border", "size", "typography", "state"],
+          "properties": {
+            "spacing": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "horizontal",
+                "vertical",
+                "buttonHorizontal",
+                "buttonVertical",
+                "buttonGap"
+              ],
+              "properties": {
+                "horizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "vertical": { "$ref": "#/$defs/nonNegativeNumber" },
+                "buttonHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "buttonVertical": { "$ref": "#/$defs/nonNegativeNumber" },
+                "buttonGap": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "radius": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["button"],
+              "properties": {
+                "button": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "border": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["buttonWidth"],
+              "properties": {
+                "buttonWidth": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "size": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["buttonMinHeight"],
+              "properties": {
+                "buttonMinHeight": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "typography": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["countSize", "buttonSize", "countWeight", "buttonWeight"],
+              "properties": {
+                "countSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "buttonSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "countWeight": { "$ref": "#/$defs/fontWeight" },
+                "buttonWeight": { "$ref": "#/$defs/fontWeight" }
+              }
+            },
+            "state": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["disabledOpacity"],
+              "properties": {
+                "disabledOpacity": { "$ref": "#/$defs/opacity" }
+              }
+            }
+          }
+        },
+        "tabBar": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["layout", "badge", "typography"],
+          "properties": {
+            "layout": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "minimumBottomPadding",
+                "height",
+                "marginHorizontal",
+                "paddingHorizontal",
+                "tabMinHeight",
+                "tabMinWidth",
+                "iconSize",
+                "iconBottomMargin"
+              ],
+              "properties": {
+                "minimumBottomPadding": { "$ref": "#/$defs/nonNegativeNumber" },
+                "height": { "$ref": "#/$defs/nonNegativeNumber" },
+                "marginHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "tabMinHeight": { "$ref": "#/$defs/nonNegativeNumber" },
+                "tabMinWidth": { "$ref": "#/$defs/nonNegativeNumber" },
+                "iconSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "iconBottomMargin": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "badge": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "offsetTop",
+                "offsetRight",
+                "radius",
+                "minWidth",
+                "minHeight",
+                "paddingHorizontal",
+                "paddingVertical",
+                "borderWidth",
+                "maxDisplayCount"
+              ],
+              "properties": {
+                "offsetTop": { "$ref": "#/$defs/nonNegativeNumber" },
+                "offsetRight": { "$ref": "#/$defs/nonNegativeNumber" },
+                "radius": { "$ref": "#/$defs/nonNegativeNumber" },
+                "minWidth": { "$ref": "#/$defs/nonNegativeNumber" },
+                "minHeight": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingVertical": { "$ref": "#/$defs/nonNegativeNumber" },
+                "borderWidth": { "$ref": "#/$defs/nonNegativeNumber" },
+                "maxDisplayCount": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "typography": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "labelSize",
+                "labelWeight",
+                "activeLabelWeight",
+                "badgeSize",
+                "badgeWeight"
+              ],
+              "properties": {
+                "labelSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "labelWeight": { "$ref": "#/$defs/fontWeight" },
+                "activeLabelWeight": { "$ref": "#/$defs/fontWeight" },
+                "badgeSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "badgeWeight": { "$ref": "#/$defs/fontWeight" }
+              }
+            }
+          }
+        },
+        "scanProgress": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "color",
+            "radius",
+            "layout",
+            "gap",
+            "pipeline",
+            "badge",
+            "cancelButton",
+            "typography",
+            "motion"
+          ],
+          "properties": {
+            "color": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "activeFillLight",
+                "activeFillDark",
+                "doneFillLight",
+                "doneFillDark",
+                "glowLight",
+                "glowDark",
+                "wakeLight",
+                "wakeDark",
+                "shimmerLight",
+                "shimmerDark"
+              ],
+              "properties": {
+                "activeFillLight": { "$ref": "#/$defs/colorString" },
+                "activeFillDark": { "$ref": "#/$defs/colorString" },
+                "doneFillLight": { "$ref": "#/$defs/colorString" },
+                "doneFillDark": { "$ref": "#/$defs/colorString" },
+                "glowLight": { "$ref": "#/$defs/colorString" },
+                "glowDark": { "$ref": "#/$defs/colorString" },
+                "wakeLight": { "$ref": "#/$defs/colorString" },
+                "wakeDark": { "$ref": "#/$defs/colorString" },
+                "shimmerLight": { "$ref": "#/$defs/colorString" },
+                "shimmerDark": { "$ref": "#/$defs/colorString" }
+              }
+            },
+            "radius": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["card", "pill"],
+              "properties": {
+                "card": { "$ref": "#/$defs/nonNegativeNumber" },
+                "pill": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "layout": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "containerMarginTop",
+                "containerPaddingHorizontal",
+                "containerPaddingVertical",
+                "containerMarginHorizontal",
+                "shadowOffsetY",
+                "shadowRadius",
+                "elevation"
+              ],
+              "properties": {
+                "containerMarginTop": { "$ref": "#/$defs/nonNegativeNumber" },
+                "containerPaddingHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "containerPaddingVertical": { "$ref": "#/$defs/nonNegativeNumber" },
+                "containerMarginHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "shadowOffsetY": { "$ref": "#/$defs/nonNegativeNumber" },
+                "shadowRadius": { "$ref": "#/$defs/nonNegativeNumber" },
+                "elevation": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "gap": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["container", "headerRow", "headerTextGroup", "headerMetaGroup"],
+              "properties": {
+                "container": { "$ref": "#/$defs/nonNegativeNumber" },
+                "headerRow": { "$ref": "#/$defs/nonNegativeNumber" },
+                "headerTextGroup": { "$ref": "#/$defs/nonNegativeNumber" },
+                "headerMetaGroup": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "pipeline": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "segmentWidth",
+                "wakeWidth",
+                "travelWidth",
+                "height",
+                "borderWidth",
+                "edgeInset",
+                "minimumFillPercent",
+                "preparingFillPercent"
+              ],
+              "properties": {
+                "segmentWidth": { "$ref": "#/$defs/nonNegativeNumber" },
+                "wakeWidth": { "$ref": "#/$defs/nonNegativeNumber" },
+                "travelWidth": { "$ref": "#/$defs/nonNegativeNumber" },
+                "height": { "$ref": "#/$defs/nonNegativeNumber" },
+                "borderWidth": { "$ref": "#/$defs/nonNegativeNumber" },
+                "edgeInset": { "$ref": "#/$defs/nonNegativeNumber" },
+                "minimumFillPercent": { "$ref": "#/$defs/nonNegativeNumber" },
+                "preparingFillPercent": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "badge": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["paddingHorizontal", "paddingVertical", "borderWidth"],
+              "properties": {
+                "paddingHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingVertical": { "$ref": "#/$defs/nonNegativeNumber" },
+                "borderWidth": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "cancelButton": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["paddingHorizontal", "paddingVertical"],
+              "properties": {
+                "paddingHorizontal": { "$ref": "#/$defs/nonNegativeNumber" },
+                "paddingVertical": { "$ref": "#/$defs/nonNegativeNumber" }
+              }
+            },
+            "typography": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "statusSize",
+                "statusWeight",
+                "statusLetterSpacing",
+                "resultBadgeSize",
+                "resultBadgeWeight",
+                "countSize",
+                "countWeight",
+                "cancelSize",
+                "cancelWeight"
+              ],
+              "properties": {
+                "statusSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "statusWeight": { "$ref": "#/$defs/fontWeight" },
+                "statusLetterSpacing": { "$ref": "#/$defs/nonNegativeNumber" },
+                "resultBadgeSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "resultBadgeWeight": { "$ref": "#/$defs/fontWeight" },
+                "countSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "countWeight": { "$ref": "#/$defs/fontWeight" },
+                "cancelSize": { "$ref": "#/$defs/nonNegativeNumber" },
+                "cancelWeight": { "$ref": "#/$defs/fontWeight" }
+              }
+            },
+            "motion": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "flowDurationMs",
+                "flowPauseDurationMs",
+                "breathInDurationMs",
+                "breathOutDurationMs",
+                "breathPauseDurationMs",
+                "settleDurationMs",
+                "resultRevealDurationMs",
+                "resultRevealDelayMs",
+                "breathInitialOpacity",
+                "breathDoneOpacity",
+                "breathMaxOpacity",
+                "breathMinOpacity"
+              ],
+              "properties": {
+                "flowDurationMs": { "$ref": "#/$defs/nonNegativeNumber" },
+                "flowPauseDurationMs": { "$ref": "#/$defs/nonNegativeNumber" },
+                "breathInDurationMs": { "$ref": "#/$defs/nonNegativeNumber" },
+                "breathOutDurationMs": { "$ref": "#/$defs/nonNegativeNumber" },
+                "breathPauseDurationMs": { "$ref": "#/$defs/nonNegativeNumber" },
+                "settleDurationMs": { "$ref": "#/$defs/nonNegativeNumber" },
+                "resultRevealDurationMs": { "$ref": "#/$defs/nonNegativeNumber" },
+                "resultRevealDelayMs": { "$ref": "#/$defs/nonNegativeNumber" },
+                "breathInitialOpacity": { "$ref": "#/$defs/opacity" },
+                "breathDoneOpacity": { "$ref": "#/$defs/opacity" },
+                "breathMaxOpacity": { "$ref": "#/$defs/opacity" },
+                "breathMinOpacity": { "$ref": "#/$defs/opacity" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "themes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["light", "dark"],
+      "properties": {
+        "light": {
+          "$ref": "#/$defs/theme"
+        },
+        "dark": {
+          "$ref": "#/$defs/theme"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "color": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$"
+    },
+    "colorString": {
+      "type": "string",
+      "pattern": "^(#[0-9a-fA-F]{6}|rgba\\([0-9]{1,3}, [0-9]{1,3}, [0-9]{1,3}, (0|1|0?\\.[0-9]+)\\))$"
+    },
+    "nonNegativeNumber": {
+      "type": "number",
+      "minimum": 0
+    },
+    "opacity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "fontWeight": {
+      "type": "string",
+      "enum": ["400", "500", "600", "700", "800"]
+    },
+    "textStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fontSize", "fontWeight", "lineHeight"],
+      "properties": {
+        "fontSize": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "fontWeight": {
+          "$ref": "#/$defs/fontWeight"
+        },
+        "lineHeight": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        }
+      }
+    },
+    "statusBarStyle": {
+      "type": "string",
+      "enum": ["dark", "light"]
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system",
+        "surfaces",
+        "brand",
+        "text",
+        "feedback",
+        "input",
+        "buttons",
+        "chips",
+        "tabs",
+        "actionBar",
+        "effects",
+        "skeleton"
+      ],
+      "properties": {
+        "system": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scheme", "statusBarStyle"],
+          "properties": {
+            "scheme": {
+              "type": "string",
+              "enum": ["light", "dark"]
+            },
+            "statusBarStyle": {
+              "$ref": "#/$defs/statusBarStyle"
+            }
+          }
+        },
+        "surfaces": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "safeArea",
+            "orbTop",
+            "orbBottom",
+            "heroBackground",
+            "heroSurface",
+            "cardBackground",
+            "cardBorder",
+            "cardMutedBackground",
+            "cardMutedBorder",
+            "thumbnailBackground",
+            "previewBackground"
+          ],
+          "properties": {
+            "safeArea": {
+              "$ref": "#/$defs/color"
+            },
+            "orbTop": {
+              "$ref": "#/$defs/color"
+            },
+            "orbBottom": {
+              "$ref": "#/$defs/color"
+            },
+            "heroBackground": {
+              "$ref": "#/$defs/color"
+            },
+            "heroSurface": {
+              "$ref": "#/$defs/color"
+            },
+            "cardBackground": {
+              "$ref": "#/$defs/color"
+            },
+            "cardBorder": {
+              "$ref": "#/$defs/color"
+            },
+            "cardMutedBackground": {
+              "$ref": "#/$defs/color"
+            },
+            "cardMutedBorder": {
+              "$ref": "#/$defs/color"
+            },
+            "thumbnailBackground": {
+              "$ref": "#/$defs/color"
+            },
+            "previewBackground": {
+              "$ref": "#/$defs/color"
+            }
+          }
+        },
+        "brand": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["heroAccent"],
+          "properties": {
+            "heroAccent": {
+              "$ref": "#/$defs/color"
+            }
+          }
+        },
+        "text": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "heroTitle",
+            "heroText",
+            "heroHint",
+            "pageTextPrimary",
+            "pageTextSecondary",
+            "pageTextMuted"
+          ],
+          "properties": {
+            "heroTitle": {
+              "$ref": "#/$defs/color"
+            },
+            "heroText": {
+              "$ref": "#/$defs/color"
+            },
+            "heroHint": {
+              "$ref": "#/$defs/color"
+            },
+            "pageTextPrimary": {
+              "$ref": "#/$defs/color"
+            },
+            "pageTextSecondary": {
+              "$ref": "#/$defs/color"
+            },
+            "pageTextMuted": {
+              "$ref": "#/$defs/color"
+            }
+          }
+        },
+        "feedback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["info", "notice"],
+          "properties": {
+            "info": {
+              "$ref": "#/$defs/backgroundBorder"
+            },
+            "notice": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["background", "border", "title", "text"],
+              "properties": {
+                "background": {
+                  "$ref": "#/$defs/color"
+                },
+                "border": {
+                  "$ref": "#/$defs/color"
+                },
+                "title": {
+                  "$ref": "#/$defs/color"
+                },
+                "text": {
+                  "$ref": "#/$defs/color"
+                }
+              }
+            }
+          }
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["background", "border", "text"],
+          "properties": {
+            "background": {
+              "$ref": "#/$defs/color"
+            },
+            "border": {
+              "$ref": "#/$defs/color"
+            },
+            "text": {
+              "$ref": "#/$defs/color"
+            }
+          }
+        },
+        "buttons": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["primary", "success", "secondary", "tertiary", "danger"],
+          "properties": {
+            "primary": {
+              "$ref": "#/$defs/buttonText"
+            },
+            "success": {
+              "$ref": "#/$defs/buttonPressed"
+            },
+            "secondary": {
+              "$ref": "#/$defs/buttonText"
+            },
+            "tertiary": {
+              "$ref": "#/$defs/buttonText"
+            },
+            "danger": {
+              "$ref": "#/$defs/buttonPressedText"
+            }
+          }
+        },
+        "chips": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["background", "border", "text", "activeBackground", "activeText"],
+          "properties": {
+            "background": {
+              "$ref": "#/$defs/color"
+            },
+            "border": {
+              "$ref": "#/$defs/color"
+            },
+            "text": {
+              "$ref": "#/$defs/color"
+            },
+            "activeBackground": {
+              "$ref": "#/$defs/color"
+            },
+            "activeText": {
+              "$ref": "#/$defs/color"
+            }
+          }
+        },
+        "tabs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["background", "text", "activeBackground", "activeText"],
+          "properties": {
+            "background": {
+              "$ref": "#/$defs/color"
+            },
+            "text": {
+              "$ref": "#/$defs/color"
+            },
+            "activeBackground": {
+              "$ref": "#/$defs/color"
+            },
+            "activeText": {
+              "$ref": "#/$defs/color"
+            }
+          }
+        },
+        "actionBar": {
+          "$ref": "#/$defs/buttonText"
+        },
+        "effects": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["shadowColor"],
+          "properties": {
+            "shadowColor": {
+              "$ref": "#/$defs/color"
+            }
+          }
+        },
+        "skeleton": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["base", "highlight", "surface", "border"],
+          "properties": {
+            "base": {
+              "$ref": "#/$defs/color"
+            },
+            "highlight": {
+              "$ref": "#/$defs/color"
+            },
+            "surface": {
+              "$ref": "#/$defs/color"
+            },
+            "border": {
+              "$ref": "#/$defs/color"
+            }
+          }
+        }
+      }
+    },
+    "backgroundBorder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["background", "border"],
+      "properties": {
+        "background": {
+          "$ref": "#/$defs/color"
+        },
+        "border": {
+          "$ref": "#/$defs/color"
+        }
+      }
+    },
+    "buttonText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["background", "text"],
+      "properties": {
+        "background": {
+          "$ref": "#/$defs/color"
+        },
+        "text": {
+          "$ref": "#/$defs/color"
+        }
+      }
+    },
+    "buttonPressed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["background", "pressedBackground"],
+      "properties": {
+        "background": {
+          "$ref": "#/$defs/color"
+        },
+        "pressedBackground": {
+          "$ref": "#/$defs/color"
+        }
+      }
+    },
+    "buttonPressedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["background", "pressedBackground", "text"],
+      "properties": {
+        "background": {
+          "$ref": "#/$defs/color"
+        },
+        "pressedBackground": {
+          "$ref": "#/$defs/color"
+        },
+        "text": {
+          "$ref": "#/$defs/color"
+        }
+      }
+    }
+  }
+}

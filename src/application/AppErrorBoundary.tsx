@@ -1,11 +1,19 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import {
+  detectPreferredAppLanguage,
+  type AppLanguage,
+} from '../i18n/app-language';
+import { getAppCopy } from '../i18n/app-copy';
 import { OBSERVABILITY_EVENTS } from '../services/observability/observability';
+import { getAppTheme } from '../theme/app-theme';
+import { Button, Card, Text } from '../ui/primitives';
 import { getAppObservability } from './observability';
 
 interface AppErrorBoundaryProps {
   children: React.ReactNode;
+  language?: AppLanguage;
 }
 
 interface AppErrorBoundaryState {
@@ -36,15 +44,23 @@ export class AppErrorBoundary extends React.Component<
 
   render() {
     if (this.state.error) {
+      const language = this.props.language ?? detectPreferredAppLanguage();
+      const copy = getAppCopy(language).appErrorBoundary;
+      const theme = getAppTheme('dark');
+
       return (
-        <View style={styles.container}>
-          <Text style={styles.title}>应用遇到渲染错误</Text>
-          <Text style={styles.body}>
-            当前版本未接入远程监控。请重试，或稍后重新打开应用。
-          </Text>
-          <Pressable onPress={this.handleRetry} style={styles.button}>
-            <Text style={styles.buttonText}>重试</Text>
-          </Pressable>
+        <View style={[styles.container, { backgroundColor: theme.safeArea }]}>
+          <Card variant="muted" theme={theme} style={styles.card}>
+            <Text variant="title" theme={theme} style={styles.title}>
+              {copy.title}
+            </Text>
+            <Text variant="body" tone="secondary" theme={theme} style={styles.body}>
+              {copy.body}
+            </Text>
+            <Button onPress={this.handleRetry} variant="tertiary" theme={theme} style={styles.button}>
+              {copy.retry}
+            </Button>
+          </Card>
         </View>
       );
     }
@@ -59,33 +75,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#0f172a',
+  },
+  card: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff7ec',
     marginBottom: 12,
     textAlign: 'center',
   },
   body: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#dbeafe',
     textAlign: 'center',
     marginBottom: 20,
   },
   button: {
     minWidth: 120,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 999,
-    backgroundColor: '#173944',
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '700',
   },
 });

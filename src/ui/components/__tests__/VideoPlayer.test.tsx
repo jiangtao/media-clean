@@ -3,7 +3,9 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { VideoPlayer } from '../VideoPlayer';
+import { MEDIA_VIEWER_STYLE_TOKENS } from '../media-viewer-tokens';
 import type { AppThemePalette } from '../../../theme/app-theme';
+import { COMPONENT_TOKENS } from '../../../theme/generated/component-tokens.generated';
 
 const useVideoPlayerMock = vi.fn();
 
@@ -76,9 +78,81 @@ const mockTheme: AppThemePalette = {
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+function mockVideoPlayer() {
+  const player = {
+    loop: false,
+    play: vi.fn(),
+    pause: vi.fn(),
+  };
+
+  useVideoPlayerMock.mockImplementation(
+    (
+      _source: { uri: string },
+      setup?: (playerRef: { loop: boolean; play: () => void; pause: () => void }) => void,
+    ) => {
+      setup?.(player);
+      return player;
+    },
+  );
+
+  return player;
+}
+
+function flattenStyle(style: unknown): Record<string, unknown> {
+  if (Array.isArray(style)) {
+    return Object.assign({}, ...style.map((item) => flattenStyle(item)));
+  }
+
+  if (style && typeof style === 'object') {
+    return style as Record<string, unknown>;
+  }
+
+  return {};
+}
+
 describe('VideoPlayer', () => {
   beforeEach(() => {
     useVideoPlayerMock.mockReset();
+  });
+
+  it('shares the generated media viewer token facade', () => {
+    expect(MEDIA_VIEWER_STYLE_TOKENS).toBe(COMPONENT_TOKENS.mediaViewer);
+  });
+
+  it('uses generated media viewer tokens for fallback video sizing', () => {
+    mockVideoPlayer();
+
+    let renderer!: ReturnType<typeof TestRenderer.create>;
+
+    act(() => {
+      renderer = TestRenderer.create(
+        <VideoPlayer uri="file:///fallback-video.mov" width={0} height={0} theme={mockTheme} />,
+      );
+    });
+
+    const mediaFrame = renderer.root.findByProps({ testID: 'video-player-media-frame' });
+
+    expect(flattenStyle(mediaFrame.props.style).aspectRatio).toBe(
+      MEDIA_VIEWER_STYLE_TOKENS.video.fallbackAspectRatio,
+    );
+  });
+
+  it('clamps tall video sizing with the generated minimum aspect ratio token', () => {
+    mockVideoPlayer();
+
+    let renderer!: ReturnType<typeof TestRenderer.create>;
+
+    act(() => {
+      renderer = TestRenderer.create(
+        <VideoPlayer uri="file:///tall-video.mov" width={100} height={1000} theme={mockTheme} />,
+      );
+    });
+
+    const mediaFrame = renderer.root.findByProps({ testID: 'video-player-media-frame' });
+
+    expect(flattenStyle(mediaFrame.props.style).aspectRatio).toBe(
+      MEDIA_VIEWER_STYLE_TOKENS.video.minAspectRatio,
+    );
   });
 
   it('pauses playback on unmount and ignores released-player cleanup errors', () => {

@@ -20,7 +20,7 @@ const jpegApi = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock('expo-file-system/legacy', () => fileSystemApi);
+vi.mock('expo-file-system/src/legacy', () => fileSystemApi);
 
 vi.mock('expo-image-manipulator', () => ({
   manipulateAsync: imageManipulatorApi.manipulateAsync,

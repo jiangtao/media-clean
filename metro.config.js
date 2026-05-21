@@ -1,5 +1,6 @@
 const path = require('path');
 const { getDefaultConfig } = require('expo/metro-config');
+const { withNativeWind } = require('nativewind/metro');
 
 const config = getDefaultConfig(__dirname);
 
@@ -14,6 +15,7 @@ config.watchFolders = [path.resolve(__dirname, 'node_modules')];
 const customResolver = {
   'call-bind/callBound': path.resolve(__dirname, 'node_modules/call-bind/callBound.js'),
   'call-bind': path.resolve(__dirname, 'node_modules/call-bind/index.js'),
+  'expo-image': path.resolve(__dirname, 'src/vendor/expo-image-shim.tsx'),
   'object.assign/polyfill': path.resolve(__dirname, 'node_modules/object.assign/polyfill.js'),
   'object-is/polyfill': path.resolve(__dirname, 'node_modules/object-is/polyfill.js'),
   'react-native-reanimated/scripts/validate-worklets-version': path.resolve(
@@ -29,9 +31,6 @@ const customResolver = {
     'node_modules/react-native-worklets/src/index.ts',
   ),
 };
-
-// Store original resolveRequest
-const originalResolveRequest = config.resolver.resolveRequest;
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (
@@ -54,13 +53,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     };
   }
 
-  // Otherwise use default resolution
-  if (originalResolveRequest) {
-    return originalResolveRequest(context, moduleName, platform);
-  }
-
-  // Fall back to context's default resolver
   return context.resolveRequest(context, moduleName, platform);
 };
 
-module.exports = config;
+module.exports = withNativeWind(config, { input: './global.css' });

@@ -2,45 +2,22 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import type { AppLanguage } from '../../i18n/app-language';
+import {
+  buildScanCompletionNotificationCopy,
+  getScanCompletionNotificationChannelCopy,
+} from '../../i18n/app-copy';
 
 const SCAN_COMPLETION_CHANNEL_ID = 'scan-completion';
 
-function buildScanCompletionCopy(
-  language: AppLanguage,
-  scannedCount: number,
-  resultCount: number,
-) {
-  if (language === 'zh-CN') {
-    return resultCount > 0
-      ? {
-          title: '扫描完成',
-          body: `已检查 ${scannedCount} 个媒体，发现 ${resultCount} 个待处理媒体。`,
-        }
-      : {
-          title: '扫描完成',
-          body: `已检查 ${scannedCount} 个媒体，当前这一批已处理完成。`,
-        };
-  }
-
-  return resultCount > 0
-    ? {
-        title: 'Scan complete',
-        body: `Checked ${scannedCount} media items and found ${resultCount} flagged results.`,
-      }
-    : {
-        title: 'Scan complete',
-        body: `Checked ${scannedCount} media items. This batch is fully processed.`,
-      };
-}
-
-async function ensureScanCompletionChannel() {
+async function ensureScanCompletionChannel(language: AppLanguage) {
   if (Platform.OS !== 'android') {
     return;
   }
 
+  const copy = getScanCompletionNotificationChannelCopy(language);
   await Notifications.setNotificationChannelAsync(SCAN_COMPLETION_CHANNEL_ID, {
-    name: '扫描完成提醒',
-    description: '在应用不处于前台时，提醒本地扫描已经完成。',
+    name: copy.name,
+    description: copy.description,
     importance: Notifications.AndroidImportance.DEFAULT,
     showBadge: false,
     enableVibrate: true,
@@ -57,9 +34,9 @@ export async function notifyScanCompletionIfNeeded(options: {
     return false;
   }
 
-  await ensureScanCompletionChannel();
+  await ensureScanCompletionChannel(options.language);
 
-  const copy = buildScanCompletionCopy(
+  const copy = buildScanCompletionNotificationCopy(
     options.language,
     options.scannedCount,
     options.resultCount,

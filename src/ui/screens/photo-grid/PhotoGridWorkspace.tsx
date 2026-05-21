@@ -1,12 +1,12 @@
 import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { PhotoGrid } from '../../components/PhotoGrid';
-import { TouchSurface } from '../../components/TouchSurface';
 import { AppIcon } from '../../icons/AppIcon';
+import { Button, Card, IconButton, Text } from '../../primitives';
 import type { CleanupCandidate } from '../../../domain/recognition/types';
 import type { AppLanguage } from '../../../i18n/app-language';
-import { formatLocalizedSize } from '../../../i18n/app-copy';
+import { formatLocalizedSize, getAppCopy } from '../../../i18n/app-copy';
 import type { AppThemePalette } from '../../../theme/app-theme';
 import type { MediaGridLayout } from '../screen-layout';
 import type { SwipeSelectionReason } from '../../hooks/useSwipeSelection';
@@ -77,23 +77,9 @@ export function PhotoGridWorkspace({
     () => createWorkspaceStyles(theme, isCompact),
     [isCompact, theme],
   );
-  const copy = useMemo(
-    () =>
-      language === 'en-US'
-        ? {
-            titleWithCount: (value: string, count: number) => `${value} (${count})`,
-            footerTitle: (formattedSize: string) => `Selected ${formattedSize}`,
-            emptyIssueTitle: 'No media of this type',
-          }
-        : {
-            titleWithCount: (value: string, count: number) => `${value} (${count})`,
-            footerTitle: (formattedSize: string) => `已选 ${formattedSize}`,
-            emptyIssueTitle: '暂无该类型媒体',
-          },
-    [language],
-  );
+  const copy = useMemo(() => getAppCopy(language).screens.photoGrid, [language]);
   const footerSizeText = useMemo(
-    () => copy.footerTitle(formatLocalizedSize(selectedBytes, language)),
+    () => copy.workspaceSelectedSize(formatLocalizedSize(selectedBytes, language)),
     [copy, language, selectedBytes],
   );
   const headerShellStyle = useMemo(
@@ -128,14 +114,14 @@ export function PhotoGridWorkspace({
         <View style={styles.headerRow}>
           {isSelectionMode ? (
             <>
-              <Pressable
-                accessibilityRole="button"
+              <IconButton
                 onPress={onCloseSelection ?? onBack}
                 style={styles.backButton}
+                theme={theme}
                 testID="photo-grid-close-button"
               >
                 <AppIcon name="close" size={24} color={theme.pageTextPrimary} />
-              </Pressable>
+              </IconButton>
 
               <View style={styles.headerCopy}>
                 <Text style={styles.headerTitle} testID="photo-grid-workspace-title">
@@ -145,32 +131,34 @@ export function PhotoGridWorkspace({
             </>
           ) : (
             <>
-              <Pressable
-                accessibilityRole="button"
+              <IconButton
                 onPress={onBack}
                 style={styles.backButton}
+                theme={theme}
                 testID="photo-grid-back-button"
               >
                 <AppIcon name="arrow-back" size={24} color={theme.pageTextPrimary} />
-              </Pressable>
+              </IconButton>
 
               <View style={styles.headerCopy}>
                 <Text style={styles.headerTitle} testID="photo-grid-workspace-title">
-                  {copy.titleWithCount(title, itemCount)}
+                  {copy.workspaceTitleWithCount(title, itemCount)}
                 </Text>
               </View>
             </>
           )}
 
           {isSelectionMode ? (
-            <Pressable
-              accessibilityRole="button"
+            <Button
               onPress={onToggleSelectAll}
+              variant="tertiary"
+              theme={theme}
               style={styles.headerAction}
+              textStyle={styles.headerActionText}
               testID="photo-selection-toggle-button"
             >
-              <Text style={styles.headerActionText}>{selectionToggleLabel}</Text>
-            </Pressable>
+              {selectionToggleLabel}
+            </Button>
           ) : null}
         </View>
       </View>
@@ -193,40 +181,44 @@ export function PhotoGridWorkspace({
           />
         ) : (
           <View style={styles.emptyIssueState} testID="photo-grid-issue-empty-state">
-            <Text style={styles.emptyIssueText}>{copy.emptyIssueTitle}</Text>
+            <Text variant="title" tone="secondary" theme={theme} style={styles.emptyIssueText}>
+              {copy.workspaceEmptyIssueTitle}
+            </Text>
           </View>
         )}
       </View>
 
       {isSelectionMode ? (
         <View style={styles.footerShell}>
-          <View style={styles.footerCard}>
+          <Card theme={theme} style={styles.footerCard}>
             <View style={styles.footerSummary}>
-              <Text style={styles.footerBody}>{footerSizeText}</Text>
+              <Text variant="caption" theme={theme} style={styles.footerBody}>{footerSizeText}</Text>
             </View>
 
             <View style={styles.footerActions}>
-              <TouchSurface
+              <Button
                 style={[styles.footerActionButton, styles.keepButton]}
-                pressedStyle={styles.keepButtonPressed}
                 onPress={onKeepSelected}
-                preset="pill"
+                variant="secondary"
+                theme={theme}
+                textStyle={[styles.footerActionText, styles.keepButtonText]}
                 testID="keep-selected-button"
               >
-                <Text style={[styles.footerActionText, styles.keepButtonText]}>{keepSelectedLabel}</Text>
-              </TouchSurface>
+                {keepSelectedLabel}
+              </Button>
 
-              <TouchSurface
+              <Button
                 style={[styles.footerActionButton, styles.cleanupButton]}
-                pressedStyle={styles.cleanupButtonPressed}
                 onPress={onCleanupSelected}
-                preset="pill"
+                variant="danger"
+                theme={theme}
+                textStyle={styles.footerActionText}
                 testID="cleanup-selected-button"
               >
-                <Text style={styles.footerActionText}>{cleanupSelectedLabel}</Text>
-              </TouchSurface>
+                {cleanupSelectedLabel}
+              </Button>
             </View>
-          </View>
+          </Card>
         </View>
       ) : null}
     </View>
@@ -265,7 +257,10 @@ function createWorkspaceStyles(theme: AppThemePalette, isCompact = false) {
     headerAction: {
       minHeight: 40,
       borderRadius: 20,
+      borderWidth: 0,
+      backgroundColor: 'transparent',
       paddingHorizontal: 6,
+      paddingVertical: 0,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -342,30 +337,26 @@ function createWorkspaceStyles(theme: AppThemePalette, isCompact = false) {
       flex: 1,
       minHeight: isCompact ? 38 : 44,
       borderRadius: isCompact ? 13 : 15,
+      borderWidth: 0,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: isCompact ? 10 : 14,
+      paddingVertical: 0,
     },
     footerActionText: {
-      color: '#ffffff',
+      color: theme.buttonPrimaryText,
       fontSize: isCompact ? 13 : 15,
       fontWeight: '800',
     },
     keepButton: {
       backgroundColor: theme.buttonSecondaryBackground,
     },
-    keepButtonPressed: {
-      backgroundColor: theme.cardMutedBorder,
-    },
     keepButtonText: {
       color: theme.buttonSecondaryText,
     },
     cleanupButton: {
       backgroundColor: theme.buttonDangerBackground,
-    },
-    cleanupButtonPressed: {
-      backgroundColor: theme.buttonDangerPressedBackground,
     },
   });
 }

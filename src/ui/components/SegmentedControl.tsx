@@ -1,12 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import type { AppThemePalette } from '../../theme/app-theme';
+import { COMPONENT_TOKENS } from '../../theme/generated/component-tokens.generated';
 import { AppIcon, type AppIconName } from '../icons/AppIcon';
-import { TouchSurface } from './TouchSurface';
+import { Text, TouchSurface } from '../primitives';
 
-const SIZE_LARGE = 16;
-const SIZE_DEFAULT = 14;
-const SIZE_SMALL = 12;
+export const SEGMENTED_CONTROL_STYLE_TOKENS = COMPONENT_TOKENS.segmentedControl;
 
 export interface SegmentedControlOption {
   value: string;
@@ -25,55 +24,67 @@ interface SegmentedControlProps {
 export function SegmentedControl({ options, selectedValue, onChange, theme }: SegmentedControlProps) {
   return (
     <View style={styles.container}>
-      {options.map((option) => (
-        <TouchSurface
-          key={option.value}
-          style={[
-            styles.button,
-            { backgroundColor: theme.cardMutedBackground, borderColor: theme.cardBorder },
-            selectedValue === option.value && styles.selectedButton,
-          ]}
-          onPress={() => onChange(option.value)}
-          preset="tab"
-        >
-          <View style={styles.buttonContent}>
-            {option.icon ? (
-              <AppIcon
-                name={option.icon}
-                size={SIZE_LARGE}
-                color={selectedValue === option.value ? '#ffffff' : theme.pageTextSecondary}
-                testID={`segmented-icon-${option.value}`}
-              />
-            ) : null}
-            <View style={styles.textGroup}>
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                style={[
-                  styles.label,
-                  { color: theme.pageTextSecondary },
-                  selectedValue === option.value && styles.selectedLabel,
-                  selectedValue === option.value && { color: '#ffffff' },
-                ]}
-              >
-                {option.label}
-              </Text>
-              {typeof option.count === 'number' ? (
-                <Text
-                  style={[
-                    styles.count,
-                    { color: theme.pageTextMuted },
-                    selectedValue === option.value && { color: 'rgba(255,255,255,0.88)' },
-                  ]}
-                  testID={`segmented-count-${option.value}`}
-                >
-                  {option.count}
-                </Text>
+      {options.map((option) => {
+        const selected = selectedValue === option.value;
+        const selectedColor = theme.buttonPrimaryText;
+
+        return (
+          <TouchSurface
+            key={option.value}
+            style={[
+              styles.button,
+              { backgroundColor: theme.cardMutedBackground, borderColor: theme.cardBorder },
+              selected && {
+                backgroundColor: theme.buttonPrimaryBackground,
+                borderColor: theme.buttonPrimaryBackground,
+              },
+            ]}
+            onPress={() => onChange(option.value)}
+            preset="tab"
+          >
+            <View style={styles.buttonContent}>
+              {option.icon ? (
+                <AppIcon
+                  name={option.icon}
+                  size={SEGMENTED_CONTROL_STYLE_TOKENS.size.icon}
+                  color={selected ? selectedColor : theme.pageTextSecondary}
+                  testID={`segmented-icon-${option.value}`}
+                />
               ) : null}
+              <View style={styles.textGroup}>
+                <Text
+                  variant="body"
+                  theme={theme}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  style={[
+                    styles.label,
+                    { color: theme.pageTextSecondary },
+                    selected && styles.selectedLabel,
+                    selected && { color: selectedColor },
+                  ]}
+                >
+                  {option.label}
+                </Text>
+                {typeof option.count === 'number' ? (
+                  <Text
+                    variant="label"
+                    theme={theme}
+                    style={[
+                      styles.count,
+                      { color: theme.pageTextMuted },
+                      selected && { color: SEGMENTED_CONTROL_STYLE_TOKENS.color.selectedCountText },
+                    ]}
+                    testID={`segmented-count-${option.value}`}
+                  >
+                    {option.count}
+                  </Text>
+                ) : null}
+              </View>
             </View>
-          </View>
-        </TouchSurface>
-      ))}
+          </TouchSurface>
+        );
+      })}
     </View>
   );
 }
@@ -81,44 +92,40 @@ export function SegmentedControl({ options, selectedValue, onChange, theme }: Se
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    gap: 6,
+    gap: SEGMENTED_CONTROL_STYLE_TOKENS.gap.container,
   },
   button: {
     flex: 1,
-    minHeight: 38,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    minHeight: SEGMENTED_CONTROL_STYLE_TOKENS.size.buttonMinHeight,
+    paddingHorizontal: SEGMENTED_CONTROL_STYLE_TOKENS.size.buttonPaddingHorizontal,
+    paddingVertical: SEGMENTED_CONTROL_STYLE_TOKENS.size.buttonPaddingVertical,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 18,
-    borderWidth: 1,
+    borderRadius: SEGMENTED_CONTROL_STYLE_TOKENS.radius.button,
+    borderWidth: SEGMENTED_CONTROL_STYLE_TOKENS.size.buttonBorderWidth,
   },
   buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: SEGMENTED_CONTROL_STYLE_TOKENS.gap.buttonContent,
   },
   textGroup: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 3,
-  },
-  selectedButton: {
-    backgroundColor: '#2f80ff',
-    borderColor: '#2f80ff',
+    gap: SEGMENTED_CONTROL_STYLE_TOKENS.gap.textGroup,
   },
   label: {
-    fontSize: SIZE_DEFAULT,
-    fontWeight: '700',
+    fontSize: SEGMENTED_CONTROL_STYLE_TOKENS.typography.labelFontSize,
+    fontWeight: SEGMENTED_CONTROL_STYLE_TOKENS.typography.labelFontWeight,
     textAlign: 'center',
   },
   selectedLabel: {
-    fontWeight: '800',
+    fontWeight: SEGMENTED_CONTROL_STYLE_TOKENS.typography.selectedLabelFontWeight,
   },
   count: {
-    fontSize: SIZE_SMALL,
-    fontWeight: '700',
+    fontSize: SEGMENTED_CONTROL_STYLE_TOKENS.typography.countFontSize,
+    fontWeight: SEGMENTED_CONTROL_STYLE_TOKENS.typography.countFontWeight,
     textAlign: 'center',
   },
 });

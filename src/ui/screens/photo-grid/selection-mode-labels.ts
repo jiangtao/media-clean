@@ -1,15 +1,13 @@
-export function buildSelectionToggleLabel(language: string, isAllSelected: boolean) {
-  if (language === 'en-US') {
-    return isAllSelected ? 'Deselect All' : 'Select All';
-  }
+import { normalizeAppLanguage } from '../../../i18n/app-language';
+import { getAppCopy } from '../../../i18n/app-copy';
 
-  return isAllSelected ? '全不选' : '全选';
+export function buildSelectionToggleLabel(language: string, isAllSelected: boolean) {
+  const copy = getAppCopy(normalizeAppLanguage(language)).screens.photoGrid;
+  return isAllSelected ? copy.selectionModeDeselectAll : copy.selectionModeSelectAll;
 }
 
 export function buildSelectionHeaderTitle(language: string, selectedCount: number) {
-  if (language === 'en-US') {
-    return `${selectedCount} selected`;
-  }
-
-  return `已选 ${selectedCount} 项`;
+  return getAppCopy(normalizeAppLanguage(language)).screens.photoGrid.selectionModeSelectedItems(
+    selectedCount,
+  );
 }

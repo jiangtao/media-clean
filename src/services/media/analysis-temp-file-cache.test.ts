@@ -7,7 +7,7 @@ const fileSystemApi = vi.hoisted(() => ({
   readDirectoryAsync: vi.fn(),
 }));
 
-vi.mock('expo-file-system/legacy', () => fileSystemApi);
+vi.mock('expo-file-system/src/legacy', () => fileSystemApi);
 
 import {
   clearGeneratedAnalysisFileCache,

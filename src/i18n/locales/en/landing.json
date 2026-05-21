@@ -1,0 +1,17 @@
+{
+  "statusTitleGranted": "Permission granted",
+  "statusBodyGranted": "Ready to scan the library",
+  "statusTitlePending": "Media permission required",
+  "statusBodyPending": "Grant access in the workspace to start scanning",
+  "heroTitle": "Local scan",
+  "heroBodyGranted": "Find duplicate, blurry, and similar items",
+  "heroBodyPending": "Open the workspace, grant access, then find duplicate, blurry, and similar items",
+  "actionReady": "Open workspace",
+  "actionPending": "Open and grant access",
+  "skeletonLabel": "Loading landing screen",
+  "featurePill": "Photos and videos will be included",
+  "localOnlyTitle": "Local analysis only, nothing is uploaded",
+  "localOnlyBody": "Every recognition and cleanup action stays on the device",
+  "mediaSupportTitle": "Supports both photos and videos",
+  "mediaSupportBody": "Broader coverage for duplicate, blurry, and similar items"
+}

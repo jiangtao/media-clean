@@ -1,13 +1,39 @@
 import { describe, expect, it, vi } from 'vitest';
 import React from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
 
-import { SegmentedControl } from '../SegmentedControl';
+import { getAppTheme } from '../../../theme/app-theme';
+import { SegmentedControl, SEGMENTED_CONTROL_STYLE_TOKENS } from '../SegmentedControl';
+
+vi.mock('react-native', () => ({
+  View: 'View',
+  Text: 'Text',
+  Pressable: 'Pressable',
+  StyleSheet: {
+    create: (styles: Record<string, unknown>) => styles,
+  },
+}));
 
 const FILTER_OPTIONS = [
   { value: 'all', label: '全部', count: 5 },
   { value: 'photo', label: '照片', count: 3 },
   { value: 'video', label: '视频', count: 2 },
 ];
+
+function flattenStyle(style: unknown): Record<string, unknown> {
+  if (Array.isArray(style)) {
+    return style.reduce<Record<string, unknown>>(
+      (merged, entry) => ({ ...merged, ...flattenStyle(entry) }),
+      {},
+    );
+  }
+
+  if (style && typeof style === 'object') {
+    return style as Record<string, unknown>;
+  }
+
+  return {};
+}
 
 describe('SegmentedControl', () => {
   describe('Segment display', () => {
@@ -195,25 +221,45 @@ describe('SegmentedControl', () => {
     });
 
     it('should have rounded corners', () => {
-      // Button has pill radius
-      const buttonStyle = { borderRadius: 18 };
-      expect(buttonStyle.borderRadius).toBe(18);
+      expect(SEGMENTED_CONTROL_STYLE_TOKENS.radius.button).toBe(18);
     });
 
     it('should have proper button padding', () => {
-      // Button has compact but tappable vertical padding
-      const buttonStyle = { paddingVertical: 6 };
-      expect(buttonStyle.paddingVertical).toBe(6);
+      expect(SEGMENTED_CONTROL_STYLE_TOKENS.size.buttonPaddingVertical).toBe(6);
     });
 
-    it('should keep the segmented hierarchy at 16/14/12', () => {
-      const iconSize = 16;
-      const labelFontSize = 14;
-      const countFontSize = 12;
+    it('should keep the segmented hierarchy at 16/14/12 through file-backed tokens', () => {
+      expect(SEGMENTED_CONTROL_STYLE_TOKENS.size.icon).toBe(16);
+      expect(SEGMENTED_CONTROL_STYLE_TOKENS.typography.labelFontSize).toBe(14);
+      expect(SEGMENTED_CONTROL_STYLE_TOKENS.typography.countFontSize).toBe(12);
+    });
 
-      expect(iconSize).toBe(16);
-      expect(labelFontSize).toBe(14);
-      expect(countFontSize).toBe(12);
+    it('maps the selected segment to app theme tokens while preserving compact text sizing', () => {
+      const theme = getAppTheme('light');
+      let renderer!: ReturnType<typeof TestRenderer.create>;
+
+      act(() => {
+        renderer = TestRenderer.create(
+          <SegmentedControl
+            options={FILTER_OPTIONS}
+            selectedValue="photo"
+            onChange={vi.fn()}
+            theme={theme}
+          />,
+        );
+      });
+
+      const segments = renderer.root.findAllByType('Pressable');
+      const labels = renderer.root.findAllByType('Text');
+      const selectedSegmentStyle = flattenStyle(segments[1].props.style);
+      const selectedLabelStyle = flattenStyle(labels[2].props.style);
+
+      expect(selectedSegmentStyle.backgroundColor).toBe(theme.buttonPrimaryBackground);
+      expect(selectedSegmentStyle.borderColor).toBe(theme.buttonPrimaryBackground);
+      expect(selectedLabelStyle.color).toBe(theme.buttonPrimaryText);
+      expect(selectedLabelStyle.fontSize).toBe(
+        SEGMENTED_CONTROL_STYLE_TOKENS.typography.labelFontSize,
+      );
     });
   });
 });

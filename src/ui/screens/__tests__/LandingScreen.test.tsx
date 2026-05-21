@@ -12,10 +12,37 @@ const runtime = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
+  Animated: {
+    View: 'Animated.View',
+    Value: class {
+      value: number;
+
+      constructor(value: number) {
+        this.value = value;
+      }
+
+      setValue(value: number) {
+        this.value = value;
+      }
+    },
+    loop: () => ({ start: vi.fn(), stop: vi.fn() }),
+    sequence: () => ({}),
+    timing: () => ({}),
+  },
+  Easing: {
+    ease: 'ease',
+    inOut: (value: unknown) => value,
+  },
   View: 'View',
   Text: 'Text',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  Dimensions: {
+    get: () => ({ width: 375, height: 812, scale: 3, fontScale: 1 }),
+    addEventListener: () => ({
+      remove: vi.fn(),
+    }),
+  },
   useWindowDimensions: () => ({ width: 375, height: 812, scale: 3, fontScale: 1 }),
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
@@ -47,6 +74,7 @@ vi.mock('../../../application/AppPreferencesContext', () => ({
       pageTextMuted: '#7c8595',
       buttonPrimaryBackground: '#173944',
       buttonPrimaryText: '#ffffff',
+      buttonSuccessBackground: '#18bf63',
       buttonSecondaryBackground: '#efe6d6',
       buttonSecondaryText: '#28404c',
       heroAccent: '#9ed3c7',
@@ -118,6 +146,30 @@ function flattenStyle(style: unknown): Record<string, unknown> {
   return {};
 }
 
+function findHostPressableByTestID(
+  renderer: ReturnType<typeof TestRenderer.create>,
+  testID: string,
+) {
+  return (
+    renderer.root
+      .findAllByProps({ testID })
+      .find((node: { type: unknown }) => node.type === 'Pressable') ??
+    renderer.root.findByProps({ testID })
+  );
+}
+
+function findHostViewByTestID(
+  renderer: ReturnType<typeof TestRenderer.create>,
+  testID: string,
+) {
+  return (
+    renderer.root
+      .findAllByProps({ testID })
+      .find((node: { type: unknown }) => node.type === 'View') ??
+    renderer.root.findByProps({ testID })
+  );
+}
+
 async function flushPromises() {
   await Promise.resolve();
   await Promise.resolve();
@@ -151,6 +203,7 @@ describe('LandingScreen', () => {
 
     const texts = collectTexts(renderer);
 
+    expect(renderer.root.findAllByProps({ testID: 'landing-skeleton' })).toHaveLength(0);
     expect(texts).toContain('授权已完成');
     expect(texts).toContain('可开始扫描相册');
     expect(texts).toContain('本地扫描');
@@ -175,7 +228,49 @@ describe('LandingScreen', () => {
     expect(statusCardStyle.shadowOpacity).toBe(0);
     expect(statusCardStyle.elevation).toBe(0);
     expect(renderer.root.findAllByProps({ testID: 'landing-feature-row' })).toHaveLength(2);
-    expect(renderer.root.findByProps({ testID: 'landing-primary-action' })).toBeTruthy();
+    const primaryActionStyle = flattenStyle(
+      findHostPressableByTestID(renderer, 'landing-primary-action').props.style,
+    );
+    expect(primaryActionStyle.backgroundColor).toBe('#173944');
+    expect(primaryActionStyle.borderRadius).toBe(999);
+  });
+
+  it('shows a module skeleton only while the initial media permission check is unresolved', async () => {
+    let resolvePermission!: (value: { granted: boolean }) => void;
+    runtime.getMediaLibraryPermissionsAsync.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePermission = resolve;
+      }),
+    );
+    let renderer!: ReturnType<typeof TestRenderer.create>;
+
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <LandingScreen
+          navigation={{
+            replace: runtime.replace,
+          }}
+        />,
+      );
+    });
+
+    expect(renderer.root.findByProps({ testID: 'landing-skeleton' })).toBeTruthy();
+    expect(renderer.root.findAllByProps({ testID: 'landing-screen' })).toHaveLength(0);
+    expect(findHostViewByTestID(renderer, 'landing-skeleton-status-title').props)
+      .toMatchObject({
+        accessibilityLabel: '正在加载首页',
+        accessibilityRole: 'progressbar',
+        accessibilityState: { busy: true },
+      });
+
+    await act(async () => {
+      resolvePermission({ granted: true });
+      await flushPromises();
+    });
+
+    expect(renderer.root.findAllByProps({ testID: 'landing-skeleton' })).toHaveLength(0);
+    expect(renderer.root.findByProps({ testID: 'landing-screen' })).toBeTruthy();
+    expect(collectTexts(renderer)).toContain('授权已完成');
   });
 
   it('persists workspace entry and replaces the landing page when the CTA is pressed', async () => {
@@ -230,6 +325,7 @@ describe('LandingScreen', () => {
       await renderer.root.findByProps({ testID: 'landing-primary-action' }).props.onPress();
     });
 
+    expect(renderer.root.findAllByProps({ testID: 'landing-skeleton' })).toHaveLength(0);
     expect(runtime.requestMediaLibraryPermissionsAsync).toHaveBeenCalledTimes(1);
     expect(runtime.saveHasEnteredWorkspace).toHaveBeenCalledWith(true);
     expect(runtime.replace).toHaveBeenCalledWith('Main', {

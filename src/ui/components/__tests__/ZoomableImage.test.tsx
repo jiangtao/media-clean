@@ -4,6 +4,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ZoomableImage } from '../ZoomableImage';
+import { MEDIA_VIEWER_STYLE_TOKENS } from '../media-viewer-tokens';
+import { COMPONENT_TOKENS } from '../../../theme/generated/component-tokens.generated';
 
 describe('ZoomableImage', () => {
   const defaultProps = {
@@ -29,6 +31,10 @@ describe('ZoomableImage', () => {
 
     return renderer;
   }
+
+  it('shares the generated media viewer token facade', () => {
+    expect(MEDIA_VIEWER_STYLE_TOKENS).toBe(COMPONENT_TOKENS.mediaViewer);
+  });
 
   it('should render without error', () => {
     const renderer = renderZoomableImage();
@@ -69,6 +75,23 @@ describe('ZoomableImage', () => {
       width: 500,
       height: 600,
       scale: 3,
+    });
+  });
+
+  it('rotates an explicitly oriented image inside the zoom frame', () => {
+    const renderer = renderZoomableImage({ width: 300, height: 400, orientation: 90 });
+    const image = renderer.root.findByProps({ testID: 'zoomable-image-content' });
+
+    expect(image.props.source).toMatchObject({
+      uri: 'test-image.jpg',
+      width: 400,
+      height: 300,
+      scale: 3,
+    });
+    expect(image.props.style).toMatchObject({
+      width: 400,
+      height: 300,
+      transform: [{ rotate: '90deg' }],
     });
   });
 

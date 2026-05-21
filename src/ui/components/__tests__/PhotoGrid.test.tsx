@@ -58,9 +58,10 @@ vi.mock('../../hooks/useSwipeSelection', () => ({
   useSwipeSelection: mockUseSwipeSelection,
 }));
 
-import { PhotoGrid } from '../PhotoGrid';
+import { PhotoGrid, PHOTO_GRID_STYLE_TOKENS } from '../PhotoGrid';
 import type { CleanupCandidate } from '../../../domain/recognition/types';
 import type { AppThemePalette } from '../../../theme/app-theme';
+import { COMPONENT_TOKENS } from '../../../theme/generated/component-tokens.generated';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -179,6 +180,10 @@ describe('PhotoGrid', () => {
       isSwiping: false,
       getItemAtPosition: vi.fn(),
     });
+  });
+
+  it('shares the generated photo grid token facade', () => {
+    expect(PHOTO_GRID_STYLE_TOKENS).toBe(COMPONENT_TOKENS.photoGrid);
   });
 
   describe('Scenario 2.2: Segmented control filtering', () => {
@@ -329,13 +334,19 @@ describe('PhotoGrid', () => {
 
       const icon = renderer.root.findByProps({ testID: 'video-indicator-icon' });
       expect(icon.props.name).toBe('video');
-      expect(icon.props.color).toBe('#ffffff');
-      expect(icon.props.width).toBe(15);
-      expect(icon.props.height).toBe(13.5);
+      expect(icon.props.color).toBe(PHOTO_GRID_STYLE_TOKENS.videoBadge.foreground);
+      expect(icon.props.width).toBe(PHOTO_GRID_STYLE_TOKENS.videoBadge.iconWidthCompact);
+      expect(icon.props.height).toBe(
+        PHOTO_GRID_STYLE_TOKENS.videoBadge.iconWidthCompact *
+          PHOTO_GRID_STYLE_TOKENS.videoBadge.iconHeightRatio,
+      );
       expect(icon.props.align).toBe('start');
       const svg = icon.findByType('Svg');
-      expect(svg.props.width).toBe(15);
-      expect(svg.props.height).toBe(13.5);
+      expect(svg.props.width).toBe(PHOTO_GRID_STYLE_TOKENS.videoBadge.iconWidthCompact);
+      expect(svg.props.height).toBe(
+        PHOTO_GRID_STYLE_TOKENS.videoBadge.iconWidthCompact *
+          PHOTO_GRID_STYLE_TOKENS.videoBadge.iconHeightRatio,
+      );
       expect(svg.props.viewBox).toBe('0.889 2 22.222 20');
     });
 
@@ -437,13 +448,13 @@ describe('PhotoGrid', () => {
 
       expect(checkmarkIcon).toBeTruthy();
       expect(flattenStyle(filledIndicator.props.style).backgroundColor).toBe(
-        '#2f80ff',
+        PHOTO_GRID_STYLE_TOKENS.selection.filledBackground,
       );
       expect(flattenStyle(filledIndicator.props.style)).toMatchObject({
-        width: 18,
-        height: 18,
-        top: 7,
-        right: 7,
+        width: PHOTO_GRID_STYLE_TOKENS.selection.sizeCompact,
+        height: PHOTO_GRID_STYLE_TOKENS.selection.sizeCompact,
+        top: PHOTO_GRID_STYLE_TOKENS.selection.offsetCompact,
+        right: PHOTO_GRID_STYLE_TOKENS.selection.offsetCompact,
       });
       expect(item.props.style.opacity).toBeUndefined();
     });
@@ -467,11 +478,11 @@ describe('PhotoGrid', () => {
       const emptyIndicator = renderer.root.findByProps({ testID: 'selection-indicator-empty' });
 
       expect(flattenStyle(emptyIndicator.props.style)).toMatchObject({
-        width: 18,
-        height: 18,
-        top: 7,
-        right: 7,
-        borderColor: 'rgba(255, 255, 255, 0.98)',
+        width: PHOTO_GRID_STYLE_TOKENS.selection.sizeCompact,
+        height: PHOTO_GRID_STYLE_TOKENS.selection.sizeCompact,
+        top: PHOTO_GRID_STYLE_TOKENS.selection.offsetCompact,
+        right: PHOTO_GRID_STYLE_TOKENS.selection.offsetCompact,
+        borderColor: PHOTO_GRID_STYLE_TOKENS.selection.borderColorCompact,
       });
       expect(renderer.root.findAllByProps({ testID: 'selection-checkmark-icon' })).toHaveLength(0);
     });
@@ -504,6 +515,63 @@ describe('PhotoGrid', () => {
       expect(image.props.allowDownscaling).toBe(true);
       expect(image.props.decodeFormat).toBe('rgb');
       expect(image.props.transition).toBe(0);
+    });
+
+    it('keeps a cached thumbnail visible on remount instead of replaying a blank load', () => {
+      let renderer!: ReturnType<typeof TestRenderer.create>;
+
+      act(() => {
+        renderer = TestRenderer.create(
+          <PhotoGrid
+            candidates={[createMockCandidate('cached', 'photo')]}
+            selectedIds={[]}
+            onSelect={vi.fn()}
+            onItemPress={vi.fn()}
+            theme={mockTheme}
+          />,
+        );
+      });
+
+      expect(renderer.root.findByType('Image').props.placeholder).toBeUndefined();
+
+      act(() => {
+        renderer.root.findByType('Image').props.onDisplay();
+      });
+
+      expect(renderer.root.findByType('Image').props.placeholder).toEqual({
+        uri: 'file:///asset-cached.jpg',
+        width: 109,
+        height: 109,
+        scale: 3,
+      });
+      expect(renderer.root.findByType('Image').props.recyclingKey).toBe('file:///asset-cached.jpg');
+    });
+
+    it('applies explicit orientation metadata to photo thumbnails', () => {
+      const rotatedCandidate = {
+        ...createMockCandidate('rotated', 'photo'),
+        asset: {
+          ...createMockCandidate('rotated', 'photo').asset,
+          orientation: 90,
+        },
+      };
+      let renderer!: ReturnType<typeof TestRenderer.create>;
+
+      act(() => {
+        renderer = TestRenderer.create(
+          <PhotoGrid
+            candidates={[rotatedCandidate]}
+            selectedIds={[]}
+            onSelect={vi.fn()}
+            onItemPress={vi.fn()}
+            theme={mockTheme}
+          />,
+        );
+      });
+
+      expect(flattenStyle(renderer.root.findByType('Image').props.style).transform).toEqual([
+        { rotate: '90deg' },
+      ]);
     });
 
     it('opens detail on tap when not in selection mode', () => {

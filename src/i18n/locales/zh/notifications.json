@@ -1,0 +1,14 @@
+{
+  "scanCompletion": {
+    "channelName": "扫描完成提醒",
+    "channelDescription": "在应用不处于前台时，提醒本地扫描已经完成。",
+    "title": "扫描完成",
+    "bodyWithResults": "已检查 {{scannedCount}} 个媒体，发现 {{resultCount}} 个待处理媒体。",
+    "bodyEmpty": "已检查 {{scannedCount}} 个媒体，当前这一批已处理完成。"
+  },
+  "androidBackgroundScan": {
+    "title": "扫描进行中",
+    "bodyWithFile": "已处理 {{progressLabel}}，当前：{{currentFileName}}",
+    "bodyWithoutFile": "已处理 {{progressLabel}}，离开应用后仍会继续扫描。"
+  }
+}

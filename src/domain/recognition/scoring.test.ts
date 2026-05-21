@@ -6,7 +6,10 @@ import {
   classifyAccidentalMedia,
   sortCandidatesByScore,
 } from './scoring';
+import { RECOGNITION_REASON } from './reasons';
 import type { MediaAssetSnapshot } from './types';
+
+const R = RECOGNITION_REASON;
 
 const baseAsset: MediaAssetSnapshot = {
   id: 'asset-1',
@@ -31,7 +34,7 @@ describe('classifyAccidentalMedia', () => {
     expect(result.confidence).toBe('high');
     expect(result.score).toBeGreaterThanOrEqual(80);
     expect(result.reasons).toEqual(
-      expect.arrayContaining(['画面明显过暗', '边缘信息很少', '文件尺寸较小']),
+      expect.arrayContaining([R.frameVeryDark, R.lowEdgeDetail, R.smallFile]),
     );
   });
 
@@ -55,7 +58,7 @@ describe('classifyAccidentalMedia', () => {
     expect(result.kind).toBe('accidental-photo');
     expect(result.confidence).not.toBe('low');
     expect(result.score).toBeGreaterThanOrEqual(55);
-    expect(result.reasons).toEqual(expect.arrayContaining(['边缘信息很少']));
+    expect(result.reasons).toEqual(expect.arrayContaining([R.lowEdgeDetail]));
   });
 
   it('marks a short dark video as a strong accidental candidate', () => {
@@ -79,7 +82,7 @@ describe('classifyAccidentalMedia', () => {
     expect(result.confidence).toBe('high');
     expect(result.score).toBeGreaterThanOrEqual(85);
     expect(result.reasons).toEqual(
-      expect.arrayContaining(['视频时长极短', '缩略图明显过暗']),
+      expect.arrayContaining([R.videoExtremelyShort, R.thumbnailVeryDark]),
     );
   });
 
@@ -120,7 +123,7 @@ describe('classifyAccidentalMedia', () => {
       },
     );
 
-    expect(result.reasons).not.toContain('文件尺寸较小');
+    expect(result.reasons).not.toContain(R.smallFile);
   });
 
   it('marks a moderately dim blurry photo as actionable even when it is not an extreme dark frame', () => {
@@ -143,7 +146,7 @@ describe('classifyAccidentalMedia', () => {
     expect(result.score).toBeGreaterThanOrEqual(55);
     expect(result.confidence).not.toBe('low');
     expect(result.reasons).toEqual(
-      expect.arrayContaining(['画面明显过暗', '边缘信息很少']),
+      expect.arrayContaining([R.frameVeryDark, R.lowEdgeDetail]),
     );
   });
 
@@ -157,7 +160,7 @@ describe('classifyAccidentalMedia', () => {
         kind: 'accidental-photo',
         primaryIssueType: 'accidental',
         issueTypes: ['accidental'],
-        reasons: ['画面明显过暗'],
+        reasons: [R.frameVeryDark],
       },
       {
         id: 'a',
@@ -167,7 +170,7 @@ describe('classifyAccidentalMedia', () => {
         kind: 'accidental-video',
         primaryIssueType: 'accidental',
         issueTypes: ['accidental'],
-        reasons: ['视频时长极短'],
+        reasons: [R.videoExtremelyShort],
       },
       {
         id: 'c',
@@ -177,7 +180,7 @@ describe('classifyAccidentalMedia', () => {
         kind: 'accidental-photo',
         primaryIssueType: 'accidental',
         issueTypes: ['accidental'],
-        reasons: ['文件尺寸较小'],
+        reasons: [R.smallFile],
       },
     ]);
 
@@ -211,7 +214,7 @@ describe('classifyAbnormalMedia', () => {
     expect(result.confidence).toBe('high');
     expect(result.score).toBeGreaterThanOrEqual(80);
     expect(result.reasons).toEqual(
-      expect.arrayContaining(['媒体时长异常短', '缩略图接近全黑']),
+      expect.arrayContaining([R.mediaDurationTooShort, R.thumbnailNearlyBlack]),
     );
   });
 
@@ -236,7 +239,7 @@ describe('classifyAbnormalMedia', () => {
     expect(result.primaryIssueType).toBe('abnormal');
     expect(result.confidence).not.toBe('low');
     expect(result.score).toBeGreaterThanOrEqual(55);
-    expect(result.reasons).toEqual(expect.arrayContaining(['几乎没有可见内容']));
+    expect(result.reasons).toEqual(expect.arrayContaining([R.noVisibleContent]));
   });
 });
 
@@ -265,7 +268,7 @@ describe('buildCleanupCandidates', () => {
     expect(result[0]?.id).toBe('flat-photo');
     expect(result[0]?.score).toBeGreaterThanOrEqual(55);
     expect(result[0]?.reasons).toEqual(
-      expect.arrayContaining(['几乎没有可见内容']),
+      expect.arrayContaining([R.noVisibleContent]),
     );
   });
 
@@ -296,7 +299,11 @@ describe('buildCleanupCandidates', () => {
     expect(result[0]?.issueTypes).toContain('abnormal');
     expect(result[0]?.score).toBeGreaterThanOrEqual(80);
     expect(result[0]?.reasons).toEqual(
-      expect.arrayContaining(['媒体内容分析失败', '媒体文件为空', '媒体元数据异常']),
+      expect.arrayContaining([
+        R.mediaAnalysisFailed,
+        R.emptyMediaFile,
+        R.invalidMediaMetadata,
+      ]),
     );
   });
 

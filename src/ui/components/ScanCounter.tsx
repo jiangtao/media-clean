@@ -1,6 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+
+import { getAppCopy } from '../../i18n/app-copy';
 import type { AppThemePalette } from '../../theme/app-theme';
+import { COMPONENT_TOKENS } from '../../theme/generated/component-tokens.generated';
+import { Text } from '../primitives';
+
+export const SCAN_COUNTER_STYLE_TOKENS = COMPONENT_TOKENS.scanCounter;
 
 interface ScanCounterProps {
   current: number;
@@ -142,15 +148,22 @@ export function ScanCounter({
   }, [counter.cleanup]);
 
   const styles = createStyles(theme);
+  const copy = getAppCopy(locale).components.scanCounter;
 
   const isComplete = current >= total;
   const statusText = isComplete
-    ? locale === 'zh-CN' ? '识别完成' : 'Scan Complete'
-    : locale === 'zh-CN' ? `识别中... ${counter.getCounterText()}` : `Scanning... ${counter.getCounterText()}`;
+    ? copy.complete
+    : copy.scanning(counter.getCounterText());
 
   return (
     <View style={styles.container} testID="scan-counter">
-      <Text style={styles.statusText}>{statusText}</Text>
+      <Text
+        variant="body"
+        theme={theme}
+        style={styles.statusText}
+      >
+        {statusText}
+      </Text>
     </View>
   );
 }
@@ -162,8 +175,8 @@ function createStyles(theme: AppThemePalette) {
       justifyContent: 'center',
     },
     statusText: {
-      fontSize: 18,
-      fontWeight: '500',
+      fontSize: SCAN_COUNTER_STYLE_TOKENS.typography.statusSize,
+      fontWeight: SCAN_COUNTER_STYLE_TOKENS.typography.statusWeight,
       color: theme.pageTextPrimary,
     },
   });

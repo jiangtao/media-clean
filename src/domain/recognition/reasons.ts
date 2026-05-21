@@ -1,0 +1,31 @@
+export const RECOGNITION_REASON = {
+  frameVeryDark: 'frame-very-dark',
+  lowEdgeDetail: 'low-edge-detail',
+  smallFile: 'small-file',
+  lowResolution: 'low-resolution',
+  videoExtremelyShort: 'video-extremely-short',
+  videoShort: 'video-short',
+  thumbnailVeryDark: 'thumbnail-very-dark',
+  thumbnailLowEdgeDetail: 'thumbnail-low-edge-detail',
+  smallVideoFile: 'small-video-file',
+  mediaAnalysisFailed: 'media-analysis-failed',
+  emptyMediaFile: 'empty-media-file',
+  invalidMediaMetadata: 'invalid-media-metadata',
+  frameNearlyBlack: 'frame-nearly-black',
+  noVisibleContent: 'no-visible-content',
+  flatFrameComposition: 'flat-frame-composition',
+  tinyMediaFile: 'tiny-media-file',
+  veryLowResolution: 'very-low-resolution',
+  unusualAspectRatio: 'unusual-aspect-ratio',
+  mediaDurationTooShort: 'media-duration-too-short',
+  thumbnailNearlyBlack: 'thumbnail-nearly-black',
+  thumbnailNoVisibleContent: 'thumbnail-no-visible-content',
+  flatThumbnailComposition: 'flat-thumbnail-composition',
+  tinyVideoFile: 'tiny-video-file',
+  highlySimilar: 'highly-similar',
+  contentSimilar: 'content-similar',
+  higherQualityCopyKept: 'higher-quality-copy-kept',
+} as const;
+
+export type RecognitionReasonCode =
+  (typeof RECOGNITION_REASON)[keyof typeof RECOGNITION_REASON];

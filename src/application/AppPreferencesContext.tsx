@@ -32,7 +32,7 @@ import {
   type AppThemeScheme,
 } from '../theme/app-theme';
 
-interface AppPreferencesContextValue {
+export interface AppPreferencesSnapshot {
   isReady: boolean;
   language: AppLanguage;
   languagePreference: AppLanguagePreference;
@@ -44,13 +44,13 @@ interface AppPreferencesContextValue {
   setThemePreference: (preference: AppThemePreference) => Promise<void>;
 }
 
-const AppPreferencesContext = createContext<AppPreferencesContextValue | null>(null);
+const AppPreferencesContext = createContext<AppPreferencesSnapshot | null>(null);
 
 interface AppPreferencesProviderProps {
   children: React.ReactNode;
 }
 
-export function AppPreferencesProvider({ children }: AppPreferencesProviderProps) {
+export function useManagedAppPreferencesState(): AppPreferencesSnapshot {
   const systemTheme = useColorScheme();
   const [isReady, setIsReady] = useState(false);
   const [language, setLanguageState] = useState<AppLanguage>(detectPreferredAppLanguage);
@@ -161,7 +161,7 @@ export function AppPreferencesProvider({ children }: AppPreferencesProviderProps
   const theme = useMemo(() => getAppTheme(resolvedThemeScheme), [resolvedThemeScheme]);
   const copy = useMemo(() => getAppCopy(language), [language]);
 
-  const value = useMemo<AppPreferencesContextValue>(
+  return useMemo<AppPreferencesSnapshot>(
     () => ({
       isReady,
       language,
@@ -185,11 +185,15 @@ export function AppPreferencesProvider({ children }: AppPreferencesProviderProps
       themePreference,
     ],
   );
+}
+
+export function AppPreferencesProvider({ children }: AppPreferencesProviderProps) {
+  const value = useManagedAppPreferencesState();
 
   return <AppPreferencesContext.Provider value={value}>{children}</AppPreferencesContext.Provider>;
 }
 
-export function useAppPreferences(): AppPreferencesContextValue {
+export function useAppPreferences(): AppPreferencesSnapshot {
   const context = useContext(AppPreferencesContext);
 
   if (!context) {

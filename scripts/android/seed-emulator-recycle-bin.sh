@@ -14,7 +14,7 @@ RK_REMOTE_TMP_PATH="/data/local/tmp/RKStorage"
 MEDIASTORE_DUMP_PATH="${TMP_DIR}/mediastore-recycle-seed.txt"
 
 SERIAL="${ANDROID_SERIAL:-}"
-APP_ID="com.jt.mistapmediacleaner"
+APP_ID="${ANDROID_APP_ID:-com.jt.mistapmediacleaner}"
 APP_DATA_DIR="/data/user/0/${APP_ID}"
 TARGET_ASSET_ID="${TARGET_ASSET_ID:-}"
 TARGET_BUCKET_NAME="${TARGET_BUCKET_NAME:-MediaCleanSeed}"
@@ -488,7 +488,7 @@ adb -s "${SERIAL}" push "${DB_LOCAL_PATH}" "${DB_REMOTE_TMP_PATH}" >/dev/null
 adb -s "${SERIAL}" shell "run-as ${APP_ID} sh -c 'mkdir -p files/SQLite && cat ${DB_REMOTE_TMP_PATH} > files/SQLite/app-cleaner-operational.db'" >/dev/null
 adb -s "${SERIAL}" exec-out run-as "${APP_ID}" cat "${APP_DATA_DIR}/files/SQLite/app-cleaner-operational.db" > "${DB_VERIFY_PATH}"
 adb -s "${SERIAL}" push "${RK_LOCAL_PATH}" "${RK_REMOTE_TMP_PATH}" >/dev/null
-adb -s "${SERIAL}" shell "run-as com.jt.mistapmediacleaner sh -c 'mkdir -p databases'" >/dev/null
+adb -s "${SERIAL}" shell "run-as ${APP_ID} sh -c 'mkdir -p databases'" >/dev/null
 adb -s "${SERIAL}" shell "run-as ${APP_ID} sh -c 'cat ${RK_REMOTE_TMP_PATH} > databases/RKStorage'" >/dev/null
 adb -s "${SERIAL}" exec-out run-as "${APP_ID}" cat "${APP_DATA_DIR}/databases/RKStorage" > "${RK_VERIFY_PATH}"
 

@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CleanupCandidate } from '../../../domain/recognition/types';
 import { getAppTheme } from '../../../theme/app-theme';
-import { DuplicateCarousel } from '../DuplicateCarousel';
+import { COMPONENT_TOKENS } from '../../../theme/generated/component-tokens.generated';
+import { DuplicateCarousel, DUPLICATE_CAROUSEL_STYLE_TOKENS } from '../DuplicateCarousel';
 
 const imageLifecycle = vi.hoisted(() => ({
   mounts: new Map<string, number>(),
@@ -250,6 +251,10 @@ describe('DuplicateCarousel', () => {
     videoLifecycle.nextInstanceId = 0;
   });
 
+  it('shares the generated duplicate carousel token facade', () => {
+    expect(DUPLICATE_CAROUSEL_STYLE_TOKENS).toBe(COMPONENT_TOKENS.duplicateCarousel);
+  });
+
   it('renders a full-stage high-fidelity image viewer for duplicate items', () => {
     const { renderer } = renderCarousel();
 
@@ -261,18 +266,61 @@ describe('DuplicateCarousel', () => {
       uri: 'file:///duplicate-item.jpg',
       scale: 3,
     });
-    expect(stageImage.props.source.width).toBeGreaterThan(300);
+    expect(stageImage.props.source.width).toBe(390);
     expect(stageImage.props.source.height).toBeGreaterThan(450);
     expect(stageImage.props.cachePolicy).toBe('memory-disk');
     expect(stageImage.props.priority).toBe('high');
     expect(stageImage.props.allowDownscaling).toBe(true);
   });
 
+  it('uses a full-width paging interval so the edge page cannot expose a second image', () => {
+    const { renderer } = renderCarousel();
+    const stageScroll = renderer.root.findByProps({ testID: 'duplicate-stage-scroll' });
+
+    expect(stageScroll.props.pagingEnabled).toBe(true);
+    expect(stageScroll.props.snapToInterval).toBe(390);
+    expect(stageScroll.props.disableIntervalMomentum).toBe(true);
+    expect(stageScroll.props.bounces).toBe(false);
+    expect(stageScroll.props.overScrollMode).toBe('never');
+  });
+
+  it('rotates media with explicit orientation metadata while keeping the slide centered', () => {
+    const rotatedCandidate: CleanupCandidate = {
+      ...duplicateCandidate,
+      id: 'rotated-item',
+      asset: {
+        ...duplicateCandidate.asset,
+        id: 'rotated-item',
+        uri: 'file:///rotated-item.jpg',
+        width: 3024,
+        height: 4032,
+        orientation: 90,
+      },
+    };
+    const { renderer } = renderCarousel({
+      candidate: rotatedCandidate,
+      duplicateCandidates: [rotatedCandidate],
+    });
+    const image = renderer.root
+      .findByProps({ testID: 'duplicate-stage-media-rotated-item' })
+      .findByProps({ testID: 'zoomable-image-content' });
+    const imageStyle = flattenStyle(image.props.style);
+
+    expect(image.props.source).toMatchObject({
+      uri: 'file:///rotated-item.jpg',
+      width: Math.round(390 * DUPLICATE_CAROUSEL_STYLE_TOKENS.defaultStage.heightRatio),
+      height: 390,
+    });
+    expect(imageStyle.width).toBe(Math.round(390 * DUPLICATE_CAROUSEL_STYLE_TOKENS.defaultStage.heightRatio));
+    expect(imageStyle.height).toBe(390);
+    expect(imageStyle.transform).toEqual([{ rotate: '90deg' }]);
+  });
+
   it('moves left and right between duplicate candidates and reports the focused id', () => {
     const { renderer, onActiveIdChange } = renderCarousel();
-    const nextNavStyle = flattenStyle(
-      renderer.root.findByProps({ testID: 'duplicate-nav-next' }).props.style,
-    );
+    const nextNav = renderer.root.findByProps({ testID: 'duplicate-nav-next' });
+    const nextNavSize = nextNav.props.size;
+    const nextNavStyle = flattenStyle(nextNav.props.style);
 
     expect(renderer.root.findAllByProps({ testID: 'duplicate-nav-prev' })).toHaveLength(0);
 
@@ -280,8 +328,8 @@ describe('DuplicateCarousel', () => {
       renderer.root.findByProps({ testID: 'duplicate-nav-next' }).props.onPress();
     });
 
-    expect(nextNavStyle.width).toBe(46);
-    expect(nextNavStyle.height).toBe(46);
+    expect(nextNavSize).toBe(DUPLICATE_CAROUSEL_STYLE_TOKENS.nav.buttonSize);
+    expect(nextNavStyle.backgroundColor).toBe(DUPLICATE_CAROUSEL_STYLE_TOKENS.nav.background);
     expect(onActiveIdChange).toHaveBeenCalledWith('duplicate-item-2');
     expect(renderer.root.findAllByProps({ testID: 'duplicate-nav-next' })).toHaveLength(0);
     expect(renderer.root.findByProps({ testID: 'duplicate-nav-prev' })).toBeTruthy();

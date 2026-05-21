@@ -1,0 +1,140 @@
+{
+  "languageLabel": "语言",
+  "languageOptions": [
+    {
+      "value": "zh-CN",
+      "label": "简体中文"
+    },
+    {
+      "value": "en-US",
+      "label": "English"
+    }
+  ],
+  "appearance": {
+    "title": "显示主题",
+    "system": "跟随系统",
+    "light": "浅色",
+    "dark": "深色"
+  },
+  "common": {
+    "cancel": "取消",
+    "close": "关闭",
+    "deleteConfirm": "确认删除",
+    "unknownSize": "未知大小",
+    "neverScanned": "尚未扫描",
+    "notScheduled": "未排程",
+    "statusTitle": "当前状态"
+  },
+  "appErrorBoundary": {
+    "title": "应用遇到渲染错误",
+    "body": "当前版本未接入远程监控。请重试，或稍后重新打开应用。",
+    "retry": "重试"
+  },
+  "skeleton": {
+    "loadingLabel": "正在加载内容"
+  },
+  "hero": {
+    "kicker": "跨端本地清理",
+    "title": "相册清理建议",
+    "description": "本地分批扫描整个相册，识别重复、模糊与相似照片，并通过应用内回收站做安全清理。",
+    "lastScan": "上次扫描",
+    "autoCleanupHint": "自动清理只会软删除，高风险操作始终二次确认。"
+  },
+  "summary": {
+    "scannedLabel": "本次扫描",
+    "scannedCaption": "最近媒体总数",
+    "candidatesLabel": "识别结果",
+    "candidatesCaption": "待人工确认处理",
+    "blurryLabel": "模糊照片",
+    "duplicateLabel": "重复照片",
+    "similarLabel": "相似照片",
+    "suggestedCleanupLabel": "建议清理",
+    "suggestedCleanupCaption": "优先复核处理",
+    "recycleLabel": "保留和清理",
+    "recycleCaption": "最终决策区"
+  },
+  "controls": {
+    "rescan": "重新扫描",
+    "scanning": "扫描中...",
+    "autoCleanup": "自动清理"
+  },
+  "info": {
+    "title": "首版识别说明",
+    "firstLine": "当前默认扫描整个相册，并额外保留应用内回收站中的已软删除条目。识别完全在本地完成：模糊与相似内容依赖本地启发式评分，重复内容依赖图片缩略图指纹，以及视频按时长自适应采样的多帧缩略图与元数据近似分组。扫描过程会分批推进，以控制内存占用与机身发热。",
+    "secondLine": "回收站是应用内软删除，不等同于系统回收站；卸载应用或清空本地存储后，软删除记录可能失效。"
+  },
+  "reminder": {
+    "title": "定期清理准备",
+    "genericTitle": "定期清理提醒",
+    "defaultSummary": "定期检查最近拍摄的照片和视频，优先清理重复、模糊与相似内容。",
+    "disabledSummary": "未开启定期清理提醒",
+    "weekly": "每周",
+    "daily": "每天",
+    "weekdays": [
+      "周一",
+      "周二",
+      "周三",
+      "周四",
+      "周五",
+      "周六",
+      "周日"
+    ],
+    "weekdayShorts": [
+      "一",
+      "二",
+      "三",
+      "四",
+      "五",
+      "六",
+      "日"
+    ],
+    "themePreview": "通知主题",
+    "frequencyLabel": "提醒频率",
+    "weekdayLabel": "提醒星期",
+    "timeLabel": "提醒时间",
+    "hourMinus": "小时 -1",
+    "hourPlus": "小时 +1",
+    "minuteMinus": "分钟 -15",
+    "minutePlus": "分钟 +15",
+    "themePlaceholder": "提醒主题",
+    "saveTheme": "保存提醒主题",
+    "footnote": "系统通知只负责提醒重新打开应用，不会在后台偷偷扫描你的照片或视频。",
+    "permissionLabel": "通知权限",
+    "permissionOn": "已开启",
+    "permissionOff": "未开启",
+    "scheduled": "已排程",
+    "pending": "待排程",
+    "disabled": "未开启",
+    "unauthorized": "未授权",
+    "channelName": "定期清理提醒",
+    "channelDescription": "提醒你重新扫描最近媒体并清理重复、模糊与相似内容。",
+    "nextReminder": "下次提醒",
+    "estimatedReminder": "预计下次提醒",
+    "plannedReminder": "计划提醒时间",
+    "noScanSummary": "还没有最近扫描记录，先打开应用完成一次本地扫描，再开始定期清理。",
+    "noScanDetail": "建议把扫描和提醒都保留在本地，避免把照片与视频上传到云端。",
+    "eligibilityHint": "仅当最近 {{months}} 个月内有新增媒体时才触发提醒。",
+    "scheduleDaily": "{{daily}} {{time}} 提醒你检查识别结果",
+    "scheduleWeekly": "{{weekly}}{{weekdayShort}} {{time}} 提醒你检查识别结果",
+    "recentScanFoundSummary": "最近一次扫描发现 {{candidateCount}} 个待处理识别结果，建议在 {{time}} 再检查一次。",
+    "recentScanEmptySummary": "最近一次扫描没有发现明显待处理项，建议在 {{time}} 再确认一下相册。",
+    "recentScanDetail": "本次扫描共检查 {{scannedCount}} 项媒体，其中 {{highConfidenceCount}} 项建议清理、{{mediumConfidenceCount}} 项建议复核，保留和清理页里还有 {{recycleBinCount}} 项待处理。"
+  },
+  "permission": {
+    "title": "需要媒体权限",
+    "body": "首版会读取照片和视频元数据，并在本地生成缩略图做轻量分析；不会上传到云端。",
+    "action": "授权并开始扫描"
+  },
+  "tabs": {
+    "suggestions": "识别结果",
+    "recycle": "回收站",
+    "photos": "照片",
+    "settings": "设置"
+  },
+  "splash": {
+    "brand": "Media Clean",
+    "title": "智能相册 管理工具",
+    "subtitle": "智能识别重复、模糊与相似内容",
+    "body": "本地扫描、识别重复、模糊与相似内容"
+  }
+}

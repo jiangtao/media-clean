@@ -1,3 +1,5 @@
+import { GENERATED_APP_THEMES } from './generated/app-theme.generated';
+
 export const APP_THEME_PREFERENCES = ['system', 'light', 'dark'] as const;
 
 export type AppThemePreference = (typeof APP_THEME_PREFERENCES)[number];
@@ -58,116 +60,6 @@ export interface AppThemePalette {
   previewBackground: string;
 }
 
-const LIGHT_THEME: AppThemePalette = {
-  scheme: 'light',
-  statusBarStyle: 'dark',
-  safeArea: '#f5f7fb',
-  orbTop: '#e9f0ff',
-  orbBottom: '#f9fbff',
-  heroBackground: '#ffffff',
-  heroSurface: '#f3f7ff',
-  heroAccent: '#dce8ff',
-  heroTitle: '#17213a',
-  heroText: '#6d7891',
-  heroHint: '#8490a7',
-  pageTextPrimary: '#17213a',
-  pageTextSecondary: '#6d7891',
-  pageTextMuted: '#8792a8',
-  cardBackground: '#ffffff',
-  cardBorder: '#e7edf7',
-  cardMutedBackground: '#f2f5fb',
-  cardMutedBorder: '#e2e8f3',
-  infoBackground: '#eef5ff',
-  infoBorder: '#d9e7ff',
-  noticeBackground: '#fff4e7',
-  noticeBorder: '#ffd8ad',
-  noticeTitle: '#8b4e12',
-  noticeText: '#9d5c1a',
-  inputBackground: '#f6f8fc',
-  inputBorder: '#dfe6f1',
-  inputText: '#17213a',
-  buttonPrimaryBackground: '#2f80ff',
-  buttonPrimaryText: '#ffffff',
-  buttonSuccessBackground: '#2fba88',
-  buttonSuccessPressedBackground: '#279f74',
-  buttonSecondaryBackground: '#ffffff',
-  buttonSecondaryText: '#2f80ff',
-  buttonTertiaryBackground: '#eef4ff',
-  buttonTertiaryText: '#17213a',
-  buttonDangerBackground: '#ff2f3a',
-  buttonDangerPressedBackground: '#dd2934',
-  buttonDangerText: '#ffffff',
-  chipBackground: '#f3f6fb',
-  chipBorder: '#e3eaf5',
-  chipText: '#73809a',
-  chipActiveBackground: '#e5edff',
-  chipActiveText: '#4f7cff',
-  tabBackground: '#ffffff',
-  tabText: '#828b9f',
-  tabActiveBackground: '#2f80ff',
-  tabActiveText: '#2f80ff',
-  actionBarBackground: '#ffffff',
-  actionBarText: '#17213a',
-  shadowColor: '#0f172a',
-  thumbnailBackground: '#dfe6f1',
-  previewBackground: '#141c28',
-};
-
-const DARK_THEME: AppThemePalette = {
-  scheme: 'dark',
-  statusBarStyle: 'light',
-  safeArea: '#0a1020',
-  orbTop: '#101a31',
-  orbBottom: '#0a1020',
-  heroBackground: '#151d2e',
-  heroSurface: '#1b263b',
-  heroAccent: '#233a72',
-  heroTitle: '#f2f5ff',
-  heroText: '#b4bed2',
-  heroHint: '#8d98ad',
-  pageTextPrimary: '#f2f5ff',
-  pageTextSecondary: '#aab6ce',
-  pageTextMuted: '#7f8aa0',
-  cardBackground: '#151d2e',
-  cardBorder: '#26324a',
-  cardMutedBackground: '#0f1728',
-  cardMutedBorder: '#26324a',
-  infoBackground: '#111d35',
-  infoBorder: '#243b70',
-  noticeBackground: '#302417',
-  noticeBorder: '#6b4a1f',
-  noticeTitle: '#ffd59d',
-  noticeText: '#f2bd7d',
-  inputBackground: '#0f1728',
-  inputBorder: '#283653',
-  inputText: '#f2f5ff',
-  buttonPrimaryBackground: '#4f7cff',
-  buttonPrimaryText: '#ffffff',
-  buttonSuccessBackground: '#32c38b',
-  buttonSuccessPressedBackground: '#24a874',
-  buttonSecondaryBackground: '#0f1728',
-  buttonSecondaryText: '#5c83ff',
-  buttonTertiaryBackground: '#1d2940',
-  buttonTertiaryText: '#e6ecf7',
-  buttonDangerBackground: '#dd3038',
-  buttonDangerPressedBackground: '#bf2931',
-  buttonDangerText: '#fff7f1',
-  chipBackground: '#0f1728',
-  chipBorder: '#26324a',
-  chipText: '#aab6ce',
-  chipActiveBackground: '#223a78',
-  chipActiveText: '#7fa0ff',
-  tabBackground: '#121a29',
-  tabText: '#7f8aa0',
-  tabActiveBackground: '#4f7cff',
-  tabActiveText: '#5c83ff',
-  actionBarBackground: '#121a29',
-  actionBarText: '#f2f5ff',
-  shadowColor: '#000000',
-  thumbnailBackground: '#222d42',
-  previewBackground: '#05080d',
-};
-
 export function normalizeThemePreference(input?: string | null): AppThemePreference {
   if (input === 'light' || input === 'dark') {
     return input;
@@ -188,5 +80,5 @@ export function resolveThemeScheme(
 }
 
 export function getAppTheme(scheme: AppThemeScheme): AppThemePalette {
-  return scheme === 'dark' ? DARK_THEME : LIGHT_THEME;
+  return GENERATED_APP_THEMES[scheme];
 }

@@ -9,8 +9,16 @@ const runtime = vi.hoisted(() => ({
     navigate: vi.fn(),
   },
   loadHasEnteredWorkspace: vi.fn(),
+  hydrateStartupPhotoScanState: vi.fn(),
+  preventAutoHideAsync: vi.fn(),
+  hideAsync: vi.fn(),
   landingRenderCount: 0,
   mainRenderCount: 0,
+}));
+
+vi.mock('expo-splash-screen', () => ({
+  preventAutoHideAsync: () => runtime.preventAutoHideAsync(),
+  hideAsync: () => runtime.hideAsync(),
 }));
 
 vi.mock('@react-navigation/native-stack', () => ({
@@ -51,10 +59,41 @@ vi.mock('@react-navigation/native-stack', () => ({
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  Animated: {
+    View: 'AnimatedView',
+    Value: class AnimatedValue {
+      value: number;
+
+      constructor(initialValue: number) {
+        this.value = initialValue;
+      }
+
+      setValue(nextValue: number) {
+        this.value = nextValue;
+      }
+    },
+    timing: (value: { setValue?: (next: number) => void }, config: { toValue: number }) => ({
+      start: () => value.setValue?.(config.toValue),
+      stop: () => undefined,
+    }),
+    sequence: (animations: Array<{ start?: () => void; stop?: () => void }>) => ({
+      start: () => animations.forEach((animation) => animation.start?.()),
+      stop: () => animations.forEach((animation) => animation.stop?.()),
+    }),
+    loop: (animation: { start?: () => void; stop?: () => void }) => ({
+      start: () => animation.start?.(),
+      stop: () => animation.stop?.(),
+    }),
+  },
+  Easing: {
+    ease: (value: number) => value,
+    inOut: <T,>(value: T) => value,
+  },
   View: 'View',
   Text: 'Text',
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
+    absoluteFill: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   },
 }));
 
@@ -92,7 +131,11 @@ vi.mock('../../ui/screens/SettingsScreen', () => ({
 
 vi.mock('../../application/AppPreferencesContext', () => ({
   useAppPreferences: () => ({
+    language: 'zh-CN',
     copy: {
+      skeleton: {
+        loadingLabel: '正在加载内容',
+      },
       tabs: {
         photos: '照片',
         recycle: '回收站',
@@ -127,6 +170,10 @@ vi.mock('../../services/storage/workspace-entry-storage', () => ({
   loadHasEnteredWorkspace: () => runtime.loadHasEnteredWorkspace(),
 }));
 
+vi.mock('../startup-photo-scan-state', () => ({
+  hydrateStartupPhotoScanState: () => runtime.hydrateStartupPhotoScanState(),
+}));
+
 import { RootNavigator } from '../RootNavigator';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -149,6 +196,12 @@ describe('RootNavigator', () => {
     runtime.navigation.replace.mockReset();
     runtime.navigation.navigate.mockReset();
     runtime.loadHasEnteredWorkspace.mockReset();
+    runtime.hydrateStartupPhotoScanState.mockReset();
+    runtime.hydrateStartupPhotoScanState.mockResolvedValue(undefined);
+    runtime.preventAutoHideAsync.mockReset();
+    runtime.preventAutoHideAsync.mockResolvedValue(undefined);
+    runtime.hideAsync.mockReset();
+    runtime.hideAsync.mockResolvedValue(undefined);
     runtime.landingRenderCount = 0;
     runtime.mainRenderCount = 0;
     consoleWarnSpy.mockClear();
@@ -162,6 +215,8 @@ describe('RootNavigator', () => {
     expect(runtime.initialRouteName).toBe('Landing');
     expect(renderer.root.findByProps({ testID: 'mock-landing-screen' })).toBeTruthy();
     expect(renderer.root.findAllByProps({ testID: 'mock-main-tab-navigator' })).toHaveLength(0);
+    expect(runtime.hydrateStartupPhotoScanState).not.toHaveBeenCalled();
+    expect(runtime.hideAsync).toHaveBeenCalledTimes(1);
     expect(runtime.landingRenderCount).toBeGreaterThanOrEqual(1);
     expect(runtime.mainRenderCount).toBe(0);
   });
@@ -174,6 +229,8 @@ describe('RootNavigator', () => {
     expect(runtime.initialRouteName).toBe('Main');
     expect(renderer.root.findByProps({ testID: 'mock-main-tab-navigator' })).toBeTruthy();
     expect(renderer.root.findAllByProps({ testID: 'mock-landing-screen' })).toHaveLength(0);
+    expect(runtime.hydrateStartupPhotoScanState).toHaveBeenCalledTimes(1);
+    expect(runtime.hideAsync).toHaveBeenCalledTimes(1);
     expect(runtime.landingRenderCount).toBe(0);
     expect(runtime.mainRenderCount).toBe(1);
   });
@@ -191,11 +248,12 @@ describe('RootNavigator', () => {
       'Failed to load workspace entry state, fallback to Landing.',
       loadError,
     );
+    expect(runtime.hideAsync).toHaveBeenCalledTimes(1);
     expect(runtime.landingRenderCount).toBeGreaterThanOrEqual(1);
     expect(runtime.mainRenderCount).toBe(0);
   });
 
-  it('shows a themed loading fallback while resolving the initial workspace route', () => {
+  it('keeps the native splash visible while the initial route is still resolving', () => {
     runtime.loadHasEnteredWorkspace.mockReturnValueOnce(new Promise(() => undefined));
 
     let renderer!: ReturnType<typeof TestRenderer.create>;
@@ -204,7 +262,7 @@ describe('RootNavigator', () => {
       renderer = TestRenderer.create(<RootNavigator />);
     });
 
-    expect(renderer.root.findByProps({ testID: 'root-navigation-loading' })).toBeTruthy();
-    expect(renderer.root.findByType('ActivityIndicator').props.color).toBe('#2f80ff');
+    expect(renderer.toJSON()).toBeNull();
+    expect(runtime.hideAsync).not.toHaveBeenCalled();
   });
 });

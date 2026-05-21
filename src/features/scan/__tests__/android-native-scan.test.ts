@@ -64,7 +64,7 @@ vi.mock('react-native', () => ({
   },
 }));
 
-vi.mock('expo-file-system/legacy', () => ({
+vi.mock('expo-file-system/src/legacy', () => ({
   getInfoAsync: vi.fn(),
 }));
 

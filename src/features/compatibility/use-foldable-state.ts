@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Dimensions, type ScaledSize } from 'react-native';
+import * as ReactNative from 'react-native';
+import type { ScaledSize } from 'react-native';
 
 /**
  * Foldable device state types
@@ -103,6 +104,56 @@ export interface FoldableInfo {
   postureAngle: number;
 }
 
+const FALLBACK_WINDOW_DIMENSIONS: ScaledSize = {
+  width: 390,
+  height: 844,
+  scale: 1,
+  fontScale: 1,
+};
+
+function getWindowDimensions(): ScaledSize {
+  const dimensionsApi = Reflect.get(
+    ReactNative as Record<string, unknown>,
+    'Dimensions',
+  ) as
+    | {
+        get?: (scope: 'window') => ScaledSize;
+      }
+    | undefined;
+
+  if (typeof dimensionsApi?.get === 'function') {
+    return dimensionsApi.get('window');
+  }
+
+  return FALLBACK_WINDOW_DIMENSIONS;
+}
+
+function subscribeToDimensionChanges(
+  handleChange: ({ window }: { window: ScaledSize }) => void,
+) {
+  const dimensionsApi = Reflect.get(
+    ReactNative as Record<string, unknown>,
+    'Dimensions',
+  ) as
+    | {
+        addEventListener?: (
+          type: 'change',
+          callback: ({ window }: { window: ScaledSize }) => void,
+        ) => { remove: () => void };
+      }
+    | undefined;
+
+  if (typeof dimensionsApi?.addEventListener === 'function') {
+    return dimensionsApi.addEventListener('change', handleChange);
+  }
+
+  return {
+    remove() {
+      return undefined;
+    },
+  };
+}
+
 /**
  * Default foldable info for non-foldable devices
  */
@@ -116,7 +167,7 @@ const DEFAULT_FOLDABLE_INFO: FoldableInfo = {
     orientation: 'horizontal',
     safeArea: { top: 0, bottom: 0, left: 0, right: 0 },
   },
-  dimensions: Dimensions.get('window'),
+  dimensions: getWindowDimensions(),
   isDualScreen: false,
   postureAngle: 180,
 };
@@ -251,7 +302,7 @@ function calculateHingeArea(
  * ```
  */
 export function useFoldableState(): FoldableInfo {
-  const [dimensions, setDimensions] = useState<ScaledSize>(Dimensions.get('window'));
+  const [dimensions, setDimensions] = useState<ScaledSize>(getWindowDimensions());
   const [foldableInfo, setFoldableInfo] = useState<FoldableInfo>(DEFAULT_FOLDABLE_INFO);
 
   const updateFoldableState = useCallback(() => {
@@ -311,7 +362,7 @@ export function useFoldableState(): FoldableInfo {
       setDimensions(window);
     };
 
-    const subscription = Dimensions.addEventListener('change', handleChange);
+    const subscription = subscribeToDimensionChanges(handleChange);
     return () => subscription.remove();
   }, []);
 
@@ -326,7 +377,7 @@ export function useFoldableDeviceModel(): keyof typeof FOLDABLE_DEVICES | 'unkno
   const [model, setModel] = useState<keyof typeof FOLDABLE_DEVICES | 'unknown' | 'non-foldable'>('non-foldable');
 
   useEffect(() => {
-    const { width, height } = Dimensions.get('window');
+    const { width, height } = getWindowDimensions();
     const isLandscape = width > height;
     const effectiveWidth = isLandscape ? width : height;
     const effectiveHeight = isLandscape ? height : width;

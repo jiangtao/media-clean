@@ -1,0 +1,19 @@
+{
+  "title": "Recycle bin",
+  "emptyTitle": "Nothing is waiting for a final decision yet",
+  "emptyBody": "Items moved into the app recycle bin by auto cleanup or manual cleanup are finalized here: keep or delete forever.",
+  "loading": "Loading keep and clean…",
+  "skeletonLabel": "Loading recycle bin",
+  "selectionToggle": "Select All",
+  "pendingSummary": "Clean {{count}} items",
+  "selectedItems": "{{count}} selected",
+  "cancel": "Cancel",
+  "restore": "Restore",
+  "delete": "Delete",
+  "keepAction": "Keep",
+  "cleanupAction": "Clean",
+  "releasableSizeLabel": "Free up",
+  "cleanupHistoryTitle": "Cleanup history",
+  "cleanupHistoryReleased": "Total freed {{formattedSize}}",
+  "selectionToggleAllSelected": "Deselect All"
+}

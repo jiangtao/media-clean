@@ -1113,7 +1113,8 @@ EOF
 seed_recycle_bin_fixture() {
   local seed_log_path="${RUN_DIR}/recycle-seed.log"
 
-  bash "${REPO_ROOT}/scripts/android/seed-emulator-recycle-bin.sh" --serial "${SERIAL}" "$@" > "${seed_log_path}" 2>&1
+  ANDROID_APP_ID="${APP_ID}" \
+    bash "${REPO_ROOT}/scripts/android/seed-emulator-recycle-bin.sh" --serial "${SERIAL}" "$@" > "${seed_log_path}" 2>&1
 }
 
 REACT_DEVTOOLS_CONNECTED=0
@@ -3629,7 +3630,8 @@ run_scan_cleanup_probe() {
 
   if agent_device_session wait 'id="photo-grid-start-scan-button"' 3000 >/dev/null 2>&1; then
     local deterministic_seed_ready=0
-    if bash "${REPO_ROOT}/scripts/android/seed-emulator-scan-result.sh" --serial "${SERIAL}"; then
+    if ANDROID_APP_ID="${APP_ID}" \
+      bash "${REPO_ROOT}/scripts/android/seed-emulator-scan-result.sh" --serial "${SERIAL}"; then
       agent_device close --platform android --session "${SESSION}" >/dev/null 2>&1 || true
       open_app_with_session "relaunch"
       ensure_app_foreground
@@ -3798,7 +3800,8 @@ run_filtering_selection_probe() {
 
   if agent_device_session wait 'id="photo-grid-start-scan-button"' 3000 >/dev/null 2>&1; then
     local deterministic_seed_ready=0
-    if bash "${REPO_ROOT}/scripts/android/seed-emulator-scan-result.sh" --serial "${SERIAL}"; then
+    if ANDROID_APP_ID="${APP_ID}" \
+      bash "${REPO_ROOT}/scripts/android/seed-emulator-scan-result.sh" --serial "${SERIAL}"; then
       agent_device close --platform android --session "${SESSION}" >/dev/null 2>&1 || true
       open_app_with_session "relaunch"
       ensure_app_foreground

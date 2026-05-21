@@ -218,6 +218,7 @@ function buildNativeAssetDescriptors(sourceCandidates: readonly CleanupCandidate
     mediaType: candidate.asset.mediaType,
     width: candidate.asset.width,
     height: candidate.asset.height,
+    orientation: candidate.asset.orientation ?? null,
     duration: candidate.asset.duration,
     fileSize: candidate.asset.fileSize,
     creationTime: candidate.asset.creationTime,

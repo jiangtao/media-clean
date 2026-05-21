@@ -1,0 +1,19 @@
+{
+  "title": "回收站",
+  "emptyTitle": "这里还没有待最终处理的项目",
+  "emptyBody": "自动清理或手动移入应用内回收站后的项目，会在这里统一决定保留还是彻底清理。",
+  "loading": "加载保留和清理…",
+  "skeletonLabel": "正在加载回收站",
+  "selectionToggle": "全选",
+  "pendingSummary": "清理 {{count}} 项",
+  "selectedItems": "已选择 {{count}} 项",
+  "cancel": "取消",
+  "restore": "恢复",
+  "delete": "删除",
+  "keepAction": "保留",
+  "cleanupAction": "清理",
+  "releasableSizeLabel": "释放",
+  "cleanupHistoryTitle": "历史清理",
+  "cleanupHistoryReleased": "共释放 {{formattedSize}}",
+  "selectionToggleAllSelected": "取消全选"
+}

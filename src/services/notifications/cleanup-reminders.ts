@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as MediaLibrary from 'expo-media-library';
 import { Platform } from 'react-native';
 
-import { isDefaultReminderSummary } from '../../i18n/app-copy';
+import { getAppCopy, isDefaultReminderSummary } from '../../i18n/app-copy';
 import { assessReminderTrigger } from '../../features/reminders/reminder-trigger';
 import type { ReminderCopy } from '../../features/reminders/reminder-copy';
 import {
@@ -133,10 +133,11 @@ export async function configureCleanupReminderChannel(copy?: ReminderChannelCopy
     return;
   }
 
+  const fallbackCopy = getAppCopy('zh-CN').reminder;
   await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
-    name: copy?.name ?? '定期清理提醒',
+    name: copy?.name ?? fallbackCopy.channelName,
     importance: Notifications.AndroidImportance.DEFAULT,
-    description: copy?.description ?? '提醒你重新扫描最近媒体并清理重复、模糊与相似内容。',
+    description: copy?.description ?? fallbackCopy.channelDescription,
     enableVibrate: true,
     showBadge: false,
   });

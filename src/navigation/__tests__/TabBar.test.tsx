@@ -12,7 +12,9 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 import { getAppTheme } from '../../theme/app-theme';
-import { TabBar } from '../../ui/components/TabBar';
+import { COMPONENT_TOKENS } from '../../theme/generated/component-tokens.generated';
+import { PRIMITIVE_TOKENS } from '../../theme/generated/primitive-tokens.generated';
+import { TabBar, TAB_BAR_STYLE_TOKENS } from '../../ui/components/TabBar';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -21,8 +23,9 @@ import { TabBar } from '../../ui/components/TabBar';
 
 describe('TabBar', () => {
   const mockOnTabPress = vi.fn();
+  type TabBarTabs = React.ComponentProps<typeof TabBar>['tabs'];
 
-  const defaultTabs = [
+  const defaultTabs: TabBarTabs = [
     { name: 'Photos', label: '照片', icon: 'nav-photo' as const, badge: undefined },
     { name: 'RecycleBin', label: '回收站', icon: 'nav-trash' as const, badge: undefined },
     { name: 'Settings', label: '设置', icon: 'nav-setting' as const, badge: undefined },
@@ -33,14 +36,20 @@ describe('TabBar', () => {
     runtime.safeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
   });
 
-  function renderTabBar() {
+  function renderTabBar({
+    tabs = defaultTabs,
+    activeTab = 'Photos',
+  }: {
+    tabs?: TabBarTabs;
+    activeTab?: string;
+  } = {}) {
     let renderer!: ReturnType<typeof TestRenderer.create>;
 
     act(() => {
       renderer = TestRenderer.create(
         <TabBar
-          tabs={defaultTabs}
-          activeTab="Photos"
+          tabs={tabs}
+          activeTab={activeTab}
           onTabPress={mockOnTabPress}
           theme={getAppTheme('light')}
         />,
@@ -117,8 +126,7 @@ describe('TabBar', () => {
     });
 
     it('should use a restrained touch-scale treatment on tab items', () => {
-      const pressedScale = 0.972;
-      expect(pressedScale).toBe(0.972);
+      expect(PRIMITIVE_TOKENS.interaction.touchSurfacePressed.tabScale).toBe(0.972);
     });
   });
 
@@ -142,8 +150,11 @@ describe('TabBar', () => {
     });
 
     it('should display 99+ badge when count exceeds 99', () => {
-      const badgeValue = 150;
-      const displayValue = badgeValue > 99 ? '99+' : String(badgeValue);
+      const badgeValue = TAB_BAR_STYLE_TOKENS.badge.maxDisplayCount + 51;
+      const displayValue =
+        badgeValue > TAB_BAR_STYLE_TOKENS.badge.maxDisplayCount
+          ? `${TAB_BAR_STYLE_TOKENS.badge.maxDisplayCount}+`
+          : String(badgeValue);
 
       expect(displayValue).toBe('99+');
     });
@@ -172,13 +183,54 @@ describe('TabBar', () => {
       const badgeBackgroundColor = '#ff3b30';
       expect(badgeBackgroundColor).toBe('#ff3b30');
     });
+
+    it('should render badge count and badge geometry from file-backed component tokens', () => {
+      const tabsWithBadge = [
+        { name: 'Photos', label: '照片', icon: 'nav-photo' as const, badge: undefined },
+        {
+          name: 'RecycleBin',
+          label: '回收站',
+          icon: 'nav-trash' as const,
+          badge: TAB_BAR_STYLE_TOKENS.badge.maxDisplayCount + 1,
+        },
+        { name: 'Settings', label: '设置', icon: 'nav-setting' as const, badge: undefined },
+      ];
+
+      const renderer = renderTabBar({ tabs: tabsWithBadge });
+      const iconContainer = renderer.root.findByProps({
+        testID: 'tab-icon-container-RecycleBin',
+      });
+      const badge = renderer.root.findByProps({ testID: 'tab-badge-RecycleBin' });
+      const iconContainerStyle = flattenStyle(iconContainer.props.style);
+      const badgeStyle = flattenStyle(badge.props.style);
+      const overflowText = renderer.root.findAll((node: { props: { children?: unknown } }) =>
+        node.props.children === `${TAB_BAR_STYLE_TOKENS.badge.maxDisplayCount}+`,
+      );
+
+      expect(TAB_BAR_STYLE_TOKENS).toBe(COMPONENT_TOKENS.tabBar);
+      expect(overflowText.length).toBeGreaterThan(0);
+      expect(iconContainerStyle).toMatchObject({
+        position: 'relative',
+        width: TAB_BAR_STYLE_TOKENS.layout.iconSize,
+        height: TAB_BAR_STYLE_TOKENS.layout.iconSize,
+      });
+      expect(badgeStyle.top).toBe(-TAB_BAR_STYLE_TOKENS.badge.offsetTop);
+      expect(badgeStyle.right).toBe(-TAB_BAR_STYLE_TOKENS.badge.offsetRight);
+      expect(badgeStyle.borderRadius).toBe(TAB_BAR_STYLE_TOKENS.badge.radius);
+      expect(badgeStyle.minWidth).toBe(TAB_BAR_STYLE_TOKENS.badge.minWidth);
+      expect(badgeStyle.minHeight).toBe(TAB_BAR_STYLE_TOKENS.badge.minHeight);
+      expect(badgeStyle.height).toBeUndefined();
+      expect(badgeStyle.paddingHorizontal).toBe(TAB_BAR_STYLE_TOKENS.badge.paddingHorizontal);
+      expect(badgeStyle.paddingVertical).toBe(TAB_BAR_STYLE_TOKENS.badge.paddingVertical);
+      expect(badgeStyle.borderWidth).toBe(TAB_BAR_STYLE_TOKENS.badge.borderWidth);
+    });
   });
 
   describe('Accessibility', () => {
     it('should have proper touch target sizes', () => {
       // Tab items have minHeight: 44 and minWidth: 44 for accessibility
-      const minHeight = 44;
-      const minWidth = 44;
+      const minHeight = TAB_BAR_STYLE_TOKENS.layout.tabMinHeight;
+      const minWidth = TAB_BAR_STYLE_TOKENS.layout.tabMinWidth;
       expect(minHeight).toBe(44);
       expect(minWidth).toBe(44);
     });
@@ -229,13 +281,17 @@ describe('TabBar', () => {
         renderer.root.findByProps({ testID: 'main-tab-bar-safe-area' }).props.style,
       );
 
-      expect(safeAreaStyle?.paddingBottom).toBe(8);
+      expect(safeAreaStyle?.paddingBottom).toBe(TAB_BAR_STYLE_TOKENS.layout.minimumBottomPadding);
     });
 
     it('should have correct tab bar height', () => {
       // Tab bar has height: 56
-      const tabBarHeight = 56;
-      expect(tabBarHeight).toBe(56);
+      const renderer = renderTabBar();
+      const tabBarStyle = flattenStyle(
+        renderer.root.findByProps({ testID: 'main-tab-bar' }).props.style,
+      );
+
+      expect(tabBarStyle.height).toBe(TAB_BAR_STYLE_TOKENS.layout.height);
     });
 
     it('should have horizontal layout for tabs', () => {

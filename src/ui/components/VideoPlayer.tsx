@@ -1,8 +1,10 @@
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import type { AppThemePalette } from '../../theme/app-theme';
+import { MediaFrame } from '../primitives';
+import { MEDIA_VIEWER_STYLE_TOKENS } from './media-viewer-tokens';
 
 interface VideoPlayerProps {
   uri: string;
@@ -17,7 +19,7 @@ export function VideoPlayer({ uri, width, height, theme, autoPlay = false, isAct
   const playerRef = useVideoPlayer({ uri }, (instance) => {
     instance.loop = true;
   });
-  const styles = useMemo(() => createStyles(theme, width, height), [theme, width, height]);
+  const styles = useMemo(() => createStyles(width, height), [width, height]);
 
   useEffect(() => {
     if (autoPlay && isActive) {
@@ -38,7 +40,7 @@ export function VideoPlayer({ uri, width, height, theme, autoPlay = false, isAct
   }, [playerRef, uri]);
 
   return (
-    <View style={styles.container}>
+    <MediaFrame theme={theme} style={styles.container} testID="video-player-media-frame">
       <VideoView
         player={playerRef}
         nativeControls
@@ -46,7 +48,7 @@ export function VideoPlayer({ uri, width, height, theme, autoPlay = false, isAct
         fullscreenOptions={{ enable: true }}
         style={styles.video}
       />
-    </View>
+    </MediaFrame>
   );
 }
 
@@ -58,17 +60,15 @@ function runPlayerCommand(command: () => void) {
   }
 }
 
-function createStyles(theme: AppThemePalette, videoWidth: number, videoHeight: number) {
-  // Calculate aspect ratio for the container
-  const aspectRatio = videoWidth > 0 && videoHeight > 0 ? videoWidth / videoHeight : 16 / 9;
+function createStyles(videoWidth: number, videoHeight: number) {
+  const { video } = MEDIA_VIEWER_STYLE_TOKENS;
+  const aspectRatio =
+    videoWidth > 0 && videoHeight > 0 ? videoWidth / videoHeight : video.fallbackAspectRatio;
 
   return StyleSheet.create({
     container: {
       width: '100%',
-      aspectRatio: Math.max(aspectRatio, 0.5), // Minimum aspect ratio to prevent too tall videos
-      borderRadius: 28,
-      backgroundColor: theme.previewBackground,
-      overflow: 'hidden',
+      aspectRatio: Math.max(aspectRatio, video.minAspectRatio),
     },
     video: {
       width: '100%',

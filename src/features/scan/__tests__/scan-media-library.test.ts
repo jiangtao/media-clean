@@ -27,7 +27,7 @@ vi.mock('expo-media-library', () => ({
   getAssetInfoAsync: vi.fn(),
 }));
 
-vi.mock('expo-file-system/legacy', () => ({
+vi.mock('expo-file-system/src/legacy', () => ({
   default: {},
 }));
 

@@ -1,0 +1,20 @@
+{
+  "selectionBar": {
+    "selectedItems": "{{count}} selected",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "clean": "Clean"
+  },
+  "scanCounter": {
+    "complete": "Scan Complete",
+    "scanning": "Scanning... {{counterText}}"
+  },
+  "scanProgress": {
+    "scanning": "Scanning",
+    "preparing": "Preparing",
+    "complete": "Scan Complete",
+    "cancel": "Cancel",
+    "pendingCount": "0/0",
+    "completedResults": "Found {{count}} items to review"
+  }
+}

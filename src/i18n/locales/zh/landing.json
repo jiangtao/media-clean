@@ -1,0 +1,17 @@
+{
+  "statusTitleGranted": "授权已完成",
+  "statusBodyGranted": "可开始扫描相册",
+  "statusTitlePending": "需要媒体权限",
+  "statusBodyPending": "进入工作区后授权即可开始扫描",
+  "heroTitle": "本地扫描",
+  "heroBodyGranted": "识别重复、模糊与相似内容",
+  "heroBodyPending": "进入工作区后授权，即可识别重复、模糊与相似内容",
+  "actionReady": "开始扫描",
+  "actionPending": "进入工作区并授权",
+  "skeletonLabel": "正在加载首页",
+  "featurePill": "即将扫描照片与视频",
+  "localOnlyTitle": "仅在本地分析，不上传任何数据",
+  "localOnlyBody": "所有识别与清理操作均在本地完成",
+  "mediaSupportTitle": "支持照片与视频",
+  "mediaSupportBody": "全面识别，快速定位重复、模糊与相似内容"
+}

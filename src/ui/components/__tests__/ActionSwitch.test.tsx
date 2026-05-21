@@ -2,7 +2,7 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ActionSwitch } from '../ActionSwitch';
+import { ActionSwitch, ACTION_SWITCH_STYLE_TOKENS } from '../ActionSwitch';
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -79,8 +79,19 @@ describe('ActionSwitch', () => {
       renderer.root.findByProps({ testID: 'action-switch-secondary' }).props.style,
     );
 
-    expect(primaryStyle.backgroundColor).toBe('#18bf63');
+    expect(primaryStyle.backgroundColor).toBe(ACTION_SWITCH_STYLE_TOKENS.color.keepBackground);
     expect(secondaryStyle.backgroundColor).toBeUndefined();
+  });
+
+  it('keeps the API-preserving visual contract in file-backed component tokens', () => {
+    expect(ACTION_SWITCH_STYLE_TOKENS.color.dangerBackground).toBe('#d8646a');
+    expect(ACTION_SWITCH_STYLE_TOKENS.color.keepBackground).toBe('#18bf63');
+    expect(ACTION_SWITCH_STYLE_TOKENS.color.activeText).toBe('#ffffff');
+    expect(ACTION_SWITCH_STYLE_TOKENS.radius.compact).toBe(16);
+    expect(ACTION_SWITCH_STYLE_TOKENS.radius.regular).toBe(18);
+    expect(ACTION_SWITCH_STYLE_TOKENS.gap.compact).toBe(4);
+    expect(ACTION_SWITCH_STYLE_TOKENS.size.segmentMinWidthCompact).toBe(56);
+    expect(ACTION_SWITCH_STYLE_TOKENS.typography.fontWeight).toBe('800');
   });
 
   it('renders shared icon glyphs when action icons are provided', () => {

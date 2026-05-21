@@ -1,0 +1,11 @@
+@import './src/theme/generated/nativewind-theme.generated.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * CSS variable values are generated from src/theme/tokens/app.tokens.json into
+ * src/theme/generated/nativewind-vars.generated.ts and mirrored into
+ * src/theme/generated/tailwind-theme.generated.cjs for Tailwind token lookup.
+ */

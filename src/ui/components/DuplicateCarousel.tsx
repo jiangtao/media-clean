@@ -1,14 +1,14 @@
-import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 
 import type { CleanupCandidate } from '../../domain/recognition/types';
 import type { AppLanguage } from '../../i18n/app-language';
 import type { AppThemePalette } from '../../theme/app-theme';
+import { COMPONENT_TOKENS } from '../../theme/generated/component-tokens.generated';
 import { AppIcon } from '../icons/AppIcon';
-import { buildSizedImageSource } from './image-source';
-import { TouchSurface } from './TouchSurface';
+import { IconButton } from '../primitives';
 import { VideoPlayer } from './VideoPlayer';
+import { ZoomableImage } from './ZoomableImage';
 
 interface DuplicateCarouselProps {
   candidate: CleanupCandidate;
@@ -30,6 +30,7 @@ interface ViewerItem {
   mediaType: CleanupCandidate['asset']['mediaType'];
   width: number;
   height: number;
+  orientation?: number | null;
   duration: number;
 }
 
@@ -38,9 +39,18 @@ interface WindowedViewerItem extends ViewerItem {
   reuseSlot: number;
 }
 
-const DEFAULT_STAGE_WIDTH = Math.max(Dimensions.get('window').width - 32, 280);
-const DEFAULT_STAGE_HEIGHT = Math.max(Math.round(DEFAULT_STAGE_WIDTH * 1.45), 320);
-const WINDOWED_VIEW_REUSE_SLOT_COUNT = 3;
+export const DUPLICATE_CAROUSEL_STYLE_TOKENS = COMPONENT_TOKENS.duplicateCarousel;
+
+const DEFAULT_STAGE_WIDTH = Math.max(
+  Dimensions.get('window').width,
+  DUPLICATE_CAROUSEL_STYLE_TOKENS.defaultStage.minWidth,
+);
+const DEFAULT_STAGE_HEIGHT = Math.max(
+  Math.round(DEFAULT_STAGE_WIDTH * DUPLICATE_CAROUSEL_STYLE_TOKENS.defaultStage.heightRatio),
+  DUPLICATE_CAROUSEL_STYLE_TOKENS.defaultStage.minHeight,
+);
+const WINDOWED_VIEW_REUSE_SLOT_COUNT = DUPLICATE_CAROUSEL_STYLE_TOKENS.windowing.reuseSlotCount;
+const ACTIVE_ZOOM_LOCK_SCALE = 1.01;
 
 function buildViewerItems(
   candidate: CleanupCandidate,
@@ -59,6 +69,7 @@ function buildViewerItems(
       mediaType: entry.asset.mediaType,
       width: entry.asset.width,
       height: entry.asset.height,
+      orientation: entry.asset.orientation,
       duration: entry.asset.duration,
     }),
   );
@@ -93,7 +104,6 @@ export function DuplicateCarousel({
   onActiveIdChange,
   onFocusedPhotoChange,
 }: DuplicateCarouselProps) {
-  const styles = useMemo(() => createStyles(), []);
   const viewerItems = useMemo(
     () => buildViewerItems(candidate, duplicateCandidates),
     [candidate, duplicateCandidates],
@@ -105,6 +115,7 @@ export function DuplicateCarousel({
   });
   const scrollRef = useRef<ScrollView | null>(null);
   const syncedScrollPositionRef = useRef<{ index: number; width: number } | null>(null);
+  const [activeScale, setActiveScale] = useState(1);
 
   useEffect(() => {
     if (activeId !== undefined) {
@@ -154,6 +165,10 @@ export function DuplicateCarousel({
       animated: false,
     });
   }, [resolvedActiveId, stageSize.width, viewerItems]);
+
+  useEffect(() => {
+    setActiveScale(1);
+  }, [resolvedActiveId]);
 
   const syncFocusedItem = (nextIndex: number) => {
     const nextItem = viewerItems[nextIndex];
@@ -218,6 +233,8 @@ export function DuplicateCarousel({
     scrollToIndex(currentIndex + 1);
   };
 
+  const isActiveItemZoomed = activeScale > ACTIVE_ZOOM_LOCK_SCALE;
+
   if (viewerItems.length === 0) {
     return null;
   }
@@ -253,9 +270,14 @@ export function DuplicateCarousel({
           ]}
           horizontal
           pagingEnabled
+          snapToInterval={stageSize.width}
+          snapToAlignment="center"
+          disableIntervalMomentum
           showsHorizontalScrollIndicator={false}
           removeClippedSubviews
-          scrollEnabled={viewerItems.length > 1}
+          bounces={false}
+          overScrollMode="never"
+          scrollEnabled={viewerItems.length > 1 && !isActiveItemZoomed}
           decelerationRate="fast"
           onMomentumScrollEnd={(event) =>
             handleStageMomentumEnd(
@@ -266,61 +288,53 @@ export function DuplicateCarousel({
           testID="duplicate-stage-scroll"
         >
           {windowedViewerItems.map((item) => (
-            <View
+            <CarouselSlide
               key={`${item.mediaType}-${item.reuseSlot}`}
-              style={[styles.slide, { width: stageSize.width, left: item.index * stageSize.width }]}
-              testID={`duplicate-stage-slide-${item.id}`}
-            >
-              {item.mediaType === 'video' ? (
-                <View style={styles.videoWrap} testID={`duplicate-stage-video-${item.id}`}>
-                  <VideoPlayer
-                    uri={item.uri}
-                    width={item.width}
-                    height={item.height}
-                    theme={theme}
-                    isActive={item.id === resolvedActiveId}
-                  />
-                </View>
-              ) : (
-                <Image
-                  source={buildSizedImageSource(item.uri, stageSize.width, stageSize.height)}
-                  style={styles.media}
-                  contentFit="contain"
-                  cachePolicy="memory-disk"
-                  priority="high"
-                  allowDownscaling
-                  transition={0}
-                  recyclingKey={item.uri}
-                  testID={`duplicate-stage-media-${item.id}`}
-                />
-              )}
-            </View>
+              item={item}
+              stageSize={stageSize}
+              theme={theme}
+              isActive={item.id === resolvedActiveId}
+              onScaleChange={item.id === resolvedActiveId ? setActiveScale : undefined}
+              panEnabled={item.id === resolvedActiveId && isActiveItemZoomed}
+            />
           ))}
         </ScrollView>
 
         {viewerItems.length > 1 ? (
           <>
             {currentIndex > 0 ? (
-              <TouchSurface
+              <IconButton
                 onPress={handlePrev}
+                size={DUPLICATE_CAROUSEL_STYLE_TOKENS.nav.buttonSize}
+                theme={theme}
+                variant="overlay"
                 style={[styles.navButton, styles.navButtonLeft]}
                 pressedStyle={styles.navButtonPressed}
-                preset="icon"
                 testID="duplicate-nav-prev"
               >
-                <AppIcon name="chevron-back" size={18} color="#ffffff" />
-              </TouchSurface>
+                <AppIcon
+                  name="chevron-back"
+                  size={DUPLICATE_CAROUSEL_STYLE_TOKENS.nav.iconSize}
+                  color={theme.buttonPrimaryText}
+                />
+              </IconButton>
             ) : null}
             {currentIndex < viewerItems.length - 1 ? (
-              <TouchSurface
+              <IconButton
                 onPress={handleNext}
+                size={DUPLICATE_CAROUSEL_STYLE_TOKENS.nav.buttonSize}
+                theme={theme}
+                variant="overlay"
                 style={[styles.navButton, styles.navButtonRight]}
                 pressedStyle={styles.navButtonPressed}
-                preset="icon"
                 testID="duplicate-nav-next"
               >
-                <AppIcon name="chevron-forward" size={18} color="#ffffff" />
-              </TouchSurface>
+                <AppIcon
+                  name="chevron-forward"
+                  size={DUPLICATE_CAROUSEL_STYLE_TOKENS.nav.iconSize}
+                  color={theme.buttonPrimaryText}
+                />
+              </IconButton>
             ) : null}
           </>
         ) : null}
@@ -329,8 +343,56 @@ export function DuplicateCarousel({
   );
 }
 
-function createStyles() {
-  return StyleSheet.create({
+function CarouselSlide({
+  item,
+  stageSize,
+  theme,
+  isActive,
+  onScaleChange,
+  panEnabled,
+}: {
+  item: WindowedViewerItem;
+  stageSize: { width: number; height: number };
+  theme: AppThemePalette;
+  isActive: boolean;
+  onScaleChange?: (scale: number) => void;
+  panEnabled: boolean;
+}) {
+  return (
+    <View
+      style={[styles.slide, { width: stageSize.width, left: item.index * stageSize.width }]}
+      testID={`duplicate-stage-slide-${item.id}`}
+    >
+      {item.mediaType === 'video' ? (
+        <View style={styles.videoWrap} testID={`duplicate-stage-video-${item.id}`}>
+          <VideoPlayer
+            uri={item.uri}
+            width={item.width}
+            height={item.height}
+            theme={theme}
+            isActive={isActive}
+          />
+        </View>
+      ) : (
+        <View style={styles.media} testID={`duplicate-stage-media-${item.id}`}>
+          <ZoomableImage
+            key={item.id}
+            uri={item.uri}
+            width={stageSize.width}
+            height={stageSize.height}
+            orientation={item.orientation}
+            maxScale={3}
+            minScale={1}
+            onScaleChange={onScaleChange}
+            panEnabled={panEnabled}
+          />
+        </View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
     container: {
       flex: 1,
       width: '100%',
@@ -369,22 +431,21 @@ function createStyles() {
     navButton: {
       position: 'absolute',
       top: '50%',
-      marginTop: -23,
-      width: 46,
-      height: 46,
-      borderRadius: 23,
+      width: DUPLICATE_CAROUSEL_STYLE_TOKENS.nav.buttonSize,
+      height: DUPLICATE_CAROUSEL_STYLE_TOKENS.nav.buttonSize,
+      marginTop: -DUPLICATE_CAROUSEL_STYLE_TOKENS.nav.buttonSize / 2,
+      borderRadius: DUPLICATE_CAROUSEL_STYLE_TOKENS.nav.buttonSize / 2,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: 'rgba(14, 30, 38, 0.76)',
+      backgroundColor: DUPLICATE_CAROUSEL_STYLE_TOKENS.nav.background,
     },
     navButtonPressed: {
-      backgroundColor: 'rgba(14, 30, 38, 0.92)',
+      backgroundColor: DUPLICATE_CAROUSEL_STYLE_TOKENS.nav.pressedBackground,
     },
     navButtonLeft: {
-      left: 12,
+      left: DUPLICATE_CAROUSEL_STYLE_TOKENS.nav.buttonInset,
     },
     navButtonRight: {
-      right: 12,
+      right: DUPLICATE_CAROUSEL_STYLE_TOKENS.nav.buttonInset,
     },
-  });
-}
+});

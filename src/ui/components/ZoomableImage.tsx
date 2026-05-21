@@ -3,11 +3,14 @@ import { Image } from 'expo-image';
 import { StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { buildSizedImageSource } from './image-source';
+import { MediaFrame } from '../primitives';
+import { buildOrientedImageFrameStyle, buildSizedImageSource } from './image-source';
+import { MEDIA_VIEWER_STYLE_TOKENS } from './media-viewer-tokens';
 
 interface ZoomableImageProps {
   uri: string;
@@ -16,19 +19,24 @@ interface ZoomableImageProps {
   maxScale?: number;
   minScale?: number;
   doubleTapReset?: boolean;
+  orientation?: number | null;
   onScaleChange?: (scale: number) => void;
+  panEnabled?: boolean;
 }
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
+const AnimatedMediaFrame = Animated.createAnimatedComponent(MediaFrame);
 
 function ZoomableImageComponent({
   uri,
   width,
   height,
-  maxScale = 3,
-  minScale = 1,
+  maxScale = MEDIA_VIEWER_STYLE_TOKENS.zoom.defaultMaxScale,
+  minScale = MEDIA_VIEWER_STYLE_TOKENS.zoom.defaultMinScale,
   doubleTapReset = true,
+  orientation,
   onScaleChange,
+  panEnabled = true,
 }: ZoomableImageProps) {
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -40,32 +48,40 @@ function ZoomableImageComponent({
   const pinchGesture = Gesture.Pinch()
     .onUpdate((event) => {
       const newScale = savedScale.value * event.scale;
-      // Clamp scale during gesture
-      scale.value = Math.max(minScale * 0.5, Math.min(maxScale * 1.1, newScale));
+      const minGestureScale = minScale * MEDIA_VIEWER_STYLE_TOKENS.zoom.underScaleFactor;
+      const maxGestureScale = maxScale * MEDIA_VIEWER_STYLE_TOKENS.zoom.overScaleFactor;
+      scale.value = Math.max(minGestureScale, Math.min(maxGestureScale, newScale));
     })
     .onEnd(() => {
+      let resolvedScale = scale.value;
+
       // Boundary checks and bounce back
-      if (scale.value < minScale) {
+      if (resolvedScale < minScale) {
         // Quick bounce back to minScale without animation
         scale.value = minScale;
+        resolvedScale = minScale;
         translateX.value = 0;
         translateY.value = 0;
         savedTranslateX.value = 0;
         savedTranslateY.value = 0;
-      } else if (scale.value > maxScale) {
-        scale.value = withTiming(maxScale, { duration: 150 });
+      } else if (resolvedScale > maxScale) {
+        scale.value = withTiming(maxScale, {
+          duration: MEDIA_VIEWER_STYLE_TOKENS.zoom.clampDurationMs,
+        });
+        resolvedScale = maxScale;
       }
 
-      savedScale.value = scale.value;
+      savedScale.value = resolvedScale;
       savedTranslateX.value = translateX.value;
       savedTranslateY.value = translateY.value;
 
       if (onScaleChange) {
-        onScaleChange(scale.value);
+        runOnJS(onScaleChange)(resolvedScale);
       }
     });
 
   const panGesture = Gesture.Pan()
+    .enabled(panEnabled)
     .onUpdate((event) => {
       // Only allow pan when zoomed in
       if (scale.value > minScale) {
@@ -103,7 +119,7 @@ function ZoomableImageComponent({
         savedTranslateY.value = 0;
 
         if (onScaleChange) {
-          onScaleChange(minScale);
+          runOnJS(onScaleChange)(minScale);
         }
       }
     });
@@ -121,22 +137,34 @@ function ZoomableImageComponent({
       { scale: scale.value },
     ],
   }));
+  const imageFrameStyle = buildOrientedImageFrameStyle(width, height, orientation);
 
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.View style={[{ width, height }, animatedStyle]} testID="zoomable-image">
+      <AnimatedMediaFrame
+        variant="transparent"
+        style={[styles.frame, { width, height }, animatedStyle]}
+        testID="zoomable-image"
+      >
         <AnimatedImage
-          source={buildSizedImageSource(uri, width, height)}
-          style={StyleSheet.absoluteFill}
+          source={buildSizedImageSource(uri, imageFrameStyle.width, imageFrameStyle.height)}
+          style={imageFrameStyle}
           contentFit="contain"
           cachePolicy="memory-disk"
           priority="high"
           allowDownscaling
           testID="zoomable-image-content"
         />
-      </Animated.View>
+      </AnimatedMediaFrame>
     </GestureDetector>
   );
 }
+
+const styles = StyleSheet.create({
+  frame: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
 
 export const ZoomableImage = memo(ZoomableImageComponent);

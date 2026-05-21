@@ -1,5 +1,5 @@
 import { Buffer } from 'buffer';
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system/src/legacy';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { getThumbnailAsync } from 'expo-video-thumbnails';
 import { toByteArray } from 'base64-js';

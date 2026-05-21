@@ -1,14 +1,15 @@
-import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { NativeScrollEvent, StyleSheet, useWindowDimensions, View, Text, FlatList } from 'react-native';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { NativeScrollEvent, StyleSheet, useWindowDimensions, View, FlatList } from 'react-native';
 import { Image } from 'expo-image';
 import { GestureDetector } from 'react-native-gesture-handler';
 
 import type { CleanupCandidate } from '../../domain/recognition/types';
 import type { AppThemePalette } from '../../theme/app-theme';
-import { buildSizedImageSource } from './image-source';
-import { TouchSurface } from './TouchSurface';
+import { COMPONENT_TOKENS } from '../../theme/generated/component-tokens.generated';
+import { buildOrientedImageFrameStyle, buildSizedImageSource } from './image-source';
 import { AppIcon } from '../icons/AppIcon';
 import { DesignIcon } from '../icons/DesignIcon';
+import { Badge, Text as PrimitiveText, TouchSurface } from '../primitives';
 import {
   buildMediaGridLayout,
   type MediaGridLayout,
@@ -36,7 +37,9 @@ interface PhotoGridProps {
   gridLayout?: MediaGridLayout;
 }
 
-const SIZE_SMALL = 12;
+export const PHOTO_GRID_STYLE_TOKENS = COMPONENT_TOKENS.photoGrid;
+
+const displayedThumbnailUris = new Set<string>();
 
 function formatDuration(seconds: number) {
   const safeSeconds = Math.max(0, Math.round(seconds));
@@ -99,7 +102,10 @@ export function PhotoGrid({
     () => createStyles(theme, contentPadding, resolvedGridLayout),
     [contentPadding, resolvedGridLayout, theme],
   );
-  const gridContentTopOffset = (contentPadding?.top ?? 0) + 6 + resolvedGridLayout.spacing / 2;
+  const gridContentTopOffset =
+    (contentPadding?.top ?? 0) +
+    PHOTO_GRID_STYLE_TOKENS.list.edgePadding +
+    resolvedGridLayout.spacing / 2;
   const isSelectionMode = selectionMode ?? selectedIds.length > 0;
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
@@ -221,8 +227,27 @@ function PhotoGridItem({
 }: PhotoGridItemProps) {
   const styles = useMemo(() => createStyles(theme, undefined, gridLayout), [gridLayout, theme]);
   const lastLongPressAtRef = useRef(0);
-  const videoIconWidth = gridLayout.isSELike ? 15 : 16;
-  const videoIconHeight = videoIconWidth * 0.9;
+  const thumbnailUri = resolveThumbnailUri(candidate);
+  const thumbnailSource = useMemo(
+    () => buildSizedImageSource(thumbnailUri, gridLayout.itemSize, gridLayout.itemSize),
+    [gridLayout.itemSize, thumbnailUri],
+  );
+  const [hasDisplayedThumbnail, setHasDisplayedThumbnail] = useState(() =>
+    displayedThumbnailUris.has(thumbnailUri),
+  );
+  const videoIconWidth = gridLayout.isSELike
+    ? PHOTO_GRID_STYLE_TOKENS.videoBadge.iconWidthCompact
+    : PHOTO_GRID_STYLE_TOKENS.videoBadge.iconWidthRegular;
+  const videoIconHeight = videoIconWidth * PHOTO_GRID_STYLE_TOKENS.videoBadge.iconHeightRatio;
+
+  useEffect(() => {
+    setHasDisplayedThumbnail(displayedThumbnailUris.has(thumbnailUri));
+  }, [thumbnailUri]);
+
+  const handleThumbnailDisplay = useCallback(() => {
+    displayedThumbnailUris.add(thumbnailUri);
+    setHasDisplayedThumbnail(true);
+  }, [thumbnailUri]);
 
   const handleLongPress = () => {
     lastLongPressAtRef.current = Date.now();
@@ -257,19 +282,24 @@ function PhotoGridItem({
       testID={itemTestID}
     >
       <Image
-        source={buildSizedImageSource(
-          resolveThumbnailUri(candidate),
-          gridLayout.itemSize,
-          gridLayout.itemSize,
-        )}
-        style={styles.thumbnail}
+        source={thumbnailSource}
+        placeholder={hasDisplayedThumbnail ? thumbnailSource : undefined}
+        style={[
+          styles.thumbnail,
+          buildOrientedImageFrameStyle(
+            gridLayout.itemSize,
+            gridLayout.itemSize,
+            candidate.asset.orientation,
+          ),
+        ]}
         contentFit="cover"
         cachePolicy="memory-disk"
         priority="normal"
         allowDownscaling
         decodeFormat="rgb"
         transition={0}
-        recyclingKey={resolveThumbnailUri(candidate)}
+        recyclingKey={thumbnailUri}
+        onDisplay={handleThumbnailDisplay}
         testID="photo-grid-image"
       />
       {candidate.asset.mediaType === 'video' && (
@@ -279,17 +309,24 @@ function PhotoGridItem({
             width={videoIconWidth}
             height={videoIconHeight}
             align="start"
-            color="#ffffff"
+            color={PHOTO_GRID_STYLE_TOKENS.videoBadge.foreground}
             testID="video-indicator-icon"
           />
-          <Text style={styles.videoIndicatorText}>
+          <PrimitiveText theme={theme} style={styles.videoIndicatorText}>
             {formatDuration(candidate.asset.duration)}
-          </Text>
+          </PrimitiveText>
         </View>
       )}
       {duplicateCount > 1 ? (
         <View style={styles.duplicateBadge} testID="duplicate-count-badge">
-          <Text style={styles.duplicateBadgeText}>{duplicateCount}</Text>
+          <Badge
+            variant="danger"
+            theme={theme}
+            style={styles.duplicateBadgeContent}
+            textStyle={styles.duplicateBadgeText}
+          >
+            {duplicateCount}
+          </Badge>
         </View>
       ) : null}
       {selectionMode && !isSelected ? (
@@ -299,8 +336,12 @@ function PhotoGridItem({
         <View style={styles.selectionIndicatorFilled} testID="selection-checkmark">
           <AppIcon
             name="checkmark"
-            size={gridLayout.isSELike ? 11 : 13}
-            color="#ffffff"
+            size={
+              gridLayout.isSELike
+                ? PHOTO_GRID_STYLE_TOKENS.selection.checkIconSizeCompact
+                : PHOTO_GRID_STYLE_TOKENS.selection.checkIconSizeRegular
+            }
+            color={PHOTO_GRID_STYLE_TOKENS.selection.foreground}
             testID="selection-checkmark-icon"
           />
         </View>
@@ -315,6 +356,7 @@ const MemoPhotoGridItem = memo(PhotoGridItem, (prevProps, nextProps) => {
     prevProps.candidate.asset.uri === nextProps.candidate.asset.uri &&
     prevProps.candidate.asset.previewUri === nextProps.candidate.asset.previewUri &&
     prevProps.candidate.asset.mediaType === nextProps.candidate.asset.mediaType &&
+    prevProps.candidate.asset.orientation === nextProps.candidate.asset.orientation &&
     prevProps.duplicateCount === nextProps.duplicateCount &&
     prevProps.isSelected === nextProps.isSelected &&
     prevProps.selectionMode === nextProps.selectionMode &&
@@ -331,16 +373,25 @@ function createStyles(
   ),
 ) {
   const isCompact = gridLayout.isSELike;
-  const selectionIndicatorSize = isCompact ? 18 : 24;
-  const selectionIndicatorOffset = isCompact ? 7 : 10;
-  const selectionIndicatorBorderWidth = isCompact ? 1.5 : 2;
-  const itemRadius = isCompact ? 16 : 18;
-  const videoBadgeHeight = isCompact ? 23 : 25;
+  const tokens = PHOTO_GRID_STYLE_TOKENS;
+  const selectionIndicatorSize = isCompact
+    ? tokens.selection.sizeCompact
+    : tokens.selection.sizeRegular;
+  const selectionIndicatorOffset = isCompact
+    ? tokens.selection.offsetCompact
+    : tokens.selection.offsetRegular;
+  const selectionIndicatorBorderWidth = isCompact
+    ? tokens.selection.borderWidthCompact
+    : tokens.selection.borderWidthRegular;
+  const itemRadius = isCompact ? tokens.item.radiusCompact : tokens.item.radiusRegular;
+  const videoBadgeHeight = isCompact
+    ? tokens.videoBadge.heightCompact
+    : tokens.videoBadge.heightRegular;
 
   return StyleSheet.create({
     list: {
-      paddingTop: (contentPadding?.top ?? 0) + 6,
-      paddingBottom: (contentPadding?.bottom ?? 0) + 6,
+      paddingTop: (contentPadding?.top ?? 0) + tokens.list.edgePadding,
+      paddingBottom: (contentPadding?.bottom ?? 0) + tokens.list.edgePadding,
       paddingLeft: (contentPadding?.left ?? 0) + gridLayout.sidePadding - gridLayout.spacing / 2,
       paddingRight: (contentPadding?.right ?? 0) + gridLayout.sidePadding - gridLayout.spacing / 2,
     },
@@ -351,19 +402,22 @@ function createStyles(
       backgroundColor: theme.thumbnailBackground,
       position: 'relative',
       borderRadius: itemRadius,
-      borderWidth: theme.scheme === 'light' ? StyleSheet.hairlineWidth : 1,
+      borderWidth: theme.scheme === 'light' ? StyleSheet.hairlineWidth : tokens.item.darkBorderWidth,
       borderColor:
         theme.scheme === 'light'
-          ? 'rgba(226, 232, 243, 0.44)'
+          ? tokens.item.lightBorderColor
           : theme.cardBorder,
       overflow: 'hidden',
     },
     itemPressed: {
       shadowColor: theme.shadowColor,
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: theme.scheme === 'dark' ? 0.18 : 0.1,
-      shadowRadius: 14,
-      elevation: 4,
+      shadowOffset: { width: 0, height: tokens.item.pressedShadowOffsetY },
+      shadowOpacity:
+        theme.scheme === 'dark'
+          ? tokens.item.pressedShadowOpacityDark
+          : tokens.item.pressedShadowOpacityLight,
+      shadowRadius: tokens.item.pressedShadowRadius,
+      elevation: tokens.item.pressedElevation,
     },
     thumbnail: {
       width: '100%',
@@ -371,40 +425,52 @@ function createStyles(
     },
     videoIndicator: {
       position: 'absolute',
-      left: isCompact ? 7 : 8,
-      bottom: isCompact ? 7 : 8,
+      left: isCompact ? tokens.videoBadge.leftCompact : tokens.videoBadge.leftRegular,
+      bottom: isCompact ? tokens.videoBadge.bottomCompact : tokens.videoBadge.bottomRegular,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: isCompact ? 4 : 5,
-      paddingLeft: isCompact ? 7 : 8,
-      paddingRight: isCompact ? 9 : 10,
+      gap: isCompact ? tokens.videoBadge.gapCompact : tokens.videoBadge.gapRegular,
+      paddingLeft: isCompact ? tokens.videoBadge.paddingLeftCompact : tokens.videoBadge.paddingLeftRegular,
+      paddingRight: isCompact ? tokens.videoBadge.paddingRightCompact : tokens.videoBadge.paddingRightRegular,
       height: videoBadgeHeight,
-      backgroundColor: 'rgba(15, 23, 42, 0.74)',
-      borderRadius: 999,
+      backgroundColor: tokens.videoBadge.background,
+      borderRadius: tokens.videoBadge.radius,
       justifyContent: 'center',
     },
     videoIndicatorText: {
-      color: '#ffffff',
-      fontSize: isCompact ? 11 : 12,
-      fontWeight: '700',
-      lineHeight: isCompact ? 14 : 15,
+      color: tokens.videoBadge.foreground,
+      fontSize: isCompact ? tokens.videoBadge.textSizeCompact : tokens.videoBadge.textSizeRegular,
+      fontWeight: tokens.videoBadge.textWeight,
+      lineHeight: isCompact
+        ? tokens.videoBadge.textLineHeightCompact
+        : tokens.videoBadge.textLineHeightRegular,
     },
     duplicateBadge: {
       position: 'absolute',
-      bottom: 8,
-      right: 8,
-      minWidth: 24,
-      height: 22,
-      borderRadius: 11,
-      paddingHorizontal: 6,
+      bottom: tokens.duplicateBadge.bottom,
+      right: tokens.duplicateBadge.right,
+      minWidth: tokens.duplicateBadge.minWidth,
+      height: tokens.duplicateBadge.height,
+      borderRadius: tokens.duplicateBadge.radius,
+      paddingHorizontal: tokens.duplicateBadge.paddingHorizontal,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: '#df676d',
+      backgroundColor: tokens.duplicateBadge.background,
+    },
+    duplicateBadgeContent: {
+      alignSelf: 'auto',
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      height: tokens.duplicateBadge.contentHeight,
+      minHeight: tokens.duplicateBadge.contentHeight,
+      minWidth: 0,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
     },
     duplicateBadgeText: {
-      color: '#ffffff',
-      fontSize: SIZE_SMALL,
-      fontWeight: '800',
+      color: tokens.duplicateBadge.foreground,
+      fontSize: tokens.duplicateBadge.textSize,
+      fontWeight: tokens.duplicateBadge.textWeight,
     },
     selectionIndicatorEmpty: {
       position: 'absolute',
@@ -413,14 +479,23 @@ function createStyles(
       borderRadius: selectionIndicatorSize / 2,
       width: selectionIndicatorSize,
       height: selectionIndicatorSize,
-      backgroundColor: isCompact ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.08)',
+      backgroundColor: isCompact
+        ? tokens.selection.emptyBackgroundCompact
+        : tokens.selection.emptyBackgroundRegular,
       borderWidth: selectionIndicatorBorderWidth,
-      borderColor: isCompact ? 'rgba(255, 255, 255, 0.98)' : 'rgba(255, 255, 255, 0.96)',
+      borderColor: isCompact ? tokens.selection.borderColorCompact : tokens.selection.borderColorRegular,
       shadowColor: theme.shadowColor,
-      shadowOffset: { width: 0, height: isCompact ? 1 : 2 },
-      shadowOpacity: isCompact ? 0 : theme.scheme === 'dark' ? 0.3 : 0.16,
-      shadowRadius: isCompact ? 0 : 6,
-      elevation: isCompact ? 0 : 3,
+      shadowOffset: {
+        width: 0,
+        height: isCompact ? tokens.selection.shadowOffsetYCompact : tokens.selection.shadowOffsetYRegular,
+      },
+      shadowOpacity: isCompact
+        ? tokens.selection.shadowOpacityCompact
+        : theme.scheme === 'dark'
+          ? tokens.selection.shadowOpacityDark
+          : tokens.selection.shadowOpacityLight,
+      shadowRadius: isCompact ? tokens.selection.shadowRadiusCompact : tokens.selection.shadowRadiusRegular,
+      elevation: isCompact ? tokens.selection.elevationCompact : tokens.selection.elevationRegular,
     },
     selectionIndicatorFilled: {
       position: 'absolute',
@@ -431,14 +506,21 @@ function createStyles(
       height: selectionIndicatorSize,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: '#2f80ff',
+      backgroundColor: tokens.selection.filledBackground,
       borderWidth: selectionIndicatorBorderWidth,
-      borderColor: isCompact ? 'rgba(255, 255, 255, 0.98)' : 'rgba(255, 255, 255, 0.96)',
+      borderColor: isCompact ? tokens.selection.borderColorCompact : tokens.selection.borderColorRegular,
       shadowColor: theme.shadowColor,
-      shadowOffset: { width: 0, height: isCompact ? 1 : 2 },
-      shadowOpacity: isCompact ? 0 : theme.scheme === 'dark' ? 0.3 : 0.16,
-      shadowRadius: isCompact ? 0 : 6,
-      elevation: isCompact ? 0 : 3,
+      shadowOffset: {
+        width: 0,
+        height: isCompact ? tokens.selection.shadowOffsetYCompact : tokens.selection.shadowOffsetYRegular,
+      },
+      shadowOpacity: isCompact
+        ? tokens.selection.shadowOpacityCompact
+        : theme.scheme === 'dark'
+          ? tokens.selection.shadowOpacityDark
+          : tokens.selection.shadowOpacityLight,
+      shadowRadius: isCompact ? tokens.selection.shadowRadiusCompact : tokens.selection.shadowRadiusRegular,
+      elevation: isCompact ? tokens.selection.elevationCompact : tokens.selection.elevationRegular,
     },
   });
 }

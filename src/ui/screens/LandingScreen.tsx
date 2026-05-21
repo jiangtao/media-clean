@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NavigatorScreenParams } from '@react-navigation/native';
 
@@ -10,14 +10,19 @@ import {
 } from '../../services/media-library-permissions';
 import { saveHasEnteredWorkspace } from '../../services/storage/workspace-entry-storage';
 import type { AppThemePalette } from '../../theme/app-theme';
+import { COMPONENT_TOKENS } from '../../theme/generated/component-tokens.generated';
 import type { MainTabParamList } from '../../navigation/types';
 import { DesignIcon, type DesignIconName } from '../icons/DesignIcon';
+import { Button, Separator, Text as PrimitiveText } from '../primitives';
+import { LandingSkeleton } from '../skeletons';
 
 interface LandingNavigation {
   replace: (routeName: 'Main', params?: NavigatorScreenParams<MainTabParamList>) => void;
 }
 
 type LandingPermissionState = 'loading' | 'granted' | 'pending';
+
+export const LANDING_STYLE_TOKENS = COMPONENT_TOKENS.landing;
 
 export function LandingScreen({ navigation }: { navigation: LandingNavigation }) {
   const { copy, theme } = useAppPreferences();
@@ -30,6 +35,7 @@ export function LandingScreen({ navigation }: { navigation: LandingNavigation })
   );
   const landingCopy = useMemo(() => copy.landing, [copy]);
   const [permissionState, setPermissionState] = useState<LandingPermissionState>('loading');
+  const [hasCheckedInitialPermission, setHasCheckedInitialPermission] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,11 +43,13 @@ export function LandingScreen({ navigation }: { navigation: LandingNavigation })
     void getMediaLibraryPermissionsAsync()
       .then((permission) => {
         if (!cancelled) {
+          setHasCheckedInitialPermission(true);
           setPermissionState(permission.granted ? 'granted' : 'pending');
         }
       })
       .catch(() => {
         if (!cancelled) {
+          setHasCheckedInitialPermission(true);
           setPermissionState('pending');
         }
       });
@@ -63,8 +71,13 @@ export function LandingScreen({ navigation }: { navigation: LandingNavigation })
     : landingCopy.heroBodyPending;
   const actionLabel = isGranted ? landingCopy.actionReady : landingCopy.actionPending;
   const statusAccent = isGranted ? styles.statusAccentGranted : styles.statusAccentPending;
-  const statusIconColor = isGranted ? '#18bf63' : theme.buttonPrimaryBackground;
+  const statusIconColor = isGranted ? theme.buttonSuccessBackground : theme.buttonPrimaryBackground;
   const statusIconName: DesignIconName = isGranted ? 'check' : 'scan';
+
+  if (permissionState === 'loading' && !hasCheckedInitialPermission) {
+    return <LandingSkeleton />;
+  }
+
   const handlePrimaryAction = async () => {
     let granted = isGranted;
 
@@ -133,9 +146,11 @@ export function LandingScreen({ navigation }: { navigation: LandingNavigation })
           <Text style={styles.heroTitle}>{landingCopy.heroTitle}</Text>
           <Text style={styles.heroBody}>{heroBody}</Text>
 
-          <Pressable
+          <Button
             onPress={handlePrimaryAction}
+            theme={theme}
             style={styles.actionButton}
+            contentStyle={styles.actionButtonContent}
             testID="landing-primary-action"
             >
               <DesignIcon
@@ -145,8 +160,10 @@ export function LandingScreen({ navigation }: { navigation: LandingNavigation })
               color={theme.buttonPrimaryText}
               secondaryColor={theme.buttonPrimaryBackground}
             />
-            <Text style={styles.actionText}>{actionLabel}</Text>
-          </Pressable>
+            <PrimitiveText variant="button" theme={theme} style={styles.actionText}>
+              {actionLabel}
+            </PrimitiveText>
+          </Button>
 
           <View style={styles.featurePill}>
             <DesignIcon
@@ -155,10 +172,12 @@ export function LandingScreen({ navigation }: { navigation: LandingNavigation })
               height={isDesignPhone ? 15 : 18}
               color={theme.buttonPrimaryBackground}
             />
-            <Text style={styles.featurePillText}>{landingCopy.featurePill}</Text>
+            <PrimitiveText variant="label" theme={theme} style={styles.featurePillText}>
+              {landingCopy.featurePill}
+            </PrimitiveText>
           </View>
 
-          <View style={styles.divider} />
+          <Separator theme={theme} style={styles.divider} />
 
           <View style={styles.featureList}>
             <View style={styles.featureRow} testID="landing-feature-row">
@@ -204,6 +223,34 @@ function createStyles(
   insets: { top: number; bottom: number; left: number; right: number },
   isDesignPhone = true,
 ) {
+  const waveLeftColor = theme.scheme === 'dark'
+    ? LANDING_STYLE_TOKENS.color.waveLeftDark
+    : LANDING_STYLE_TOKENS.color.waveLeftLight;
+  const waveRightColor = theme.scheme === 'dark'
+    ? LANDING_STYLE_TOKENS.color.waveRightDark
+    : LANDING_STYLE_TOKENS.color.waveRightLight;
+  const orbTopOpacity = theme.scheme === 'dark'
+    ? LANDING_STYLE_TOKENS.opacity.orbTopDark
+    : LANDING_STYLE_TOKENS.opacity.orbTopLight;
+  const orbBottomOpacity = theme.scheme === 'dark'
+    ? LANDING_STYLE_TOKENS.opacity.orbBottomDark
+    : LANDING_STYLE_TOKENS.opacity.orbBottomLight;
+  const heroRingOuterColor = theme.scheme === 'dark'
+    ? LANDING_STYLE_TOKENS.color.heroRingOuterDark
+    : LANDING_STYLE_TOKENS.color.heroRingOuterLight;
+  const heroRingInnerColor = theme.scheme === 'dark'
+    ? LANDING_STYLE_TOKENS.color.heroRingInnerDark
+    : LANDING_STYLE_TOKENS.color.heroRingInnerLight;
+  const heroTileBackground = theme.scheme === 'dark'
+    ? LANDING_STYLE_TOKENS.color.heroTileBackgroundDark
+    : LANDING_STYLE_TOKENS.color.heroTileBackgroundLight;
+  const heroTileBorder = theme.scheme === 'dark'
+    ? LANDING_STYLE_TOKENS.color.heroTileBorderDark
+    : LANDING_STYLE_TOKENS.color.heroTileBorderLight;
+  const sparkleColor = theme.scheme === 'dark'
+    ? LANDING_STYLE_TOKENS.color.sparkleDark
+    : LANDING_STYLE_TOKENS.color.sparkleLight;
+
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -226,7 +273,7 @@ function createStyles(
       width: 520,
       height: 260,
       borderRadius: 220,
-      backgroundColor: theme.scheme === 'dark' ? 'rgba(64, 92, 175, 0.12)' : 'rgba(136, 158, 255, 0.12)',
+      backgroundColor: waveLeftColor,
       transform: [{ rotate: '18deg' }],
     },
     waveRight: {
@@ -236,7 +283,7 @@ function createStyles(
       width: 560,
       height: 280,
       borderRadius: 240,
-      backgroundColor: theme.scheme === 'dark' ? 'rgba(89, 104, 192, 0.16)' : 'rgba(185, 196, 255, 0.18)',
+      backgroundColor: waveRightColor,
       transform: [{ rotate: '-16deg' }],
     },
     orbTop: {
@@ -247,7 +294,7 @@ function createStyles(
       height: 164,
       borderRadius: 82,
       backgroundColor: theme.orbTop,
-      opacity: theme.scheme === 'dark' ? 0.3 : 0.42,
+      opacity: orbTopOpacity,
     },
     orbBottom: {
       position: 'absolute',
@@ -257,7 +304,7 @@ function createStyles(
       height: 184,
       borderRadius: 92,
       backgroundColor: theme.orbBottom,
-      opacity: theme.scheme === 'dark' ? 0.22 : 0.28,
+      opacity: orbBottomOpacity,
     },
     glowTop: {
       position: 'absolute',
@@ -267,7 +314,7 @@ function createStyles(
       height: 116,
       borderRadius: 58,
       backgroundColor: theme.heroAccent,
-      opacity: 0.12,
+      opacity: LANDING_STYLE_TOKENS.opacity.glow,
     },
     statusCard: {
       flexDirection: 'row',
@@ -335,7 +382,7 @@ function createStyles(
       height: isDesignPhone ? 188 : 220,
       borderRadius: isDesignPhone ? 94 : 110,
       borderWidth: 1,
-      borderColor: theme.scheme === 'dark' ? 'rgba(105, 138, 255, 0.2)' : 'rgba(114, 142, 255, 0.18)',
+      borderColor: heroRingOuterColor,
     },
     heroRingInner: {
       position: 'absolute',
@@ -343,7 +390,7 @@ function createStyles(
       height: isDesignPhone ? 148 : 174,
       borderRadius: isDesignPhone ? 74 : 87,
       borderWidth: 1,
-      borderColor: theme.scheme === 'dark' ? 'rgba(105, 138, 255, 0.14)' : 'rgba(114, 142, 255, 0.12)',
+      borderColor: heroRingInnerColor,
     },
     heroTile: {
       width: isDesignPhone ? 112 : 140,
@@ -351,16 +398,16 @@ function createStyles(
       borderRadius: isDesignPhone ? 24 : 30,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.scheme === 'dark' ? 'rgba(53, 83, 171, 0.14)' : 'rgba(100, 132, 255, 0.12)',
+      backgroundColor: heroTileBackground,
       borderWidth: 1,
-      borderColor: theme.scheme === 'dark' ? 'rgba(105, 138, 255, 0.18)' : 'rgba(114, 142, 255, 0.14)',
+      borderColor: heroTileBorder,
     },
     sparkle: {
       position: 'absolute',
       width: 14,
       height: 14,
       borderRadius: 999,
-      backgroundColor: theme.scheme === 'dark' ? 'rgba(139, 165, 255, 0.5)' : 'rgba(128, 153, 255, 0.42)',
+      backgroundColor: sparkleColor,
     },
     sparkleLeft: {
       left: 84,
@@ -392,12 +439,11 @@ function createStyles(
       minHeight: isDesignPhone ? 52 : 60,
       borderRadius: 999,
       paddingHorizontal: 22,
-      backgroundColor: theme.buttonPrimaryBackground,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 10,
       marginBottom: isDesignPhone ? 12 : 14,
+    },
+    actionButtonContent: {
+      minHeight: isDesignPhone ? 28 : 34,
+      gap: 10,
     },
     actionText: {
       fontSize: isDesignPhone ? 17 : 20,
@@ -423,8 +469,6 @@ function createStyles(
     },
     divider: {
       alignSelf: 'stretch',
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: theme.cardBorder,
       marginBottom: isDesignPhone ? 14 : 18,
     },
     featureList: {

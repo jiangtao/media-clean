@@ -1,0 +1,22 @@
+[package]
+name = "mc-recognition-node"
+version = "0.1.0"
+edition = "2021"
+description = "Node-API binding for the Media Clean Rust recognition engine"
+license = "UNLICENSED"
+rust-version = "1.78"
+
+[lib]
+name = "mc_recognition_node"
+crate-type = ["cdylib"]
+
+[dependencies]
+mc-recognition-core = { path = "../core" }
+mc-cli = { path = "../cli" }
+napi = { version = "3", features = ["serde-json"] }
+napi-derive = "3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[build-dependencies]
+napi-build = "2"

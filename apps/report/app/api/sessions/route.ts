@@ -3,9 +3,15 @@ import path from 'node:path';
 
 import { NextResponse } from 'next/server';
 
-import type { MediaCleanSession } from '@/lib/report-contract';
+import type { CleanupPlanDocument, MediaCleanSession } from '@/lib/report-contract';
 import { inferCleanupPlanPath, repoRoot } from '@/lib/local-paths';
 import { readTrashedAssetIdsForPlan, readTrashedAssetIdsForSession } from '@/lib/report-state';
+import {
+  deleteReportSessionFromStore,
+  listReportSessionsFromStore,
+  persistReportRuntime,
+  upsertReportSessionIndex,
+} from '@/lib/report-store';
 
 export const runtime = 'nodejs';
 
@@ -33,11 +39,16 @@ export async function GET(request: Request) {
     const limit = Number(url.searchParams.get('limit') ?? 30);
     const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(Math.floor(limit), 1), 100) : 30;
     const root = repoRoot();
+    const storedSessions = listReportSessionsFromStore(safeLimit);
     const sessionPaths = await findSessionPaths(root);
-    const sessions = (
+    const scannedSessions = (
       await Promise.all(sessionPaths.map((sessionPath) => readSessionHistoryItem(sessionPath)))
     )
       .filter((session): session is SessionHistoryItem => Boolean(session))
+    const sessionByPath = new Map<string, SessionHistoryItem>();
+    for (const session of storedSessions) sessionByPath.set(session.sessionPath, session);
+    for (const session of scannedSessions) sessionByPath.set(session.sessionPath, session);
+    const sessions = [...sessionByPath.values()]
       .sort((left, right) => Date.parse(right.generatedAt) - Date.parse(left.generatedAt))
       .slice(0, safeLimit);
 
@@ -61,6 +72,7 @@ export async function DELETE(request: Request) {
 
     await fsp.access(sessionPath);
     await fsp.rm(sessionDir, { recursive: true, force: true });
+    deleteReportSessionFromStore(sessionPath);
 
     return NextResponse.json({ deleted: true, sessionPath, sessionDir });
   } catch (error) {
@@ -149,6 +161,27 @@ async function readSessionHistoryItem(candidate: {
     const session = JSON.parse(await fsp.readFile(candidate.sessionPath, 'utf8')) as MediaCleanSession;
     const cleanupPlanPath = await optionalExistingPath(inferCleanupPlanPath(candidate.sessionPath));
     const cleanupHistory = await summarizeCleanupHistory(candidate.sessionPath, cleanupPlanPath, session);
+    const cleanupPlan = cleanupPlanPath
+      ? (JSON.parse(await fsp.readFile(cleanupPlanPath, 'utf8')) as CleanupPlanDocument)
+      : null;
+    if (cleanupPlan) {
+      persistReportRuntime({
+        sessionPath: candidate.sessionPath,
+        cleanupPlanPath,
+        session,
+        cleanupPlan,
+        source: candidate.source,
+        cleanupHistory,
+      });
+    } else {
+      upsertReportSessionIndex({
+        sessionPath: candidate.sessionPath,
+        cleanupPlanPath,
+        session,
+        source: candidate.source,
+        cleanupHistory,
+      });
+    }
 
     return {
       sessionPath: candidate.sessionPath,

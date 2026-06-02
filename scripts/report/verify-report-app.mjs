@@ -1,11 +1,13 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(__dirname, '..', '..');
 const session = firstExisting([
   'artifacts/scan/rust-cli/session.json',
@@ -69,6 +71,30 @@ try {
     `http://127.0.0.1:${port}/api/report?session=${encodeURIComponent(completedScan.session)}&plan=${encodeURIComponent(completedScan.cleanupPlan)}`,
   );
   assert(scannedPayload.summary?.assetCount > 0, 'scan job result must be readable by report API');
+  const scannedAssetId = scannedPayload.cleanupPlan?.plans?.[0]?.assetIds?.[0];
+  if (scannedAssetId) {
+    const confirmedTrash = await postJson(`http://127.0.0.1:${port}/api/trash`, {
+      session: completedScan.session,
+      plan: completedScan.cleanupPlan,
+      assetIds: [scannedAssetId],
+      confirm: true,
+    });
+    assert(confirmedTrash.assetCount === 1, 'trash bridge confirm must select one scanned file');
+  }
+  const sessions = await getJson(`http://127.0.0.1:${port}/api/sessions?limit=5`);
+  assert(Array.isArray(sessions.sessions), 'sessions API must return a session list');
+  const storeSummary = readReportStoreSummary();
+  assert(storeSummary.jobCount > 0, 'SQLite report store must index scan jobs');
+  assert(storeSummary.desktopJobCount > 0, 'SQLite report store must keep desktop scan job history');
+  assert(storeSummary.sessionCount > 0, 'SQLite report store must index sessions');
+  assert(storeSummary.scanBatchCount > 0, 'SQLite report store must persist scan batches');
+  assert(storeSummary.assetManifestCount > 0, 'SQLite report store must persist asset manifests');
+  assert(storeSummary.mediaAnalysisCount > 0, 'SQLite report store must persist media analysis');
+  assert(storeSummary.candidateViewCount > 0, 'SQLite report store must persist candidate views');
+  assert(storeSummary.recognitionGroupCount > 0, 'SQLite report store must persist recognition groups');
+  assert(storeSummary.recognitionMemberCount > 0, 'SQLite report store must persist recognition members');
+  assert(storeSummary.userDecisionCount > 0, 'SQLite report store must persist user cleanup decisions');
+  assert(storeSummary.recycleBinStateCount > 0, 'SQLite report store must persist recycle bin state');
   await getText(`http://127.0.0.1:${port}/?session=${encodeURIComponent(session)}`);
   console.log(`report app verify ok: http://127.0.0.1:${port}/?session=${encodeURIComponent(session)}`);
 } finally {
@@ -211,6 +237,41 @@ function firstExisting(candidates) {
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function readReportStoreSummary() {
+  const { DatabaseSync } = require('node:sqlite');
+  const dbPath = path.join(repoRoot, '.mc', '_state', 'report-workbench.sqlite');
+  assert(fs.existsSync(dbPath), 'SQLite report store must exist');
+  const db = new DatabaseSync(dbPath);
+  try {
+    const jobCount = db.prepare('SELECT COUNT(*) AS count FROM scan_job').get().count;
+    const desktopJobCount = db.prepare('SELECT COUNT(*) AS count FROM desktop_scan_job').get().count;
+    const sessionCount = db.prepare('SELECT COUNT(*) AS count FROM report_session').get().count;
+    const scanBatchCount = db.prepare('SELECT COUNT(*) AS count FROM scan_batch').get().count;
+    const assetManifestCount = db.prepare('SELECT COUNT(*) AS count FROM asset_manifest').get().count;
+    const mediaAnalysisCount = db.prepare('SELECT COUNT(*) AS count FROM media_analysis').get().count;
+    const candidateViewCount = db.prepare('SELECT COUNT(*) AS count FROM candidate_view').get().count;
+    const recognitionGroupCount = db.prepare('SELECT COUNT(*) AS count FROM recognition_group').get().count;
+    const recognitionMemberCount = db.prepare('SELECT COUNT(*) AS count FROM recognition_member').get().count;
+    const userDecisionCount = db.prepare('SELECT COUNT(*) AS count FROM user_decision').get().count;
+    const recycleBinStateCount = db.prepare('SELECT COUNT(*) AS count FROM recycle_bin_state').get().count;
+    return {
+      jobCount: Number(jobCount),
+      desktopJobCount: Number(desktopJobCount),
+      sessionCount: Number(sessionCount),
+      scanBatchCount: Number(scanBatchCount),
+      assetManifestCount: Number(assetManifestCount),
+      mediaAnalysisCount: Number(mediaAnalysisCount),
+      candidateViewCount: Number(candidateViewCount),
+      recognitionGroupCount: Number(recognitionGroupCount),
+      recognitionMemberCount: Number(recognitionMemberCount),
+      userDecisionCount: Number(userDecisionCount),
+      recycleBinStateCount: Number(recycleBinStateCount),
+    };
+  } finally {
+    db.close();
+  }
 }
 
 function prepareScanFixture(root) {

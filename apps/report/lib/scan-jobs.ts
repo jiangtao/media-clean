@@ -3,8 +3,10 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 
 import { spawnMc } from '@/lib/mc-cli';
+import { scanDirectoryWithNativeEngine } from '@/lib/mc-engine';
 import { repoRoot, resolveInputPath } from '@/lib/local-paths';
 import type { CleanupPlanDocument, MediaCleanSession } from '@/lib/report-contract';
+import { listStoredScanJobs, persistReportRuntime, upsertScanJobSnapshot } from '@/lib/report-store';
 
 export type ScanJobStatus =
   | 'queued'
@@ -97,9 +99,12 @@ export async function startScanJob(input: StartScanJobInput) {
 }
 
 export function listScanJobs() {
-  return [...jobs.values()]
+  const memoryJobs = [...jobs.values()]
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
     .map(snapshot);
+  const seen = new Set(memoryJobs.map((job) => job.jobId));
+  const storedJobs = listStoredScanJobs(30).filter((job) => !seen.has(job.jobId));
+  return [...memoryJobs, ...storedJobs].slice(0, 30);
 }
 
 export function getScanJob(jobId: string) {
@@ -131,25 +136,28 @@ async function runScanJob(job: ScanJob, sessionDir: string) {
     job.status = 'scanning';
     job.phase = 'scanning';
     touch(job);
-    await runProcess(job, [
-      'scan',
-      job.root,
-      '--format',
-      'json',
-      '--out',
-      job.session,
-      '--session-id',
-      job.sessionId,
-      '--media-type',
-      job.mediaType,
-    ]);
+    const nativeResult = await runNativeScanIfAvailable(job);
+    if (!nativeResult) {
+      await runProcess(job, [
+        'scan',
+        job.root,
+        '--format',
+        'json',
+        '--out',
+        job.session,
+        '--session-id',
+        job.sessionId,
+        '--media-type',
+        job.mediaType,
+      ]);
 
-    if (job.cancelRequested) return;
+      if (job.cancelRequested) return;
 
-    job.status = 'planning';
-    job.phase = 'planning';
-    touch(job);
-    await runProcess(job, ['plan', job.session, '--out', job.cleanupPlan]);
+      job.status = 'planning';
+      job.phase = 'planning';
+      touch(job);
+      await runProcess(job, ['plan', job.session, '--out', job.cleanupPlan]);
+    }
 
     if (job.cancelRequested) return;
 
@@ -161,6 +169,17 @@ async function runScanJob(job: ScanJob, sessionDir: string) {
     job.clusterCount = session.clusters.length;
     job.cleanupPlanCount = cleanupPlan.plans.length;
     job.diagnosticCount = session.diagnostics?.length ?? 0;
+    persistReportRuntime({
+      sessionPath: job.session,
+      cleanupPlanPath: job.cleanupPlan,
+      session,
+      cleanupPlan,
+      source: 'mc',
+      cleanupHistory: {
+        assetCount: 0,
+        fileSize: 0,
+      },
+    });
     job.progress = {
       processed: session.assets.length,
       total: session.assets.length,
@@ -181,6 +200,37 @@ async function runScanJob(job: ScanJob, sessionDir: string) {
     appendLog(job, `[mc report] scan job failed: ${job.error}`);
   } finally {
     job.child = undefined;
+  }
+}
+
+async function runNativeScanIfAvailable(job: ScanJob) {
+  try {
+    const result = scanDirectoryWithNativeEngine({
+      root: job.root,
+      sessionId: job.sessionId,
+      sessionPath: job.session,
+      cleanupPlanPath: job.cleanupPlan,
+      mediaType: job.mediaType,
+      progress: true,
+    });
+    if (!result) return false;
+    job.assetCount = result.assetCount;
+    job.clusterCount = result.clusterCount;
+    job.cleanupPlanCount = result.cleanupPlanCount;
+    job.diagnosticCount = result.diagnosticCount;
+    job.progress = {
+      processed: result.assetCount,
+      total: result.assetCount,
+      percent: 100,
+    };
+    appendLog(job, `[mc report] native engine scan completed assets=${result.assetCount} clusters=${result.clusterCount}`);
+    return true;
+  } catch (error) {
+    if (process.env.MC_REPORT_ENGINE === 'napi') {
+      throw error;
+    }
+    appendLog(job, `[mc report] native engine unavailable, falling back to CLI: ${error instanceof Error ? error.message : String(error)}`);
+    return false;
   }
 }
 
@@ -331,6 +381,7 @@ function appendLog(job: ScanJob, line: string) {
 
 function touch(job: ScanJob) {
   job.updatedAt = new Date().toISOString();
+  upsertScanJobSnapshot(snapshot(job));
 }
 
 function progressPercent(processed: number, total: number) {

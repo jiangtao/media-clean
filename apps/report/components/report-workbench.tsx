@@ -63,7 +63,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { ReportLoadingSkeleton } from '@/components/report-loading-skeleton';
+import { HomeLoadingSkeleton, ReportLoadingSkeleton } from '@/components/report-loading-skeleton';
 import { ScanWorkbench } from '@/components/scan-workbench';
 import { SessionHistory } from '@/components/session-history';
 import type {
@@ -177,10 +177,15 @@ interface BridgeResult {
   }>;
 }
 
-export function ReportWorkbench() {
-  const [sessionPath, setSessionPath] = useState<string | null>(null);
-  const [planPath, setPlanPath] = useState<string | null>(null);
-  const [workspaceTab, setWorkspaceTab] = useState<'scan' | 'review'>('review');
+interface ReportWorkbenchProps {
+  initialSessionPath?: string | null;
+  initialPlanPath?: string | null;
+}
+
+export function ReportWorkbench({ initialSessionPath = null, initialPlanPath = null }: ReportWorkbenchProps) {
+  const [sessionPath, setSessionPath] = useState<string | null>(initialSessionPath);
+  const [planPath, setPlanPath] = useState<string | null>(initialPlanPath);
+  const [workspaceTab, setWorkspaceTab] = useState<'scan' | 'review'>(initialSessionPath ? 'review' : 'scan');
   const [payload, setPayload] = useState<ReportPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -195,14 +200,6 @@ export function ReportWorkbench() {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [bridgeResult, setBridgeResult] = useState<BridgeResult | null>(null);
   const [bridgePending, setBridgePending] = useState(false);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const nextSessionPath = params.get('session');
-    setSessionPath(nextSessionPath);
-    setPlanPath(params.get('plan'));
-    if (!nextSessionPath) setWorkspaceTab('scan');
-  }, []);
 
   const loadReport = useCallback(async () => {
     if (!sessionPath) {
@@ -408,7 +405,7 @@ export function ReportWorkbench() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  if (loading) return <ReportLoadingSkeleton />;
+  if (loading) return sessionPath ? <ReportLoadingSkeleton /> : <HomeLoadingSkeleton />;
   if (!sessionPath) {
     return (
       <main className="mx-auto flex min-h-screen max-w-[1440px] flex-col gap-5 px-5 py-6">

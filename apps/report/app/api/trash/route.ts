@@ -8,6 +8,7 @@ import { runMc } from '@/lib/mc-cli';
 import type { CleanupPlanDocument } from '@/lib/report-contract';
 import { inferCleanupPlanPath, resolveInputPath } from '@/lib/local-paths';
 import { markTrashedAssetsForPlan, successfulTrashAssetIds } from '@/lib/report-state';
+import { markAssetsTrashedInStore } from '@/lib/report-store';
 
 export const runtime = 'nodejs';
 
@@ -58,6 +59,16 @@ export async function POST(request: Request) {
     const cli = await runMcQuarantine(selected.planPath, requestedPlanIds, Boolean(body.confirm));
     const trashedAssetIds = body.confirm ? successfulTrashAssetIds(cli.actions) : new Set<string>();
     const statePath = trashedAssetIds.size > 0 ? await markTrashedAssetsForPlan(planPath, trashedAssetIds) : null;
+    if (trashedAssetIds.size > 0) {
+      const fileSizeByAssetId = new Map(cleanupPlan.assets.map((asset) => [asset.id, asset.fileSize]));
+      markAssetsTrashedInStore(
+        planPath,
+        [...trashedAssetIds].map((assetId) => ({
+          id: assetId,
+          fileSize: fileSizeByAssetId.get(assetId) ?? 0,
+        })),
+      );
+    }
 
     return NextResponse.json({
       mode: cli.mode,

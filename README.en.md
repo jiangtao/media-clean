@@ -142,6 +142,22 @@ npm run ios
 
 The current primary acceptance path remains Android. iOS keeps Expo-layer compatibility, but it is not the first-version release acceptance focus.
 
+## Rust Core + CLI Workbench
+
+If you want to work directly with the Rust recognition engine and the local review workbench, instead of running the mobile app, the current recommended entrypoint is the `mc` CLI.
+
+Full user documentation:
+
+1. Rust Core + CLI user guide: [docs/product/core-cli-workbench.en.md](./docs/product/core-cli-workbench.en.md)
+2. Chinese version: [docs/product/core-cli-workbench.md](./docs/product/core-cli-workbench.md)
+
+That guide covers:
+
+1. What `mc` currently does.
+2. How to install the CLI from source.
+3. The full `scan -> plan -> report -> workbench review -> dry-run -> trash` workflow.
+4. How the CLI workbench maps back to the app structure.
+
 ## Common Commands
 
 ### App Verification
@@ -231,15 +247,16 @@ Acceptance should focus on:
 
 ## Documentation
 
-1. Product publishing page docs: [docs/product/page-home.en.md](./docs/product/page-home.en.md); Chinese version: [docs/product/page-home.md](./docs/product/page-home.md).
-2. Android release contract: [docs/release/android.en.md](./docs/release/android.en.md); Chinese version: [docs/release/android.md](./docs/release/android.md).
-3. Agent Device device-observability contract: [docs/release/agent-device.en.md](./docs/release/agent-device.en.md); Chinese version: [docs/release/agent-device.md](./docs/release/agent-device.md).
-4. Maestro acceptance contract: [docs/release/maestro.en.md](./docs/release/maestro.en.md); Chinese version: [docs/release/maestro.md](./docs/release/maestro.md).
-5. Vercel release contract: [docs/release/vercel.en.md](./docs/release/vercel.en.md); Chinese version: [docs/release/vercel.md](./docs/release/vercel.md).
-6. Android scan and recognition design: [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md); Chinese version: [design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md).
-7. Execution standard: [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md); Chinese version: [docs/standards/execution-standards.md](./docs/standards/execution-standards.md).
-8. Team-mode standard: [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md); Chinese version: [docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md).
-9. Publishing page directory docs: [page/README.en.md](./page/README.en.md); Chinese version: [page/README.md](./page/README.md).
+1. Rust Core + CLI user guide: [docs/product/core-cli-workbench.en.md](./docs/product/core-cli-workbench.en.md); Chinese version: [docs/product/core-cli-workbench.md](./docs/product/core-cli-workbench.md).
+2. Product publishing page docs: [docs/product/page-home.en.md](./docs/product/page-home.en.md); Chinese version: [docs/product/page-home.md](./docs/product/page-home.md).
+3. Android release contract: [docs/release/android.en.md](./docs/release/android.en.md); Chinese version: [docs/release/android.md](./docs/release/android.md).
+4. Agent Device device-observability contract: [docs/release/agent-device.en.md](./docs/release/agent-device.en.md); Chinese version: [docs/release/agent-device.md](./docs/release/agent-device.md).
+5. Maestro acceptance contract: [docs/release/maestro.en.md](./docs/release/maestro.en.md); Chinese version: [docs/release/maestro.md](./docs/release/maestro.md).
+6. Vercel release contract: [docs/release/vercel.en.md](./docs/release/vercel.en.md); Chinese version: [docs/release/vercel.md](./docs/release/vercel.md).
+7. Android scan and recognition design: [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md); Chinese version: [design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md).
+8. Execution standard: [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md); Chinese version: [docs/standards/execution-standards.md](./docs/standards/execution-standards.md).
+9. Team-mode standard: [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md); Chinese version: [docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md).
+10. Publishing page directory docs: [page/README.en.md](./page/README.en.md); Chinese version: [page/README.md](./page/README.md).
 
 Android device observability workflows:
 

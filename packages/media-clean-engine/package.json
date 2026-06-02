@@ -1,0 +1,13 @@
+{
+  "name": "@mistap/media-clean-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Node package wrapper for the Media Clean Rust recognition engine",
+  "main": "index.cjs",
+  "types": "index.d.ts",
+  "scripts": {
+    "build:native": "node scripts/build-native.mjs",
+    "build:native:release": "node scripts/build-native.mjs --release",
+    "smoke": "node smoke.cjs"
+  }
+}

@@ -9,6 +9,11 @@ import {
   readTrashedAssetIdsForPlan,
   readTrashedAssetIdsForSession,
 } from '@/lib/report-state';
+import {
+  loadReportDocumentsFromStore,
+  persistReportRuntime,
+  readTrashedAssetIdsFromStore,
+} from '@/lib/report-store';
 
 export const runtime = 'nodejs';
 
@@ -30,11 +35,18 @@ export async function GET(request: Request) {
   const planPath =
     optionalExistingPath(url.searchParams.get('plan') ?? process.env.MC_REPORT_PLAN ?? '') ??
     optionalExistingPath(inferCleanupPlanPath(sessionPath));
-  const session = JSON.parse(await fs.readFile(sessionPath, 'utf8')) as MediaCleanSession;
-  const cleanupPlan = planPath
-    ? (JSON.parse(await fs.readFile(planPath, 'utf8')) as CleanupPlanDocument)
-    : null;
-  const trashedAssetIds = await readTrashedAssetIdsForSession(sessionPath);
+
+  const stored = loadReportDocumentsFromStore(sessionPath);
+  const { session, cleanupPlan } =
+    stored && (!planPath || stored.paths.cleanupPlan === planPath || stored.cleanupPlan)
+      ? {
+          session: stored.session,
+          cleanupPlan: stored.cleanupPlan,
+        }
+      : await readAndPersistReportDocuments(sessionPath, planPath);
+
+  const trashedAssetIds = readTrashedAssetIdsFromStore();
+  for (const assetId of await readTrashedAssetIdsForSession(sessionPath)) trashedAssetIds.add(assetId);
   if (planPath) {
     for (const assetId of await readTrashedAssetIdsForPlan(planPath)) trashedAssetIds.add(assetId);
   }
@@ -90,4 +102,23 @@ function summarizeCleanupHistory(session: MediaCleanSession, trashedAssetIds: Se
     assetCount: assets.length,
     fileSize: assets.reduce((total, asset) => total + asset.fileSize, 0),
   };
+}
+
+async function readAndPersistReportDocuments(sessionPath: string, planPath: string | null) {
+  const session = JSON.parse(await fs.readFile(sessionPath, 'utf8')) as MediaCleanSession;
+  const cleanupPlan = planPath
+    ? (JSON.parse(await fs.readFile(planPath, 'utf8')) as CleanupPlanDocument)
+    : null;
+  persistReportRuntime({
+    sessionPath,
+    cleanupPlanPath: planPath,
+    session,
+    cleanupPlan,
+    source: sessionPath.includes('/artifacts/scan/') ? 'artifact' : 'mc',
+    cleanupHistory: {
+      assetCount: 0,
+      fileSize: 0,
+    },
+  });
+  return { session, cleanupPlan };
 }

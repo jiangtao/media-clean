@@ -142,6 +142,22 @@ npm run ios
 
 当前主验收路径仍是 Android；iOS 保留 Expo 层兼容性，但不是第一版发布验收重点。
 
+## Rust Core + CLI Workbench
+
+如果你要直接使用本仓库的 Rust 识别引擎和本地 review workbench，而不是跑移动 App，当前推荐入口是 `mc` CLI。
+
+完整用户链路文档见：
+
+1. Rust Core + CLI 用户使用指南：[docs/product/core-cli-workbench.md](./docs/product/core-cli-workbench.md)
+2. 英文版：[docs/product/core-cli-workbench.en.md](./docs/product/core-cli-workbench.en.md)
+
+这份文档覆盖：
+
+1. `mc` 的功能说明。
+2. 从源码安装 CLI 的方式。
+3. `scan -> plan -> report -> workbench review -> dry-run -> trash` 全链路命令。
+4. CLI workbench 和 App 结构如何对应。
+
 ## 常用命令
 
 ### App 验证
@@ -231,15 +247,16 @@ curl -sSI http://127.0.0.1:4173/
 
 ## 文档入口
 
-1. 产品发布页说明：[docs/product/page-home.md](./docs/product/page-home.md)，英文版 [docs/product/page-home.en.md](./docs/product/page-home.en.md)。
-2. Android 发包契约：[docs/release/android.md](./docs/release/android.md)，英文版 [docs/release/android.en.md](./docs/release/android.en.md)。
-3. Agent Device 设备观测契约：[docs/release/agent-device.md](./docs/release/agent-device.md)，英文版 [docs/release/agent-device.en.md](./docs/release/agent-device.en.md)。
-4. Maestro 验收契约：[docs/release/maestro.md](./docs/release/maestro.md)，英文版 [docs/release/maestro.en.md](./docs/release/maestro.en.md)。
-5. Vercel 发布契约：[docs/release/vercel.md](./docs/release/vercel.md)，英文版 [docs/release/vercel.en.md](./docs/release/vercel.en.md)。
-6. Android 扫描与识别设计：[design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md)，英文版 [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md)。
-7. 执行标准：[docs/standards/execution-standards.md](./docs/standards/execution-standards.md)，英文版 [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md)。
-8. 团队模式标准：[docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md)，英文版 [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md)。
-9. 发布页目录说明：[page/README.md](./page/README.md)，英文版 [page/README.en.md](./page/README.en.md)。
+1. Rust Core + CLI 用户使用指南：[docs/product/core-cli-workbench.md](./docs/product/core-cli-workbench.md)，英文版 [docs/product/core-cli-workbench.en.md](./docs/product/core-cli-workbench.en.md)。
+2. 产品发布页说明：[docs/product/page-home.md](./docs/product/page-home.md)，英文版 [docs/product/page-home.en.md](./docs/product/page-home.en.md)。
+3. Android 发包契约：[docs/release/android.md](./docs/release/android.md)，英文版 [docs/release/android.en.md](./docs/release/android.en.md)。
+4. Agent Device 设备观测契约：[docs/release/agent-device.md](./docs/release/agent-device.md)，英文版 [docs/release/agent-device.en.md](./docs/release/agent-device.en.md)。
+5. Maestro 验收契约：[docs/release/maestro.md](./docs/release/maestro.md)，英文版 [docs/release/maestro.en.md](./docs/release/maestro.en.md)。
+6. Vercel 发布契约：[docs/release/vercel.md](./docs/release/vercel.md)，英文版 [docs/release/vercel.en.md](./docs/release/vercel.en.md)。
+7. Android 扫描与识别设计：[design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md)，英文版 [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md)。
+8. 执行标准：[docs/standards/execution-standards.md](./docs/standards/execution-standards.md)，英文版 [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md)。
+9. 团队模式标准：[docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md)，英文版 [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md)。
+10. 发布页目录说明：[page/README.md](./page/README.md)，英文版 [page/README.en.md](./page/README.en.md)。
 
 Android 设备观测 workflow：
 

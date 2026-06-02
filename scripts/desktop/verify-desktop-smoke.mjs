@@ -762,7 +762,13 @@ function assertNotificationSmokeJson(notifications) {
   if (notifications.suppressedInSmoke !== true || notifications.suppressed !== true || notifications.canShow !== false || notifications.suppressedReason !== 'smoke') {
     throw new Error(`desktop package smoke must dry-run and suppress product scan notifications: ${JSON.stringify(notifications)}`);
   }
-  if (notifications.appBundleId !== 'com.mediaclean.desktop' || !/Notifications-Settings\.extension/.test(String(notifications.settingsTarget || ''))) {
+  if (notifications.appBundleId !== 'com.mediaclean.desktop') {
+    throw new Error(`desktop package smoke notification app identity is invalid: ${JSON.stringify(notifications)}`);
+  }
+  const settingsTarget = String(notifications.settingsTarget || '');
+  const requiresSettingsTarget = process.platform === 'darwin' || process.platform === 'win32';
+  const hasPlatformSettingsTarget = /Notifications-Settings\.extension|ms-settings:notifications/.test(settingsTarget);
+  if (requiresSettingsTarget && !hasPlatformSettingsTarget) {
     throw new Error(`desktop package smoke notification settings target is invalid: ${JSON.stringify(notifications)}`);
   }
   if (notifications.clickTarget !== 'review-result-or-workbench') {

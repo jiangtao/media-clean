@@ -3505,11 +3505,25 @@ select:focus {
 /* Integrated product-facing overrides after sub-agent passes. */
 body:has(.tray-surface) {
   background: transparent;
+  overflow: hidden;
 }
 
 body:has(.tray-surface) #root {
+  width: 100dvw;
   min-height: auto;
+  overflow: hidden;
   background: transparent;
+}
+
+.tray-surface {
+  width: 720px;
+  max-width: 100dvw;
+  min-height: auto;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: hidden;
+  background: transparent;
+  padding: 0;
 }
 
 .about-actions {
@@ -3518,7 +3532,17 @@ body:has(.tray-surface) #root {
 }
 
 .tray-island {
+  width: 720px;
+  max-width: 100dvw;
+  max-height: 100dvh;
+  overflow: auto;
+  scrollbar-width: none;
   transform-origin: top center;
+}
+
+.tray-island::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .tray-progress-summary {

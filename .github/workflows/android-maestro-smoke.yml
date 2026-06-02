@@ -84,7 +84,6 @@ jobs:
               - "app.json"
               - "babel.config.js"
               - "metro.config.js"
-              - "tsconfig.json"
               - "plugins/**"
               - "scripts/android/**"
               - "android/**"
@@ -105,6 +104,7 @@ jobs:
             shared:
               - "package.json"
               - "package-lock.json"
+              - "tsconfig.json"
 
       - name: Route Android smoke
         id: route
@@ -124,7 +124,7 @@ jobs:
             echo "Android paths changed: Android Maestro smoke enabled." >> "$GITHUB_STEP_SUMMARY"
           elif [[ "$shared_changed" == "true" && "$desktop_changed" != "true" ]]; then
             echo "run_android=true" >> "$GITHUB_OUTPUT"
-            echo "Shared package files changed without desktop paths: Android Maestro smoke enabled." >> "$GITHUB_STEP_SUMMARY"
+            echo "Shared root files changed without desktop paths: Android Maestro smoke enabled." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "run_android=false" >> "$GITHUB_OUTPUT"
             echo "Desktop-only or non-Android change: Android Maestro smoke skipped." >> "$GITHUB_STEP_SUMMARY"

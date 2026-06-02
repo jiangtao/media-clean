@@ -6,6 +6,8 @@ Media Clean is a local photo-library recognition and cleanup tool. It is built f
 
 Product website: [https://mc.jerret.me](https://mc.jerret.me)
 
+Desktop release: [Media Clean Desktop 0.0.1](https://github.com/jiangtao/media-clean/releases/tag/desktop-v0.0.1), macOS DMG: [media-clean-desktop-macos-arm64.dmg](https://github.com/jiangtao/media-clean/releases/download/desktop-v0.0.1/media-clean-desktop-macos-arm64.dmg).
+
 <video controls width="100%" src="./page/public/promo-video-60fps.mp4">
   This reader does not support embedded video playback.
 </video>
@@ -87,8 +89,9 @@ Media Clean is currently an Expo / React Native app, with Android as the primary
 9. `src/services/media/`: visual analysis and temporary analysis-file cache management. Durable truth should only store results and original media URIs; temporary files are not product data.
 10. `plugins/withBackgroundScan.js`: Expo config plugin that injects Android background-scan native modules, foreground service, and permissions into the native project.
 11. `android/`: current prebuilt Android native project for real-device builds, debugging, and verification.
-12. `page/`: independent Vercel static publishing page.
-13. `docs/` and `design/`: goals, standards, release contracts, Android-first scan design, and product page documentation.
+12. `apps/desktop/`: Electron desktop workbench for local scan, recognition queues, review cleanup, tray status, and desktop notifications.
+13. `page/`: independent Vercel static publishing page.
+14. `docs/` and `design/`: goals, standards, release contracts, Android-first scan design, and product page documentation.
 
 ## Data And State Contract
 
@@ -182,6 +185,15 @@ The primary Android device-observability contract: [docs/release/agent-device.en
 
 If Gradle daemon or Kotlin daemon errors mention locks, caches, or compile-daemon failures, first clean or restart the Gradle daemon, then classify whether the issue is an environment lock, disk pressure, network repository access, or a code error.
 
+### Desktop Builds
+
+```bash
+npm --prefix apps/desktop run build
+npm run desktop:package:smoke
+```
+
+Desktop PR validation uses the Electron-specific workflow. Formal desktop releases use the `release-desktop` workflow. Packaging, signing, size, and update-placeholder contracts: [docs/release/electron-desktop.en.md](./docs/release/electron-desktop.en.md); Chinese version: [docs/release/electron-desktop.md](./docs/release/electron-desktop.md).
+
 ### Publishing Page
 
 ```bash
@@ -249,14 +261,15 @@ Acceptance should focus on:
 
 1. Rust Core + CLI user guide: [docs/product/core-cli-workbench.en.md](./docs/product/core-cli-workbench.en.md); Chinese version: [docs/product/core-cli-workbench.md](./docs/product/core-cli-workbench.md).
 2. Product publishing page docs: [docs/product/page-home.en.md](./docs/product/page-home.en.md); Chinese version: [docs/product/page-home.md](./docs/product/page-home.md).
-3. Android release contract: [docs/release/android.en.md](./docs/release/android.en.md); Chinese version: [docs/release/android.md](./docs/release/android.md).
-4. Agent Device device-observability contract: [docs/release/agent-device.en.md](./docs/release/agent-device.en.md); Chinese version: [docs/release/agent-device.md](./docs/release/agent-device.md).
-5. Maestro acceptance contract: [docs/release/maestro.en.md](./docs/release/maestro.en.md); Chinese version: [docs/release/maestro.md](./docs/release/maestro.md).
-6. Vercel release contract: [docs/release/vercel.en.md](./docs/release/vercel.en.md); Chinese version: [docs/release/vercel.md](./docs/release/vercel.md).
-7. Android scan and recognition design: [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md); Chinese version: [design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md).
-8. Execution standard: [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md); Chinese version: [docs/standards/execution-standards.md](./docs/standards/execution-standards.md).
-9. Team-mode standard: [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md); Chinese version: [docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md).
-10. Publishing page directory docs: [page/README.en.md](./page/README.en.md); Chinese version: [page/README.md](./page/README.md).
+3. Electron Desktop release contract: [docs/release/electron-desktop.en.md](./docs/release/electron-desktop.en.md); Chinese version: [docs/release/electron-desktop.md](./docs/release/electron-desktop.md).
+4. Android release contract: [docs/release/android.en.md](./docs/release/android.en.md); Chinese version: [docs/release/android.md](./docs/release/android.md).
+5. Agent Device device-observability contract: [docs/release/agent-device.en.md](./docs/release/agent-device.en.md); Chinese version: [docs/release/agent-device.md](./docs/release/agent-device.md).
+6. Maestro acceptance contract: [docs/release/maestro.en.md](./docs/release/maestro.en.md); Chinese version: [docs/release/maestro.md](./docs/release/maestro.md).
+7. Vercel release contract: [docs/release/vercel.en.md](./docs/release/vercel.en.md); Chinese version: [docs/release/vercel.md](./docs/release/vercel.md).
+8. Android scan and recognition design: [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md); Chinese version: [design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md).
+9. Execution standard: [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md); Chinese version: [docs/standards/execution-standards.md](./docs/standards/execution-standards.md).
+10. Team-mode standard: [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md); Chinese version: [docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md).
+11. Publishing page directory docs: [page/README.en.md](./page/README.en.md); Chinese version: [page/README.md](./page/README.md).
 
 Android device observability workflows:
 

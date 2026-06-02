@@ -469,7 +469,13 @@ function spawnPackageLikeElectron(fakeBinDir, resourcesDir, smokeApp) {
   const enginePackagePath = path.join(resourcesDir, 'media-clean-engine');
   const scanWorkerPath = path.join(resourcesDir, 'scan-worker.cjs');
   const smokeStateRoot = path.join(smokeApp.root, '.mc');
-  return spawn(process.execPath, [electronCli, smokeApp.asarPath], {
+  const electronArgs = [electronCli];
+  if (process.platform === 'linux' && process.env.CI) {
+    electronArgs.push('--no-sandbox');
+  }
+  electronArgs.push(smokeApp.asarPath);
+
+  return spawn(process.execPath, electronArgs, {
     cwd: smokeApp.root,
     env: {
       ...process.env,

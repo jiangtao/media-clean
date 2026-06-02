@@ -132,6 +132,9 @@ jobs:
         with:
           node-version: 24.11.0
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/desktop/package-lock.json
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -150,7 +153,7 @@ jobs:
         run: npm ci
 
       - name: Install desktop dependencies
-        run: npm install --prefix apps/desktop
+        run: npm ci --prefix apps/desktop
 
       - name: Build native engine
         run: npm run engine:napi:build
@@ -160,11 +163,6 @@ jobs:
 
       - name: Desktop static smoke
         run: npm --prefix apps/desktop run build
-
-      - name: Configure Electron sandbox
-        run: |
-          sudo chown root:root apps/desktop/node_modules/electron/dist/chrome-sandbox
-          sudo chmod 4755 apps/desktop/node_modules/electron/dist/chrome-sandbox
 
       - name: Desktop packaged smoke
         run: xvfb-run -a npm run desktop:package:smoke

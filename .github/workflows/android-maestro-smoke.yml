@@ -72,7 +72,6 @@ jobs:
         with:
           filters: |
             android:
-              - ".github/workflows/android-maestro-smoke.yml"
               - ".maestro/**"
               - "App.tsx"
               - "index.ts"
@@ -102,6 +101,7 @@ jobs:
               - "scripts/scan/**"
               - "page/public/apps/icons/logo.svg"
             shared:
+              - ".github/workflows/android-maestro-smoke.yml"
               - "package.json"
               - "package-lock.json"
               - "tsconfig.json"

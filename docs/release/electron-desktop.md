@@ -71,9 +71,9 @@ Desktop 第一阶段不走 Mac App Store 或 Microsoft Store。用户下载入�
 1. 官网固定入口后续接入：
    - macOS：`https://mc.jerret.me/download/media-clean-desktop-macos-arm64.dmg`
    - Windows：`https://mc.jerret.me/download/media-clean-desktop-windows-x64.zip`
-2. GitHub Release 备份入口当前由 `release-desktop` 直接发布：
-   - macOS：`https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-desktop-macos-arm64.dmg`
-   - Windows：`https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-desktop-windows-x64.zip`
+2. GitHub Release 备份入口当前由 `release-desktop` 直接发布。桌面端不能使用仓库级 `releases/latest`，因为该入口已经作为 Android latest 备份下载契约；Desktop 必须使用 tag-specific 地址：
+   - macOS：`https://github.com/jiangtao/media-clean/releases/download/desktop-v<version>/media-clean-desktop-macos-arm64.dmg`
+   - Windows：`https://github.com/jiangtao/media-clean/releases/download/desktop-v<version>/media-clean-desktop-windows-x64.zip`
 3. 每次正式发布同时上传版本化资产和 latest 别名资产。版本化资产用于审计、回滚和 checksum 追溯；latest 别名资产用于用户下载按钮。
 4. macOS 默认公开 `.dmg` 是开源免费分发包：ad-hoc signed、未 notarized。下载页和 Release notes 必须明确提示首次打开可能触发 Gatekeeper，用户需要先校验 `media-clean-desktop-latest.sha256`，再通过 Control-click / Open 或 System Settings / Privacy & Security / Open Anyway 打开。
 5. 如果后续拿到 Apple Developer ID，`release-desktop` 可选择 `signed-notarized` 模式；只有这个模式才需要 `MACOS_CERTIFICATE_BASE64`、`APPLE_ID` 等 secrets，并且 `MACOS_CERTIFICATE_BASE64` 必须是 `.p12` 证书的 base64，不是邮箱地址。
@@ -186,7 +186,7 @@ Electron Desktop 的体积风险主要来自 Electron runtime、renderer bundle�
 1. `resolve-release`：校验 `desktop-v<version>` tag、解析 Desktop version 和 channel。
 2. `build-macos-release` / `build-windows-release`：并行产出 macOS 与 Windows release assets。
 3. `publish-release`：等待两个平台都成功后创建 tag，并把所有 assets 发布到同一个 GitHub Release。
-4. `publish-release` 会额外生成固定文件名 latest 别名，确保下载页可以长期指向 `releases/latest/download/...`，不需要知道版本号。
+4. `publish-release` 会额外生成固定文件名 latest 别名，但 GitHub 备份链接必须使用 `releases/download/desktop-v<version>/...`，不能占用仓库级 `releases/latest`。官网固定下载入口后续由 `mc.jerret.me/download/...` 指向当前桌面 tag。
 
 正式 Desktop workflow 默认不需要 Apple 付费账号。`macos_distribution=unsigned` 时不读取任何 Apple signing secrets，会产出开源免费分发用的 ad-hoc signed `.dmg`。
 

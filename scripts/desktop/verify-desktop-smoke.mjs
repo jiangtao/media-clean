@@ -363,7 +363,7 @@ function assertDesktopReleaseContracts() {
       throw new Error(`release-desktop workflow must publish multi-platform desktop assets: ${required}`);
     }
   }
-  for (const required of ['media-clean-desktop-macos-', 'media-clean-desktop-windows-', 'media-clean-desktop-latest.sha256', 'releases/latest/download']) {
+  for (const required of ['media-clean-desktop-macos-', 'media-clean-desktop-windows-', 'media-clean-desktop-latest.sha256', 'releases/download']) {
     if (!workflowSource.includes(required)) {
       throw new Error(`release-desktop workflow must publish stable user download aliases: ${required}`);
     }
@@ -395,6 +395,9 @@ function assertDesktopReleaseContracts() {
   }
   if (!/开源免费分发/.test(zhReleaseDoc) || !/open-source free distribution/.test(enReleaseDoc)) {
     throw new Error('desktop release docs must define the open-source free macOS distribution path');
+  }
+  if (!/不能使用仓库级 `releases\/latest`/.test(zhReleaseDoc) || !/must not use the repository-level `releases\/latest`/.test(enReleaseDoc)) {
+    throw new Error('desktop release docs must avoid taking over the Android repository-level latest release endpoint');
   }
 }
 

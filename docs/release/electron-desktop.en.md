@@ -71,9 +71,9 @@ The first Desktop release stage does not use the Mac App Store or Microsoft Stor
 1. Canonical website entries to wire next:
    - macOS: `https://mc.jerret.me/download/media-clean-desktop-macos-arm64.dmg`
    - Windows: `https://mc.jerret.me/download/media-clean-desktop-windows-x64.zip`
-2. GitHub Release backup entries are published by `release-desktop` now:
-   - macOS: `https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-desktop-macos-arm64.dmg`
-   - Windows: `https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-desktop-windows-x64.zip`
+2. GitHub Release backup entries are published by `release-desktop` now. Desktop must not use the repository-level `releases/latest` endpoint because that endpoint is already reserved by the Android latest backup contract. Desktop uses tag-specific URLs:
+   - macOS: `https://github.com/jiangtao/media-clean/releases/download/desktop-v<version>/media-clean-desktop-macos-arm64.dmg`
+   - Windows: `https://github.com/jiangtao/media-clean/releases/download/desktop-v<version>/media-clean-desktop-windows-x64.zip`
 3. Every formal release uploads both versioned assets and latest alias assets. Versioned assets are for audit, rollback, and checksum traceability; latest alias assets are for user-facing download buttons.
 4. The default public macOS `.dmg` is an open-source free distribution package: ad-hoc signed and not notarized. The download page and Release notes must say that first launch may trigger Gatekeeper; users should verify `media-clean-desktop-latest.sha256`, then open through Control-click / Open or System Settings / Privacy & Security / Open Anyway.
 5. If an Apple Developer ID becomes available later, `release-desktop` can use `signed-notarized` mode. Only that mode needs `MACOS_CERTIFICATE_BASE64`, `APPLE_ID`, and related secrets; `MACOS_CERTIFICATE_BASE64` must be a base64-encoded `.p12` certificate, not an email address.
@@ -186,7 +186,7 @@ Workflow direction:
 1. `resolve-release`: validates the `desktop-v<version>` tag and resolves Desktop version / channel.
 2. `build-macos-release` / `build-windows-release`: build platform release assets in parallel.
 3. `publish-release`: waits for both platforms, creates the tag, and publishes all assets to the same GitHub Release.
-4. `publish-release` also creates stable latest aliases so the download page can point to `releases/latest/download/...` without knowing the version number.
+4. `publish-release` also creates stable latest alias files, but GitHub backup links must use `releases/download/desktop-v<version>/...` and must not take over the repository-level `releases/latest`. The canonical website entry under `mc.jerret.me/download/...` can point to the current Desktop tag later.
 
 The formal Desktop workflow does not require a paid Apple account by default. When `macos_distribution=unsigned`, it reads no Apple signing secrets and publishes an ad-hoc signed `.dmg` for open-source free distribution.
 

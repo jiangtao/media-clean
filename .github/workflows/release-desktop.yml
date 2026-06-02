@@ -1,0 +1,393 @@
+name: Release Desktop
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Desktop release tag, for example desktop-v0.0.1"
+        required: true
+        type: string
+      desktop_version:
+        description: "Electron Desktop version. Defaults to release_tag without desktop-v."
+        required: false
+        type: string
+      release_channel:
+        description: "Desktop release channel"
+        required: false
+        default: "stable"
+        type: choice
+        options:
+          - stable
+          - beta
+          - internal
+      macos_distribution:
+        description: "macOS distribution mode. Use unsigned for open-source free distribution; signed-notarized requires Apple Developer secrets."
+        required: false
+        default: "unsigned"
+        type: choice
+        options:
+          - unsigned
+          - signed-notarized
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  resolve-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      release_tag: ${{ steps.release.outputs.tag }}
+      desktop_version: ${{ steps.release.outputs.version }}
+      release_channel: ${{ steps.release.outputs.channel }}
+      macos_distribution: ${{ steps.release.outputs.macos_distribution }}
+
+    steps:
+      - name: Resolve desktop release inputs
+        id: release
+        shell: bash
+        run: |
+          TAG="${{ inputs.release_tag }}"
+          if [[ ! "${TAG}" =~ ^desktop-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid desktop release tag: ${TAG}" >&2
+            exit 1
+          fi
+
+          VERSION="${{ inputs.desktop_version }}"
+          if [ -z "${VERSION}" ]; then
+            VERSION="${TAG#desktop-v}"
+          fi
+
+          if [ "${TAG}" != "desktop-v${VERSION}" ]; then
+            echo "desktop_version must match release_tag: ${VERSION} vs ${TAG}" >&2
+            exit 1
+          fi
+
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "channel=${{ inputs.release_channel || 'stable' }}" >> "${GITHUB_OUTPUT}"
+          echo "macos_distribution=${{ inputs.macos_distribution || 'unsigned' }}" >> "${GITHUB_OUTPUT}"
+
+  build-macos-release:
+    needs: resolve-release
+    runs-on: macos-latest
+    timeout-minutes: 75
+    env:
+      CI: "1"
+      DESKTOP_RELEASE_CHANNEL: ${{ needs.resolve-release.outputs.release_channel }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.11.0
+          cache: npm
+
+      - name: Setup Rust
+        run: rustup default stable
+
+      - name: Install repository dependencies
+        run: npm install
+
+      - name: Install desktop dependencies
+        run: npm install --prefix apps/desktop
+
+      - name: Import macOS signing certificate
+        if: ${{ needs.resolve-release.outputs.macos_distribution == 'signed-notarized' }}
+        env:
+          MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          for name in MACOS_CERTIFICATE_BASE64 MACOS_CERTIFICATE_PASSWORD MACOS_CODESIGN_IDENTITY APPLE_ID APPLE_TEAM_ID APPLE_APP_SPECIFIC_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required desktop signing secret: ${name}" >&2
+              exit 1
+            fi
+          done
+
+          KEYCHAIN_PASSWORD="${MACOS_KEYCHAIN_PASSWORD:-$(uuidgen)}"
+          KEYCHAIN_PATH="${RUNNER_TEMP}/media-clean-desktop-signing.keychain-db"
+          CERTIFICATE_PATH="${RUNNER_TEMP}/media-clean-desktop-signing.p12"
+
+          echo "${MACOS_CERTIFICATE_BASE64}" | base64 --decode > "${CERTIFICATE_PATH}"
+          security create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          security set-keychain-settings -lut 21600 "${KEYCHAIN_PATH}"
+          security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          security import "${CERTIFICATE_PATH}" -P "${MACOS_CERTIFICATE_PASSWORD}" -A -t cert -f pkcs12 -k "${KEYCHAIN_PATH}" -T /usr/bin/codesign
+          security list-keychain -d user -s "${KEYCHAIN_PATH}" $(security list-keychain -d user | sed s/\\\"//g)
+          security default-keychain -s "${KEYCHAIN_PATH}"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          security find-identity -v -p codesigning "${KEYCHAIN_PATH}"
+
+      - name: Build native engine
+        run: npm run engine:napi:build
+
+      - name: Typecheck desktop renderer
+        working-directory: apps/desktop
+        run: npm exec -- tsc -p tsconfig.json --noEmit
+
+      - name: Desktop smoke
+        run: npm run desktop:smoke
+
+      - name: Desktop packaged smoke
+        run: npm run desktop:package:smoke
+
+      - name: Build macOS desktop release
+        env:
+          DESKTOP_VERSION: ${{ needs.resolve-release.outputs.desktop_version }}
+          DESKTOP_RELEASE_CHANNEL: ${{ needs.resolve-release.outputs.release_channel }}
+          MACOS_DISTRIBUTION: ${{ needs.resolve-release.outputs.macos_distribution }}
+          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          npm run engine:napi:build:release
+          npm --prefix apps/desktop run renderer:build
+          if [ "${MACOS_DISTRIBUTION}" = "signed-notarized" ]; then
+            export MC_DESKTOP_REQUIRE_SIGNING=1
+            echo "Building Developer ID signed and notarized macOS release."
+          else
+            export MC_DESKTOP_REQUIRE_SIGNING=0
+            unset MACOS_CODESIGN_IDENTITY APPLE_ID APPLE_TEAM_ID APPLE_APP_SPECIFIC_PASSWORD
+            echo "Building open-source ad-hoc signed macOS DMG. Users may need Gatekeeper Open Anyway on first launch."
+          fi
+          node scripts/desktop/build-release.mjs \
+            --version "${DESKTOP_VERSION}" \
+            --channel "${DESKTOP_RELEASE_CHANNEL}"
+
+      - name: Upload macOS desktop release artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-release-macos
+          if-no-files-found: error
+          path: |
+            artifacts/desktop-release/media-clean-desktop-v*.dmg
+            artifacts/desktop-release/media-clean-desktop-v*.zip
+            artifacts/desktop-release/media-clean-desktop-v*.sha256
+            artifacts/desktop-release/media-clean-desktop-v*.metadata.json
+            artifacts/desktop-release/media-clean-desktop-v*.size-report.json
+            artifacts/desktop-release/media-clean-desktop-v*.size-report.md
+            artifacts/desktop-release/media-clean-desktop-update-*.json
+            artifacts/desktop-release/latest-mac.yml
+
+  build-windows-release:
+    needs: resolve-release
+    runs-on: windows-latest
+    timeout-minutes: 75
+    env:
+      CI: "1"
+      DESKTOP_RELEASE_CHANNEL: ${{ needs.resolve-release.outputs.release_channel }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.11.0
+          cache: npm
+
+      - name: Setup Rust
+        run: rustup default stable
+
+      - name: Install repository dependencies
+        run: npm install
+
+      - name: Install desktop dependencies
+        run: npm install --prefix apps/desktop
+
+      - name: Build native engine
+        run: npm run engine:napi:build
+
+      - name: Typecheck desktop renderer
+        working-directory: apps/desktop
+        run: npm exec -- tsc -p tsconfig.json --noEmit
+
+      - name: Desktop smoke
+        run: npm run desktop:smoke
+
+      - name: Desktop packaged smoke
+        run: npm run desktop:package:smoke
+
+      - name: Build Windows portable desktop release
+        env:
+          DESKTOP_VERSION: ${{ needs.resolve-release.outputs.desktop_version }}
+          DESKTOP_RELEASE_CHANNEL: ${{ needs.resolve-release.outputs.release_channel }}
+        run: |
+          npm run engine:napi:build:release
+          node scripts/desktop/build-windows-release.mjs --version "$env:DESKTOP_VERSION" --channel "$env:DESKTOP_RELEASE_CHANNEL"
+
+      - name: Upload Windows desktop release artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-release-windows
+          if-no-files-found: error
+          path: |
+            artifacts/desktop-release/media-clean-desktop-v*.zip
+            artifacts/desktop-release/media-clean-desktop-v*.sha256
+            artifacts/desktop-release/media-clean-desktop-v*.metadata.json
+            artifacts/desktop-release/media-clean-desktop-v*.size-report.json
+            artifacts/desktop-release/media-clean-desktop-v*.size-report.md
+            artifacts/desktop-release/media-clean-desktop-update-*.json
+            artifacts/desktop-release/latest-win.yml
+
+  publish-release:
+    needs:
+      - resolve-release
+      - build-macos-release
+      - build-windows-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RELEASE_TAG: ${{ needs.resolve-release.outputs.release_tag }}
+      RELEASE_VERSION: ${{ needs.resolve-release.outputs.desktop_version }}
+      DESKTOP_RELEASE_CHANNEL: ${{ needs.resolve-release.outputs.release_channel }}
+      MACOS_DISTRIBUTION: ${{ needs.resolve-release.outputs.macos_distribution }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download desktop release artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: desktop-release-*
+          path: artifacts/desktop-release
+          merge-multiple: true
+
+      - name: Prepare stable desktop download assets
+        id: desktop_download_assets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          MAC_DMG="$(find artifacts/desktop-release -maxdepth 1 -name 'media-clean-desktop-v*-mac-*.dmg' | sort | head -n 1)"
+          MAC_ZIP="$(find artifacts/desktop-release -maxdepth 1 -name 'media-clean-desktop-v*-mac-*.zip' | sort | head -n 1)"
+          WIN_ZIP="$(find artifacts/desktop-release -maxdepth 1 -name 'media-clean-desktop-v*-win-*.zip' | sort | head -n 1)"
+
+          if [ -z "${MAC_DMG}" ] || [ -z "${MAC_ZIP}" ] || [ -z "${WIN_ZIP}" ]; then
+            echo "Missing desktop release assets for stable download aliases." >&2
+            exit 1
+          fi
+
+          MAC_ARCH="$(basename "${MAC_DMG}" | sed -E 's/^media-clean-desktop-v[^-]+-mac-([^.]+)\.dmg$/\1/')"
+          WIN_ARCH="$(basename "${WIN_ZIP}" | sed -E 's/^media-clean-desktop-v[^-]+-win-([^.]+)\.zip$/\1/')"
+
+          MAC_DMG_ALIAS="artifacts/desktop-release/media-clean-desktop-macos-${MAC_ARCH}.dmg"
+          MAC_ZIP_ALIAS="artifacts/desktop-release/media-clean-desktop-macos-${MAC_ARCH}.zip"
+          WIN_ZIP_ALIAS="artifacts/desktop-release/media-clean-desktop-windows-${WIN_ARCH}.zip"
+          LATEST_SHA="artifacts/desktop-release/media-clean-desktop-latest.sha256"
+
+          cp "${MAC_DMG}" "${MAC_DMG_ALIAS}"
+          cp "${MAC_ZIP}" "${MAC_ZIP_ALIAS}"
+          cp "${WIN_ZIP}" "${WIN_ZIP_ALIAS}"
+          shasum -a 256 "${MAC_DMG_ALIAS}" "${MAC_ZIP_ALIAS}" "${WIN_ZIP_ALIAS}" > "${LATEST_SHA}"
+
+          {
+            echo "mac_dmg=$(basename "${MAC_DMG_ALIAS}")"
+            echo "mac_zip=$(basename "${MAC_ZIP_ALIAS}")"
+            echo "windows_zip=$(basename "${WIN_ZIP_ALIAS}")"
+            echo "latest_sha=$(basename "${LATEST_SHA}")"
+            echo "mac_dmg_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/$(basename "${MAC_DMG_ALIAS}")"
+            echo "windows_zip_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/$(basename "${WIN_ZIP_ALIAS}")"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Create release tag
+        run: |
+          git fetch --tags origin
+          if git rev-parse -q --verify "refs/tags/${RELEASE_TAG}" >/dev/null; then
+            echo "release tag already exists: ${RELEASE_TAG}" >&2
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${RELEASE_TAG}" "${GITHUB_SHA}"
+          git push origin "refs/tags/${RELEASE_TAG}"
+
+      - name: Publish GitHub release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.resolve-release.outputs.release_tag }}
+          name: Media Clean Desktop ${{ needs.resolve-release.outputs.desktop_version }}
+          generate_release_notes: true
+          make_latest: false
+          body: |
+            ## Media Clean Desktop
+
+            This release is built through the desktop release lane.
+
+            Assets:
+
+            - macOS `.dmg`
+            - macOS `.zip` rollback / update-feed asset
+            - Windows portable `.zip`
+            - SHA256 checksums
+            - metadata
+            - size reports
+            - desktop update manifests for macOS and Windows
+
+            Stable download URLs:
+
+            - macOS: https://github.com/${{ github.repository }}/releases/download/${{ needs.resolve-release.outputs.release_tag }}/${{ steps.desktop_download_assets.outputs.mac_dmg }}
+            - Windows: https://github.com/${{ github.repository }}/releases/download/${{ needs.resolve-release.outputs.release_tag }}/${{ steps.desktop_download_assets.outputs.windows_zip }}
+
+            This release is not marked as the repository latest release because `releases/latest` remains reserved for the Android latest backup asset.
+
+            macOS distribution mode: `${{ needs.resolve-release.outputs.macos_distribution }}`.
+
+            For the default open-source unsigned mode, the macOS app is ad-hoc signed and not notarized. macOS Gatekeeper may require users to use Control-click / Open or System Settings / Privacy & Security / Open Anyway on first launch after verifying SHA256. Use `signed-notarized` only when Apple Developer ID secrets are available. Windows code signing and installer packaging are reserved for the next desktop packaging step; the current Windows asset is a portable zip.
+          files: |
+            artifacts/desktop-release/media-clean-desktop-v*.dmg
+            artifacts/desktop-release/media-clean-desktop-v*.zip
+            artifacts/desktop-release/media-clean-desktop-macos-*.dmg
+            artifacts/desktop-release/media-clean-desktop-macos-*.zip
+            artifacts/desktop-release/media-clean-desktop-windows-*.zip
+            artifacts/desktop-release/media-clean-desktop-latest.sha256
+            artifacts/desktop-release/media-clean-desktop-v*.sha256
+            artifacts/desktop-release/media-clean-desktop-v*.metadata.json
+            artifacts/desktop-release/media-clean-desktop-v*.size-report.json
+            artifacts/desktop-release/media-clean-desktop-v*.size-report.md
+            artifacts/desktop-release/media-clean-desktop-update-*.json
+            artifacts/desktop-release/latest-mac.yml
+            artifacts/desktop-release/latest-win.yml
+          overwrite_files: true
+
+      - name: Publish release summary
+        shell: bash
+        run: |
+          {
+            echo "## Desktop release published"
+            echo ""
+            echo "- Tag: ${RELEASE_TAG}"
+            echo "- Version: ${RELEASE_VERSION}"
+            echo "- Channel: ${DESKTOP_RELEASE_CHANNEL}"
+            echo "- macOS distribution: ${MACOS_DISTRIBUTION}"
+            echo "- macOS latest download: ${{ steps.desktop_download_assets.outputs.mac_dmg_url }}"
+            echo "- Windows latest download: ${{ steps.desktop_download_assets.outputs.windows_zip_url }}"
+            echo ""
+            for report in artifacts/desktop-release/media-clean-desktop-v*.size-report.md; do
+              echo ""
+              cat "${report}"
+            done
+          } >> "${GITHUB_STEP_SUMMARY}"

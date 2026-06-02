@@ -6,17 +6,21 @@ on:
     paths:
       - ".github/workflows/android-maestro-smoke.yml"
       - ".maestro/**"
+      - "App.tsx"
+      - "index.ts"
       - "src/ui/**"
       - "src/navigation/**"
       - "src/application/**"
       - "src/i18n/**"
       - "src/theme/**"
       - "app.json"
+      - "babel.config.js"
+      - "metro.config.js"
       - "package.json"
+      - "package-lock.json"
+      - "plugins/**"
       - "scripts/android/**"
       - "android/**"
-      - "README.md"
-      - "README.en.md"
       - "docs/release/maestro.md"
       - "docs/release/maestro.en.md"
   push:
@@ -27,17 +31,21 @@ on:
     paths:
       - ".github/workflows/android-maestro-smoke.yml"
       - ".maestro/**"
+      - "App.tsx"
+      - "index.ts"
       - "src/ui/**"
       - "src/navigation/**"
       - "src/application/**"
       - "src/i18n/**"
       - "src/theme/**"
       - "app.json"
+      - "babel.config.js"
+      - "metro.config.js"
       - "package.json"
+      - "package-lock.json"
+      - "plugins/**"
       - "scripts/android/**"
       - "android/**"
-      - "README.md"
-      - "README.en.md"
       - "docs/release/maestro.md"
       - "docs/release/maestro.en.md"
 
@@ -45,7 +53,83 @@ permissions:
   contents: read
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_android: ${{ steps.route.outputs.run_android }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed paths
+        id: changes
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            android:
+              - ".github/workflows/android-maestro-smoke.yml"
+              - ".maestro/**"
+              - "App.tsx"
+              - "index.ts"
+              - "src/ui/**"
+              - "src/navigation/**"
+              - "src/application/**"
+              - "src/i18n/**"
+              - "src/theme/**"
+              - "app.json"
+              - "babel.config.js"
+              - "metro.config.js"
+              - "plugins/**"
+              - "scripts/android/**"
+              - "android/**"
+              - "docs/release/maestro.md"
+              - "docs/release/maestro.en.md"
+            desktop:
+              - ".github/workflows/desktop-pr-check.yml"
+              - ".github/workflows/release-desktop.yml"
+              - "apps/desktop/**"
+              - "apps/report/**"
+              - "docs/release/electron-desktop.md"
+              - "docs/release/electron-desktop.en.md"
+              - "engines/recognition/**"
+              - "packages/media-clean-engine/**"
+              - "scripts/desktop/**"
+              - "scripts/scan/**"
+              - "page/public/apps/icons/logo.svg"
+            shared:
+              - "package.json"
+              - "package-lock.json"
+
+      - name: Route Android smoke
+        id: route
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "run_android=true" >> "$GITHUB_OUTPUT"
+            echo "Manual run: Android Maestro smoke enabled." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          android_changed="${{ steps.changes.outputs.android }}"
+          desktop_changed="${{ steps.changes.outputs.desktop }}"
+          shared_changed="${{ steps.changes.outputs.shared }}"
+
+          if [[ "$android_changed" == "true" ]]; then
+            echo "run_android=true" >> "$GITHUB_OUTPUT"
+            echo "Android paths changed: Android Maestro smoke enabled." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$shared_changed" == "true" && "$desktop_changed" != "true" ]]; then
+            echo "run_android=true" >> "$GITHUB_OUTPUT"
+            echo "Shared package files changed without desktop paths: Android Maestro smoke enabled." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "run_android=false" >> "$GITHUB_OUTPUT"
+            echo "Desktop-only or non-Android change: Android Maestro smoke skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   maestro-smoke:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.run_android == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:

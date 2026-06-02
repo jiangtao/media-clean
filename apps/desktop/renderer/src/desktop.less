@@ -3504,12 +3504,15 @@ select:focus {
 
 /* Integrated product-facing overrides after sub-agent passes. */
 body:has(.tray-surface) {
+  width: 720px;
+  min-width: 720px;
   background: transparent;
   overflow: hidden;
 }
 
 body:has(.tray-surface) #root {
-  width: 100dvw;
+  width: 720px;
+  min-width: 720px;
   min-height: auto;
   overflow: hidden;
   background: transparent;
@@ -3517,7 +3520,8 @@ body:has(.tray-surface) #root {
 
 .tray-surface {
   width: 720px;
-  max-width: 100dvw;
+  min-width: 720px;
+  max-width: none;
   min-height: auto;
   align-items: flex-start;
   justify-content: center;
@@ -3533,7 +3537,8 @@ body:has(.tray-surface) #root {
 
 .tray-island {
   width: 720px;
-  max-width: 100dvw;
+  min-width: 720px;
+  max-width: none;
   max-height: 100dvh;
   overflow: auto;
   scrollbar-width: none;

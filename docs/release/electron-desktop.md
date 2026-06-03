@@ -179,7 +179,12 @@ Electron Desktop 的体积风险主要来自 Electron runtime、renderer bundle�
    - 输入：`release_tag`、`release_channel`、`desktop_version`、`macos_distribution`
    - 内容：macOS build，默认发布 ad-hoc signed `.dmg`；选择 `signed-notarized` 时执行 Developer ID sign / notarize；Windows portable zip build；生成 size report；上传 GitHub Release assets；生成 update manifest。
 
-当前已落地 `.github/workflows/release-desktop.yml`。它和 Android release 一样，只允许通过手动 workflow 发布正式桌面版本；本地只做 release smoke 与产物验证，不作为正式分发源。
+当前已落地 `.github/workflows/release-desktop.yml`。它支持两种正式发布入口：
+
+1. 手动执行 `release-desktop.yml`，用于维护者主动发布、回滚验证或重跑失败 release。
+2. PR 合并到 `main` 时，如果 PR 带有 `desktop-release` 标签，由 `.github/workflows/desktop-release-on-label.yml` 自动读取 `apps/desktop/package.json` 版本，并触发 `release-desktop.yml` 发布 `desktop-v<version>`。
+
+本地只做 release smoke 与产物验证，不作为正式分发源。`desktop-release` 标签只在 PR 已合并后生效，避免未合并代码被发布；触发者必须是仓库 owner 或 admin。
 
 `release-desktop` 当前分为三个阶段：
 
@@ -238,6 +243,7 @@ node scripts/desktop/install-launch-agent.mjs --uninstall
 11. Windows release 必须至少产出 portable zip、checksum、metadata、size report、`latest-win.yml` 和 update manifest。
 12. 每次 release 必须上传 checksum、metadata、size report 和 update manifest。
 13. 每次 release 必须上传 `media-clean-desktop-macos-<arch>.dmg`、`media-clean-desktop-windows-<arch>.zip` 和 `media-clean-desktop-latest.sha256`，作为用户侧稳定下载入口。
+14. 如果使用 PR 自动发布，合并前必须保留 `desktop-release` 标签；合并后 `.github/workflows/desktop-release-on-label.yml` 会触发正式 `release-desktop.yml`。
 
 ## TODO
 

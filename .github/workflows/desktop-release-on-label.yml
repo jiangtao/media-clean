@@ -1,0 +1,96 @@
+name: Desktop Release on Label
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  check-and-trigger:
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'desktop-release')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check permissions
+        id: auth
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          if [[ "$ACTOR" == "$OWNER" ]]; then
+            echo "authorized=true" >> "$GITHUB_OUTPUT"
+            echo "Authorized: Repository owner"
+            exit 0
+          fi
+
+          ROLE=$(gh api repos/${{ github.repository }}/collaborators/$ACTOR/permission -q '.permission' 2>/dev/null || echo "none")
+          if [[ "$ROLE" == "admin" ]]; then
+            echo "authorized=true" >> "$GITHUB_OUTPUT"
+            echo "Authorized: Admin"
+          else
+            echo "authorized=false" >> "$GITHUB_OUTPUT"
+            echo "Not authorized: $ACTOR (role: $ROLE)"
+          fi
+
+      - name: Get desktop version
+        if: steps.auth.outputs.authorized == 'true'
+        id: version
+        run: |
+          VERSION=$(node -p "require('./apps/desktop/package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=desktop-v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger desktop release
+        if: steps.auth.outputs.authorized == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Triggering Desktop release ${{ steps.version.outputs.tag }}"
+
+          gh workflow run release-desktop.yml \
+            --ref main \
+            --field release_tag="${{ steps.version.outputs.tag }}" \
+            --field desktop_version="${{ steps.version.outputs.version }}" \
+            --field release_channel="stable" \
+            --field macos_distribution="unsigned"
+
+      - name: Comment on PR (success)
+        if: steps.auth.outputs.authorized == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ steps.version.outputs.tag }}';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `Desktop release triggered\n\nDesktop release ${tag} has been triggered by @${context.actor}.\n\nTrack progress: [Actions](../../actions/workflows/release-desktop.yml)`
+            });
+
+      - name: Comment on PR (unauthorized)
+        if: steps.auth.outputs.authorized == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `Desktop release request denied\n\nOnly repository owners and admins can trigger desktop releases.\n\nPlease ask an admin to manually trigger the release workflow.`
+            });
+
+      - name: Fail if unauthorized
+        if: steps.auth.outputs.authorized == 'false'
+        run: |
+          echo "Only owners/admins can trigger desktop releases"
+          exit 1

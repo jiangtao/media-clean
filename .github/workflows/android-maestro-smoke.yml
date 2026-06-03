@@ -91,6 +91,7 @@ jobs:
             desktop:
               - ".github/workflows/desktop-pr-check.yml"
               - ".github/workflows/release-desktop.yml"
+              - ".github/workflows/desktop-release-on-label.yml"
               - "apps/desktop/**"
               - "apps/report/**"
               - "docs/release/electron-desktop.md"

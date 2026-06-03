@@ -2778,7 +2778,24 @@ function resolveInputPath(input) {
 
 function fileUriToPath(uri) {
   if (!String(uri).startsWith('file://')) throw new Error(`only file:// media URIs are supported, got ${uri}`);
-  return fileURLToPath(uri);
+  try {
+    return fileURLToPath(uri);
+  } catch (error) {
+    const winPath = fileUriToWindowsExtendedPath(uri);
+    if (process.platform === 'win32' && winPath) return winPath;
+    throw error;
+  }
+}
+
+function fileUriToWindowsExtendedPath(uri) {
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(new URL(String(uri)).pathname);
+  } catch {
+    return null;
+  }
+  const normalized = decodedPath.replace(/^\/+/, '').replace(/^\?[/\\]([A-Za-z]:[/\\])/, '$1');
+  return /^[A-Za-z]:[/\\]/.test(normalized) ? path.normalize(normalized) : null;
 }
 
 function fileUriToPathSafe(uri) {

@@ -466,6 +466,7 @@ async function runElectronSmoke({ packageLike }) {
 function spawnLegacySmoke() {
   return spawn(npmCommand(), ['run', 'smoke'], {
     cwd: desktopDir,
+    shell: process.platform === 'win32',
     env: {
       ...process.env,
       MC_DESKTOP_SMOKE: '1',

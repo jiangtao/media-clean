@@ -1,6 +1,6 @@
 {
   "name": "media-clean-desktop",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Electron desktop shell for the Media Clean local workbench",
   "main": "main.cjs",

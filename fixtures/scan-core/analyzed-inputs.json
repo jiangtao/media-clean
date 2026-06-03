@@ -1,0 +1,54 @@
+{
+  "analyzedInputs": [
+    {
+      "asset": {
+        "id": "dark-photo",
+        "uri": "file:///fixtures/dark-photo.jpg",
+        "previewUri": "file:///fixtures/dark-photo.jpg",
+        "mediaType": "photo",
+        "width": 640,
+        "height": 640,
+        "duration": 0,
+        "fileSize": 80000,
+        "creationTime": 1710000000000
+      },
+      "metrics": {
+        "brightness": 0.03,
+        "contrast": 0.04,
+        "edgeDensity": 0.02
+      },
+      "fingerprint": null,
+      "analysisStatus": "ok"
+    },
+    {
+      "asset": {
+        "id": "normal-photo",
+        "uri": "file:///fixtures/normal-photo.jpg",
+        "previewUri": "file:///fixtures/normal-photo.jpg",
+        "mediaType": "photo",
+        "width": 3024,
+        "height": 4032,
+        "duration": 0,
+        "fileSize": 3600000,
+        "creationTime": 1710000000500
+      },
+      "metrics": {
+        "brightness": 0.56,
+        "contrast": 0.32,
+        "edgeDensity": 0.28
+      },
+      "fingerprint": "feedface00000000",
+      "differenceHash": "feedface00000000",
+      "contentHash": "fixture-normal",
+      "frameFingerprints": [
+        "feedface00000000"
+      ],
+      "analysisStatus": "ok"
+    }
+  ],
+  "recycleBinIds": [],
+  "falsePositiveIds": [],
+  "recycleBinCandidateCache": [],
+  "scannedAt": 1710000000999,
+  "scannedCount": 2
+}

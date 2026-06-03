@@ -3,6 +3,7 @@
 # dependencies
 node_modules/
 !/package-lock.json
+!apps/desktop/package-lock.json
 
 # Expo
 .expo/
@@ -10,10 +11,13 @@ node_modules/
 /page/dist/
 /page/public/download/*.apk
 web-build/
+.next/
 expo-env.d.ts
 
 # Native
 .kotlin/
+target/
+packages/media-clean-engine/native/
 *.orig.*
 *.jks
 *.p8
@@ -29,10 +33,12 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 .tmp/
+.mc/
 .claude/
 **/plans/
 docs/tmp/
 docs/archive/tmp/
+/output/desktop-icon-debug/
 
 # macOS
 .DS_Store

@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "media-clean-result/v0.5",
+  "sessionId": "fixture-session-001",
+  "generatedAt": "2026-05-12T05:30:00.000Z",
+  "source": {
+    "kind": "fixture",
+    "root": "fixtures/media-clean-result",
+    "platform": "fixture"
+  },
+  "engine": {
+    "kind": "fixture",
+    "name": "media-clean-fixture-engine",
+    "version": "0.0.1"
+  },
+  "assets": [
+    {
+      "id": "dark-photo",
+      "uri": "file:///fixtures/dark-photo.jpg",
+      "mediaType": "photo",
+      "width": 640,
+      "height": 640,
+      "duration": null,
+      "fileSize": 80000,
+      "createdAt": "2024-03-09T16:00:00.000Z",
+      "metrics": {
+        "brightness": 0.03,
+        "contrast": 0.04,
+        "edgeDensity": 0.02,
+        "blurScore": 0.74
+      },
+      "hashes": {
+        "contentHash": "fixture-dark",
+        "perceptualHash": null,
+        "differenceHash": null,
+        "frameHashes": []
+      }
+    },
+    {
+      "id": "normal-photo",
+      "uri": "file:///fixtures/normal-photo.jpg",
+      "mediaType": "photo",
+      "width": 3024,
+      "height": 4032,
+      "duration": null,
+      "fileSize": 3600000,
+      "createdAt": "2024-03-09T16:00:00.500Z",
+      "metrics": {
+        "brightness": 0.56,
+        "contrast": 0.32,
+        "edgeDensity": 0.28,
+        "blurScore": 0.11
+      },
+      "hashes": {
+        "contentHash": "fixture-normal",
+        "perceptualHash": "feedface00000000",
+        "differenceHash": "feedface00000000",
+        "frameHashes": [
+          "feedface00000000"
+        ]
+      }
+    }
+  ],
+  "clusters": [
+    {
+      "id": "cluster-dark-photo",
+      "category": "low_value",
+      "assetIds": [
+        "dark-photo"
+      ],
+      "representativeAssetId": "dark-photo",
+      "score": 86,
+      "reasons": [
+        "very-dark",
+        "low-edge-density"
+      ]
+    }
+  ],
+  "llmReviews": [
+    {
+      "clusterId": "cluster-dark-photo",
+      "provider": "fixture",
+      "model": "fixture-local-reviewer",
+      "promptVersion": "local-review/v1",
+      "category": "low_value",
+      "confidence": "medium",
+      "cleanupReason": "The image is extremely dark and contains little visible detail.",
+      "keepReason": null,
+      "risk": "review",
+      "suggestedAction": "review"
+    }
+  ],
+  "cleanupPlans": [
+    {
+      "id": "plan-dark-photo",
+      "clusterId": "cluster-dark-photo",
+      "action": "review",
+      "assetIds": [
+        "dark-photo"
+      ],
+      "requiresConfirmation": true
+    }
+  ],
+  "quarantineActions": [
+    {
+      "planId": "plan-dark-photo",
+      "mode": "dry-run",
+      "status": "planned",
+      "assetIds": [
+        "dark-photo"
+      ]
+    }
+  ]
+}

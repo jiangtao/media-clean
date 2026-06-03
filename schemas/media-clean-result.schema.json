@@ -1,0 +1,512 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://media-clean.local/schemas/media-clean-result.schema.json",
+  "title": "Media Clean Result Session",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sessionId",
+    "generatedAt",
+    "source",
+    "engine",
+    "assets",
+    "clusters",
+    "llmReviews",
+    "cleanupPlans",
+    "quarantineActions"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "media-clean-result/v0.5"
+    },
+    "sessionId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "engine": {
+      "$ref": "#/$defs/engine"
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/asset"
+      }
+    },
+    "clusters": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/cluster"
+      }
+    },
+    "llmReviews": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/llmReview"
+      }
+    },
+    "cleanupPlans": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/cleanupPlan"
+      }
+    },
+    "quarantineActions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/quarantineAction"
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/diagnostic"
+      }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "root",
+        "platform"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "android-media-store",
+            "desktop-filesystem",
+            "fixture"
+          ]
+        },
+        "root": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "macos",
+            "linux",
+            "windows",
+            "fixture"
+          ]
+        }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "name",
+        "version"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "android-native",
+            "desktop-rust",
+            "desktop-go",
+            "node-wrapper",
+            "fixture"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "uri",
+        "mediaType",
+        "width",
+        "height",
+        "fileSize",
+        "createdAt",
+        "metrics",
+        "hashes"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mediaType": {
+          "type": "string",
+          "enum": [
+            "photo",
+            "video"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duration": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "fileSize": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "metrics": {
+          "$ref": "#/$defs/metrics"
+        },
+        "hashes": {
+          "$ref": "#/$defs/hashes"
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "brightness",
+        "contrast",
+        "edgeDensity",
+        "blurScore"
+      ],
+      "properties": {
+        "brightness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "contrast": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "edgeDensity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "blurScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contentHash",
+        "perceptualHash",
+        "differenceHash"
+      ],
+      "properties": {
+        "contentHash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "perceptualHash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "differenceHash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "frameHashes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "cluster": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "category",
+        "assetIds",
+        "representativeAssetId",
+        "score",
+        "reasons"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "duplicate",
+            "near_similar",
+            "blurry",
+            "low_value",
+            "screenshot",
+            "document",
+            "video",
+            "unknown"
+          ]
+        },
+        "assetIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "representativeAssetId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "llmReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clusterId",
+        "provider",
+        "model",
+        "promptVersion",
+        "category",
+        "confidence",
+        "cleanupReason",
+        "keepReason",
+        "risk",
+        "suggestedAction"
+      ],
+      "properties": {
+        "clusterId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "ollama",
+            "lm-studio",
+            "llama.cpp",
+            "openai-compatible",
+            "fixture"
+          ]
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "promptVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "duplicate",
+            "near_similar",
+            "blurry",
+            "low_value",
+            "screenshot",
+            "document",
+            "video",
+            "unknown"
+          ]
+        },
+        "confidence": {
+          "type": "string",
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "cleanupReason": {
+          "type": "string"
+        },
+        "keepReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "risk": {
+          "type": "string",
+          "enum": [
+            "safe",
+            "review",
+            "keep"
+          ]
+        },
+        "suggestedAction": {
+          "type": "string",
+          "enum": [
+            "quarantine",
+            "review",
+            "keep"
+          ]
+        }
+      }
+    },
+    "cleanupPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "clusterId",
+        "action",
+        "assetIds",
+        "requiresConfirmation"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clusterId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "quarantine",
+            "review",
+            "keep"
+          ]
+        },
+        "assetIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requiresConfirmation": {
+          "type": "boolean"
+        }
+      }
+    },
+    "quarantineAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planId",
+        "mode",
+        "status",
+        "assetIds"
+      ],
+      "properties": {
+        "planId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "dry-run",
+            "confirmed"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "planned",
+            "completed",
+            "failed"
+          ]
+        },
+        "assetIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "severity",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ]
+        },
+        "assetId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

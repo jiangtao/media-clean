@@ -1,0 +1,168 @@
+name: Desktop PR Check
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/desktop-pr-check.yml"
+      - ".github/workflows/release-desktop.yml"
+      - "apps/desktop/**"
+      - "apps/report/**"
+      - "docs/release/electron-desktop.md"
+      - "docs/release/electron-desktop.en.md"
+      - "engines/recognition/**"
+      - "packages/media-clean-engine/**"
+      - "scripts/desktop/**"
+      - "scripts/scan/**"
+      - "page/public/apps/icons/logo.svg"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - ".github/workflows/desktop-pr-check.yml"
+      - ".github/workflows/release-desktop.yml"
+      - "apps/desktop/**"
+      - "apps/report/**"
+      - "docs/release/electron-desktop.md"
+      - "docs/release/electron-desktop.en.md"
+      - "engines/recognition/**"
+      - "packages/media-clean-engine/**"
+      - "scripts/desktop/**"
+      - "scripts/scan/**"
+      - "page/public/apps/icons/logo.svg"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_desktop: ${{ steps.route.outputs.run_desktop }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed paths
+        id: changes
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            android:
+              - ".github/workflows/android-maestro-smoke.yml"
+              - ".maestro/**"
+              - "App.tsx"
+              - "index.ts"
+              - "src/ui/**"
+              - "src/navigation/**"
+              - "src/application/**"
+              - "src/i18n/**"
+              - "src/theme/**"
+              - "app.json"
+              - "babel.config.js"
+              - "metro.config.js"
+              - "plugins/**"
+              - "scripts/android/**"
+              - "android/**"
+              - "docs/release/maestro.md"
+              - "docs/release/maestro.en.md"
+            desktop:
+              - ".github/workflows/desktop-pr-check.yml"
+              - ".github/workflows/release-desktop.yml"
+              - "apps/desktop/**"
+              - "apps/report/**"
+              - "docs/release/electron-desktop.md"
+              - "docs/release/electron-desktop.en.md"
+              - "engines/recognition/**"
+              - "packages/media-clean-engine/**"
+              - "scripts/desktop/**"
+              - "scripts/scan/**"
+              - "page/public/apps/icons/logo.svg"
+            shared:
+              - "package.json"
+              - "package-lock.json"
+
+      - name: Route desktop check
+        id: route
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "run_desktop=true" >> "$GITHUB_OUTPUT"
+            echo "Manual run: Desktop PR check enabled." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          android_changed="${{ steps.changes.outputs.android }}"
+          desktop_changed="${{ steps.changes.outputs.desktop }}"
+          shared_changed="${{ steps.changes.outputs.shared }}"
+
+          if [[ "$desktop_changed" == "true" ]]; then
+            echo "run_desktop=true" >> "$GITHUB_OUTPUT"
+            echo "Desktop paths changed: Electron validation enabled." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$shared_changed" == "true" && "$android_changed" != "true" ]]; then
+            echo "run_desktop=true" >> "$GITHUB_OUTPUT"
+            echo "Shared package files changed without Android paths: Electron validation enabled." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "run_desktop=false" >> "$GITHUB_OUTPUT"
+            echo "Android-only or non-desktop change: Electron validation skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  desktop-check:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.run_desktop == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: "1"
+      MC_DESKTOP_CI: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.11.0
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/desktop/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Electron runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-0 \
+            libnss3 \
+            libxss1 \
+            xvfb
+          sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Install desktop dependencies
+        run: npm ci --prefix apps/desktop
+
+      - name: Build native engine
+        run: npm run engine:napi:build
+
+      - name: Build desktop renderer
+        run: npm --prefix apps/desktop run renderer:build
+
+      - name: Desktop static smoke
+        run: npm --prefix apps/desktop run build
+
+      - name: Desktop packaged smoke
+        run: xvfb-run -a npm run desktop:package:smoke

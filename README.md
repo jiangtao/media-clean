@@ -6,6 +6,8 @@ Media Clean 是一个 本地相册识别与清理工具。它面向家庭手机�
 
 产品官网：[https://mc.jerret.me](https://mc.jerret.me)
 
+桌面版下载：[Media Clean Desktop 0.0.1](https://github.com/jiangtao/media-clean/releases/tag/desktop-v0.0.1)，macOS DMG：[media-clean-desktop-macos-arm64.dmg](https://github.com/jiangtao/media-clean/releases/download/desktop-v0.0.1/media-clean-desktop-macos-arm64.dmg)。
+
 
 <video controls width="100%" src="./page/public/promo-video-60fps.mp4">
   当前阅读器不支持内嵌视频播放。
@@ -87,8 +89,9 @@ Media Clean 当前是 Expo / React Native 应用，Android 是主验收路径。
 9. `src/services/media/`：视觉分析和临时分析文件缓存管理。长期真值只应保存结果与原媒体 URI，临时文件不作为产品数据。
 10. `plugins/withBackgroundScan.js`：Expo config plugin，把 Android 后台扫描原生模块、前台服务和权限注入到原生工程。
 11. `android/`：当前预构建后的 Android 原生工程，用于真机构建、调试和验证。
-12. `page/`：独立 Vercel 静态发布页。
-13. `docs/` 与 `design/`：目标、标准、发布契约、Android-first 扫描设计和产品页面说明。
+12. `apps/desktop/`：Electron 桌面端工作台，承接本地扫描、识别队列、审阅清理、托盘状态和桌面通知。
+13. `page/`：独立 Vercel 静态发布页。
+14. `docs/` 与 `design/`：目标、标准、发布契约、Android-first 扫描设计和产品页面说明。
 
 ## 数据与状态口径
 
@@ -142,6 +145,22 @@ npm run ios
 
 当前主验收路径仍是 Android；iOS 保留 Expo 层兼容性，但不是第一版发布验收重点。
 
+## Rust Core + CLI Workbench
+
+如果你要直接使用本仓库的 Rust 识别引擎和本地 review workbench，而不是跑移动 App，当前推荐入口是 `mc` CLI。
+
+完整用户链路文档见：
+
+1. Rust Core + CLI 用户使用指南：[docs/product/core-cli-workbench.md](./docs/product/core-cli-workbench.md)
+2. 英文版：[docs/product/core-cli-workbench.en.md](./docs/product/core-cli-workbench.en.md)
+
+这份文档覆盖：
+
+1. `mc` 的功能说明。
+2. 从源码安装 CLI 的方式。
+3. `scan -> plan -> report -> workbench review -> dry-run -> trash` 全链路命令。
+4. CLI workbench 和 App 结构如何对应。
+
 ## 常用命令
 
 ### App 验证
@@ -165,6 +184,15 @@ Android debug / release 发包、签名验签与 CI/CD 流水线见 [docs/releas
 Android 主设备观测契约见 [docs/release/agent-device.md](./docs/release/agent-device.md)，英文版 [docs/release/agent-device.en.md](./docs/release/agent-device.en.md)。
 
 如 Gradle daemon 或 Kotlin daemon 报锁、缓存或编译 daemon 异常，优先清理/重启 Gradle daemon，再区分是环境锁、磁盘空间、网络仓库还是代码错误。
+
+### Desktop 构建
+
+```bash
+npm --prefix apps/desktop run build
+npm run desktop:package:smoke
+```
+
+Desktop PR 验证走 Electron 专用 workflow；正式桌面发布使用 `release-desktop` workflow。发布、签名、体积与更新预留契约见 [docs/release/electron-desktop.md](./docs/release/electron-desktop.md)，英文版 [docs/release/electron-desktop.en.md](./docs/release/electron-desktop.en.md)。
 
 ### 发布页
 
@@ -231,15 +259,17 @@ curl -sSI http://127.0.0.1:4173/
 
 ## 文档入口
 
-1. 产品发布页说明：[docs/product/page-home.md](./docs/product/page-home.md)，英文版 [docs/product/page-home.en.md](./docs/product/page-home.en.md)。
-2. Android 发包契约：[docs/release/android.md](./docs/release/android.md)，英文版 [docs/release/android.en.md](./docs/release/android.en.md)。
-3. Agent Device 设备观测契约：[docs/release/agent-device.md](./docs/release/agent-device.md)，英文版 [docs/release/agent-device.en.md](./docs/release/agent-device.en.md)。
-4. Maestro 验收契约：[docs/release/maestro.md](./docs/release/maestro.md)，英文版 [docs/release/maestro.en.md](./docs/release/maestro.en.md)。
-5. Vercel 发布契约：[docs/release/vercel.md](./docs/release/vercel.md)，英文版 [docs/release/vercel.en.md](./docs/release/vercel.en.md)。
-6. Android 扫描与识别设计：[design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md)，英文版 [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md)。
-7. 执行标准：[docs/standards/execution-standards.md](./docs/standards/execution-standards.md)，英文版 [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md)。
-8. 团队模式标准：[docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md)，英文版 [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md)。
-9. 发布页目录说明：[page/README.md](./page/README.md)，英文版 [page/README.en.md](./page/README.en.md)。
+1. Rust Core + CLI 用户使用指南：[docs/product/core-cli-workbench.md](./docs/product/core-cli-workbench.md)，英文版 [docs/product/core-cli-workbench.en.md](./docs/product/core-cli-workbench.en.md)。
+2. 产品发布页说明：[docs/product/page-home.md](./docs/product/page-home.md)，英文版 [docs/product/page-home.en.md](./docs/product/page-home.en.md)。
+3. Electron Desktop 发布契约：[docs/release/electron-desktop.md](./docs/release/electron-desktop.md)，英文版 [docs/release/electron-desktop.en.md](./docs/release/electron-desktop.en.md)。
+4. Android 发包契约：[docs/release/android.md](./docs/release/android.md)，英文版 [docs/release/android.en.md](./docs/release/android.en.md)。
+5. Agent Device 设备观测契约：[docs/release/agent-device.md](./docs/release/agent-device.md)，英文版 [docs/release/agent-device.en.md](./docs/release/agent-device.en.md)。
+6. Maestro 验收契约：[docs/release/maestro.md](./docs/release/maestro.md)，英文版 [docs/release/maestro.en.md](./docs/release/maestro.en.md)。
+7. Vercel 发布契约：[docs/release/vercel.md](./docs/release/vercel.md)，英文版 [docs/release/vercel.en.md](./docs/release/vercel.en.md)。
+8. Android 扫描与识别设计：[design/recognition-scan-android-first/README.md](./design/recognition-scan-android-first/README.md)，英文版 [design/recognition-scan-android-first/README.en.md](./design/recognition-scan-android-first/README.en.md)。
+9. 执行标准：[docs/standards/execution-standards.md](./docs/standards/execution-standards.md)，英文版 [docs/standards/execution-standards.en.md](./docs/standards/execution-standards.en.md)。
+10. 团队模式标准：[docs/standards/agent-team-mode.md](./docs/standards/agent-team-mode.md)，英文版 [docs/standards/agent-team-mode.en.md](./docs/standards/agent-team-mode.en.md)。
+11. 发布页目录说明：[page/README.md](./page/README.md)，英文版 [page/README.en.md](./page/README.en.md)。
 
 Android 设备观测 workflow：
 

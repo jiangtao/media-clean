@@ -21,6 +21,7 @@ const baseRequiredFiles = [
   'scripts/desktop/build-windows-release.mjs',
   'scripts/desktop/install-launch-agent.mjs',
   '.github/workflows/release-desktop.yml',
+  '.github/workflows/desktop-release-on-label.yml',
 ];
 
 const desktopIconRequiredFiles = [
@@ -306,6 +307,7 @@ function assertDesktopReleaseContracts() {
   const buildWindowsReleaseSource = fs.readFileSync(path.join(repoRoot, 'scripts/desktop/build-windows-release.mjs'), 'utf8');
   const guardianSource = fs.readFileSync(path.join(repoRoot, 'scripts/desktop/install-launch-agent.mjs'), 'utf8');
   const workflowSource = fs.readFileSync(path.join(repoRoot, '.github/workflows/release-desktop.yml'), 'utf8');
+  const labelWorkflowSource = fs.readFileSync(path.join(repoRoot, '.github/workflows/desktop-release-on-label.yml'), 'utf8');
   const zhReleaseDoc = fs.readFileSync(path.join(repoRoot, 'docs/release/electron-desktop.md'), 'utf8');
   const enReleaseDoc = fs.readFileSync(path.join(repoRoot, 'docs/release/electron-desktop.en.md'), 'utf8');
 
@@ -369,6 +371,12 @@ function assertDesktopReleaseContracts() {
     }
   }
 
+  for (const required of ['pull_request', 'types: [closed]', 'desktop-release', 'github.event.pull_request.merged == true', 'actions: write', 'apps/desktop/package.json', 'gh workflow run release-desktop.yml', 'macos_distribution="unsigned"']) {
+    if (!labelWorkflowSource.includes(required)) {
+      throw new Error(`desktop release-on-label workflow must trigger formal release after a merged desktop-release PR: ${required}`);
+    }
+  }
+
   if (!/KeepAlive/.test(guardianSource) || !/SuccessfulExit/.test(guardianSource) || !/intentional-quit/.test(guardianSource)) {
     throw new Error('desktop LaunchAgent guardian must use KeepAlive and intentional quit marker semantics');
   }
@@ -387,6 +395,9 @@ function assertDesktopReleaseContracts() {
 
   if (!/Windows portable zip/.test(zhReleaseDoc) || !/Windows portable zip/.test(enReleaseDoc) || !/release-desktop/.test(zhReleaseDoc) || !/release-desktop/.test(enReleaseDoc)) {
     throw new Error('desktop release docs must define the release-desktop multi-platform Windows portable zip contract');
+  }
+  if (!/`desktop-release` 标签/.test(zhReleaseDoc) || !/`desktop-release` label/.test(enReleaseDoc) || !/\.github\/workflows\/desktop-release-on-label\.yml/.test(zhReleaseDoc) || !/\.github\/workflows\/desktop-release-on-label\.yml/.test(enReleaseDoc)) {
+    throw new Error('desktop release docs must define the desktop-release label trigger contract');
   }
   for (const required of ['media-clean-desktop-macos-arm64.dmg', 'media-clean-desktop-windows-x64.zip', 'media-clean-desktop-latest.sha256', 'Gatekeeper', 'distribution: ad-hoc']) {
     if (!zhReleaseDoc.includes(required) || !enReleaseDoc.includes(required)) {

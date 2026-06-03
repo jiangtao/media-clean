@@ -179,7 +179,12 @@ Workflow direction:
    - Inputs: `release_tag`, `release_channel`, `desktop_version`, `macos_distribution`
    - Builds macOS, publishes an ad-hoc signed `.dmg` by default, runs Developer ID sign / notarize only when `signed-notarized` is selected, builds the Windows portable zip, generates size reports, uploads GitHub Release assets, and writes update manifests.
 
-`.github/workflows/release-desktop.yml` is now present. Like Android release, formal Desktop publishing goes through a manual workflow only; local builds are for release smoke and artifact validation, not for public distribution.
+`.github/workflows/release-desktop.yml` is now present. It supports two formal release entry points:
+
+1. Manually run `release-desktop.yml` for maintainer-triggered releases, rollback validation, or failed-release reruns.
+2. When a PR is merged into `main` with the `desktop-release` label, `.github/workflows/desktop-release-on-label.yml` reads the version from `apps/desktop/package.json` and triggers `release-desktop.yml` for `desktop-v<version>`.
+
+Local builds are for release smoke and artifact validation, not for public distribution. The `desktop-release` label is effective only after the PR is merged, so unmerged code cannot be released; the triggering actor must be the repository owner or an admin.
 
 `release-desktop` currently has three stages:
 
@@ -238,6 +243,7 @@ Before a formal Desktop release:
 11. Windows release must at least produce a portable zip, checksum, metadata, size report, `latest-win.yml`, and update manifest.
 12. Every release uploads checksum, metadata, size report, and update manifest.
 13. Every release must upload `media-clean-desktop-macos-<arch>.dmg`, `media-clean-desktop-windows-<arch>.zip`, and `media-clean-desktop-latest.sha256` as stable user-facing download entries.
+14. For PR-based publishing, the PR must keep the `desktop-release` label before merge; after merge, `.github/workflows/desktop-release-on-label.yml` triggers the formal `release-desktop.yml`.
 
 ## TODO
 

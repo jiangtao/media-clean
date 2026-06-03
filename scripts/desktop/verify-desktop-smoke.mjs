@@ -464,7 +464,7 @@ async function runElectronSmoke({ packageLike }) {
 }
 
 function spawnLegacySmoke() {
-  return spawn('npm', ['run', 'smoke'], {
+  return spawn(npmCommand(), ['run', 'smoke'], {
     cwd: desktopDir,
     env: {
       ...process.env,
@@ -473,6 +473,10 @@ function spawnLegacySmoke() {
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+}
+
+function npmCommand() {
+  return process.platform === 'win32' ? 'npm.cmd' : 'npm';
 }
 
 function spawnPackageLikeElectron(fakeBinDir, resourcesDir, smokeApp) {

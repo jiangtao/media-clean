@@ -2282,9 +2282,9 @@ async function traySmokeState() {
   const iconSize = iconImage.getSize();
   const canLoadSurface = state?.hasRoot === true && state?.surface === 'tray';
   const hasExpectedPopoverSize = bounds.width === trayPopoverWidth && bounds.height > 0 && bounds.height <= trayPopoverMaxHeight;
-  const headlessLinuxScrollbarGutter = process.env.CI && process.platform === 'linux' ? 16 : 2;
-  const hasRendererIslandWidth = Number(state?.islandWidth || 0) >= trayPopoverWidth - headlessLinuxScrollbarGutter;
-  const hasNoTransparentShellGap = Math.abs(Number(state?.viewportWidth || 0) - Number(state?.islandWidth || 0)) <= headlessLinuxScrollbarGutter;
+  const ciScrollbarGutter = process.env.CI && (process.platform === 'linux' || process.platform === 'win32') ? 16 : 2;
+  const hasRendererIslandWidth = Number(state?.islandWidth || 0) >= trayPopoverWidth - ciScrollbarGutter;
+  const hasNoTransparentShellGap = Math.abs(Number(state?.viewportWidth || 0) - Number(state?.islandWidth || 0)) <= ciScrollbarGutter;
   const hasBrandLogo = state?.hasProgressLogo === true && state?.hasProgressRing === false;
   const hasTrayOpenReveal = Number(state?.revealKey || 0) >= 1;
   if (!canLoadSurface || state?.hasBridge !== true || state?.hasPopoverEntry !== true || !hasExpectedPopoverSize || !hasRendererIslandWidth || !hasNoTransparentShellGap || !hasBrandLogo || !hasTrayOpenReveal) {

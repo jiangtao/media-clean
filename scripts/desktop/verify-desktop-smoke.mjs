@@ -371,7 +371,7 @@ function assertDesktopReleaseContracts() {
     }
   }
 
-  for (const required of ['pull_request', 'types: [closed]', 'desktop-release', 'github.event.pull_request.merged == true', 'actions: write', 'apps/desktop/package.json', 'gh workflow run release-desktop.yml', 'macos_distribution="unsigned"']) {
+  for (const required of ['pull_request', 'types: [closed]', 'desktop-release', 'github.event.pull_request.merged == true', 'actions: write', 'pull-requests: write', 'continue-on-error: true', 'apps/desktop/package.json', 'gh workflow run release-desktop.yml', 'macos_distribution="unsigned"']) {
     if (!labelWorkflowSource.includes(required)) {
       throw new Error(`desktop release-on-label workflow must trigger formal release after a merged desktop-release PR: ${required}`);
     }
@@ -464,7 +464,7 @@ async function runElectronSmoke({ packageLike }) {
 }
 
 function spawnLegacySmoke() {
-  return spawn('npm', ['run', 'smoke'], {
+  return spawn(npmCommand(), ['run', 'smoke'], {
     cwd: desktopDir,
     env: {
       ...process.env,
@@ -473,6 +473,10 @@ function spawnLegacySmoke() {
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+}
+
+function npmCommand() {
+  return process.platform === 'win32' ? 'npm.cmd' : 'npm';
 }
 
 function spawnPackageLikeElectron(fakeBinDir, resourcesDir, smokeApp) {

@@ -22,6 +22,8 @@ const baseRequiredFiles = [
   'scripts/desktop/install-launch-agent.mjs',
   '.github/workflows/release-desktop.yml',
   '.github/workflows/desktop-release-on-label.yml',
+  'page/public/index.html',
+  'page/vercel.json',
 ];
 
 const desktopIconRequiredFiles = [
@@ -308,6 +310,8 @@ function assertDesktopReleaseContracts() {
   const guardianSource = fs.readFileSync(path.join(repoRoot, 'scripts/desktop/install-launch-agent.mjs'), 'utf8');
   const workflowSource = fs.readFileSync(path.join(repoRoot, '.github/workflows/release-desktop.yml'), 'utf8');
   const labelWorkflowSource = fs.readFileSync(path.join(repoRoot, '.github/workflows/desktop-release-on-label.yml'), 'utf8');
+  const pageSource = fs.readFileSync(path.join(repoRoot, 'page/public/index.html'), 'utf8');
+  const pageVercelSource = fs.readFileSync(path.join(repoRoot, 'page/vercel.json'), 'utf8');
   const zhReleaseDoc = fs.readFileSync(path.join(repoRoot, 'docs/release/electron-desktop.md'), 'utf8');
   const enReleaseDoc = fs.readFileSync(path.join(repoRoot, 'docs/release/electron-desktop.en.md'), 'utf8');
 
@@ -365,7 +369,7 @@ function assertDesktopReleaseContracts() {
       throw new Error(`release-desktop workflow must publish multi-platform desktop assets: ${required}`);
     }
   }
-  for (const required of ['media-clean-desktop-macos-', 'media-clean-desktop-windows-', 'media-clean-desktop-latest.sha256', 'releases/download']) {
+  for (const required of ['media-clean-desktop-macos-', 'media-clean-desktop-windows-', 'media-clean-desktop-latest.sha256', 'releases/download', 'DESKTOP_LATEST_TAG', 'desktop-latest', 'Media Clean Desktop Latest']) {
     if (!workflowSource.includes(required)) {
       throw new Error(`release-desktop workflow must publish stable user download aliases: ${required}`);
     }
@@ -403,6 +407,22 @@ function assertDesktopReleaseContracts() {
     if (!zhReleaseDoc.includes(required) || !enReleaseDoc.includes(required)) {
       throw new Error(`desktop release docs must define stable desktop download entries: ${required}`);
     }
+  }
+  for (const required of ['desktop-latest', 'https://mc.jerret.me/download/media-clean-desktop-macos-arm64.dmg', 'https://mc.jerret.me/download/media-clean-desktop-windows-x64.zip']) {
+    if (!zhReleaseDoc.includes(required) || !enReleaseDoc.includes(required)) {
+      throw new Error(`desktop release docs must define fixed latest desktop download routing: ${required}`);
+    }
+    if (!pageSource.includes(required)) {
+      throw new Error(`page must use fixed latest desktop download routing: ${required}`);
+    }
+  }
+  for (const required of ['/download/media-clean-desktop-macos-arm64.dmg', '/download/media-clean-desktop-windows-x64.zip', '/download/media-clean-desktop-latest.sha256', 'releases/download/desktop-latest']) {
+    if (!pageVercelSource.includes(required)) {
+      throw new Error(`Vercel config must route fixed latest desktop downloads: ${required}`);
+    }
+  }
+  if (/desktop-v0\.0\.1/.test(pageSource)) {
+    throw new Error('page must not bind desktop downloads to a concrete old desktop release tag');
   }
   if (!/开源免费分发/.test(zhReleaseDoc) || !/open-source free distribution/.test(enReleaseDoc)) {
     throw new Error('desktop release docs must define the open-source free macOS distribution path');

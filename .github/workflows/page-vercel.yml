@@ -9,8 +9,10 @@ on:
     paths:
       - ".github/workflows/page-vercel.yml"
       - ".github/workflows/android-release.yml"
+      - ".github/workflows/release-desktop.yml"
       - "page/**"
       - "docs/release/android*.md"
+      - "docs/release/electron-desktop*.md"
       - "scripts/android/analyze-apk-size.mjs"
       - "scripts/release/verify-android-release-page-contract.mjs"
       - "scripts/release/prepare-page-android-download.mjs"
@@ -34,6 +36,8 @@ jobs:
       PAGE_PRODUCTION_URL: https://mc.jerret.me
       ANDROID_LATEST_APK_URL: https://mc.jerret.me/download/android-latest.apk
       ANDROID_LATEST_APK_SOURCE_URL: https://github.com/jiangtao/media-clean/releases/latest/download/media-clean-android-latest.apk
+      DESKTOP_MACOS_DMG_URL: https://mc.jerret.me/download/media-clean-desktop-macos-arm64.dmg
+      DESKTOP_WINDOWS_ZIP_URL: https://mc.jerret.me/download/media-clean-desktop-windows-x64.zip
 
     steps:
       - name: Checkout
@@ -85,7 +89,11 @@ jobs:
           printf '%s' "${PAGE_HTML}" | grep -q '下载 Android'
           printf '%s' "${PAGE_HTML}" | grep -q 'Android APK'
           printf '%s' "${PAGE_HTML}" | grep -q "${ANDROID_LATEST_APK_URL}"
+          printf '%s' "${PAGE_HTML}" | grep -q "${DESKTOP_MACOS_DMG_URL}"
+          printf '%s' "${PAGE_HTML}" | grep -q "${DESKTOP_WINDOWS_ZIP_URL}"
           curl -fsSIL "${ANDROID_LATEST_APK_URL}"
+          curl -fsSIL "${DESKTOP_MACOS_DMG_URL}"
+          curl -fsSIL "${DESKTOP_WINDOWS_ZIP_URL}"
 
       - name: Publish page deployment summary
         env:
@@ -98,4 +106,6 @@ jobs:
             echo "- Production alias: ${PAGE_PRODUCTION_URL}"
             echo "- Android download URL: ${ANDROID_LATEST_APK_URL}"
             echo "- Android hydrate source: ${ANDROID_LATEST_APK_SOURCE_URL}"
+            echo "- Desktop macOS download URL: ${DESKTOP_MACOS_DMG_URL}"
+            echo "- Desktop Windows download URL: ${DESKTOP_WINDOWS_ZIP_URL}"
           } >> "${GITHUB_STEP_SUMMARY}"

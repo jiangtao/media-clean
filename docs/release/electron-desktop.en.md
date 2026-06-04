@@ -68,13 +68,15 @@ The island no longer uses a large transparent carrier window. The old transparen
 
 The first Desktop release stage does not use the Mac App Store or Microsoft Store. User downloads use a dual-entry contract: a canonical website URL plus a GitHub Release backup URL, aligned with the Android page-download contract.
 
-1. Canonical website entries to wire next:
+1. Canonical website entries are wired now, and the page plus README must use these two URLs:
    - macOS: `https://mc.jerret.me/download/media-clean-desktop-macos-arm64.dmg`
    - Windows: `https://mc.jerret.me/download/media-clean-desktop-windows-x64.zip`
-2. GitHub Release backup entries are published by `release-desktop` now. Desktop must not use the repository-level `releases/latest` endpoint because that endpoint is already reserved by the Android latest backup contract. Desktop uses tag-specific URLs:
+2. GitHub Release backup entries are published by `release-desktop` now. Desktop must not use the repository-level `releases/latest` endpoint because that endpoint is already reserved by the Android latest backup contract. Desktop uses versioned URLs and a dedicated `desktop-latest` URL:
    - macOS: `https://github.com/jiangtao/media-clean/releases/download/desktop-v<version>/media-clean-desktop-macos-arm64.dmg`
    - Windows: `https://github.com/jiangtao/media-clean/releases/download/desktop-v<version>/media-clean-desktop-windows-x64.zip`
-3. Every formal release uploads both versioned assets and latest alias assets. Versioned assets are for audit, rollback, and checksum traceability; latest alias assets are for user-facing download buttons.
+   - macOS latest: `https://github.com/jiangtao/media-clean/releases/download/desktop-latest/media-clean-desktop-macos-arm64.dmg`
+   - Windows latest: `https://github.com/jiangtao/media-clean/releases/download/desktop-latest/media-clean-desktop-windows-x64.zip`
+3. Every formal release uploads both versioned assets and latest alias assets, and force-updates the `desktop-latest` release. Versioned assets are for audit, rollback, and checksum traceability; latest alias assets are for user-facing download buttons.
 4. The default public macOS `.dmg` is an open-source free distribution package: ad-hoc signed and not notarized. The download page and Release notes must say that first launch may trigger Gatekeeper; users should verify `media-clean-desktop-latest.sha256`, then open through Control-click / Open or System Settings / Privacy & Security / Open Anyway.
 5. If an Apple Developer ID becomes available later, `release-desktop` can use `signed-notarized` mode. Only that mode needs `MACOS_CERTIFICATE_BASE64`, `APPLE_ID`, and related secrets; `MACOS_CERTIFICATE_BASE64` must be a base64-encoded `.p12` certificate, not an email address.
 6. The first Windows entry is a portable zip and the download page must say “extract and run”; once Windows code signing and NSIS / MSI are added, the default entry can switch to the installer.
@@ -191,7 +193,7 @@ Local builds are for release smoke and artifact validation, not for public distr
 1. `resolve-release`: validates the `desktop-v<version>` tag and resolves Desktop version / channel.
 2. `build-macos-release` / `build-windows-release`: build platform release assets in parallel.
 3. `publish-release`: waits for both platforms, creates the tag, and publishes all assets to the same GitHub Release.
-4. `publish-release` also creates stable latest alias files, but GitHub backup links must use `releases/download/desktop-v<version>/...` and must not take over the repository-level `releases/latest`. The canonical website entry under `mc.jerret.me/download/...` can point to the current Desktop tag later.
+4. `publish-release` also creates stable latest alias files and updates the dedicated `desktop-latest` release; GitHub backup links must not take over the repository-level `releases/latest`. The canonical website entry under `mc.jerret.me/download/...` redirects through Vercel to `desktop-latest`.
 
 The formal Desktop workflow does not require a paid Apple account by default. When `macos_distribution=unsigned`, it reads no Apple signing secrets and publishes an ad-hoc signed `.dmg` for open-source free distribution.
 
@@ -242,7 +244,7 @@ Before a formal Desktop release:
 10. Public macOS release may use an ad-hoc signed `.dmg` by default, but it must publish SHA256, first-launch Gatekeeper instructions, and `distribution: ad-hoc` metadata; if `signed-notarized` is selected, signing and notarization must pass before publishing.
 11. Windows release must at least produce a portable zip, checksum, metadata, size report, `latest-win.yml`, and update manifest.
 12. Every release uploads checksum, metadata, size report, and update manifest.
-13. Every release must upload `media-clean-desktop-macos-<arch>.dmg`, `media-clean-desktop-windows-<arch>.zip`, and `media-clean-desktop-latest.sha256` as stable user-facing download entries.
+13. Every release must upload `media-clean-desktop-macos-<arch>.dmg`, `media-clean-desktop-windows-<arch>.zip`, and `media-clean-desktop-latest.sha256`, then sync them to `desktop-latest` as stable user-facing download entries.
 14. For PR-based publishing, the PR must keep the `desktop-release` label before merge; after merge, `.github/workflows/desktop-release-on-label.yml` triggers the formal `release-desktop.yml`.
 
 ## TODO

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Desktop release tag, for example desktop-v0.0.1"
+        description: "Desktop release tag, for example desktop-v1.2.3"
         required: true
         type: string
       desktop_version:
@@ -261,6 +261,8 @@ jobs:
       RELEASE_VERSION: ${{ needs.resolve-release.outputs.desktop_version }}
       DESKTOP_RELEASE_CHANNEL: ${{ needs.resolve-release.outputs.release_channel }}
       MACOS_DISTRIBUTION: ${{ needs.resolve-release.outputs.macos_distribution }}
+      DESKTOP_LATEST_TAG: desktop-latest
+      PAGE_PRODUCTION_URL: https://mc.jerret.me
 
     steps:
       - name: Checkout
@@ -310,6 +312,8 @@ jobs:
             echo "latest_sha=$(basename "${LATEST_SHA}")"
             echo "mac_dmg_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/$(basename "${MAC_DMG_ALIAS}")"
             echo "windows_zip_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/$(basename "${WIN_ZIP_ALIAS}")"
+            echo "canonical_mac_dmg_url=${PAGE_PRODUCTION_URL}/download/$(basename "${MAC_DMG_ALIAS}")"
+            echo "canonical_windows_zip_url=${PAGE_PRODUCTION_URL}/download/$(basename "${WIN_ZIP_ALIAS}")"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Create release tag
@@ -349,8 +353,8 @@ jobs:
 
             Stable download URLs:
 
-            - macOS: https://github.com/${{ github.repository }}/releases/download/${{ needs.resolve-release.outputs.release_tag }}/${{ steps.desktop_download_assets.outputs.mac_dmg }}
-            - Windows: https://github.com/${{ github.repository }}/releases/download/${{ needs.resolve-release.outputs.release_tag }}/${{ steps.desktop_download_assets.outputs.windows_zip }}
+            - macOS: https://mc.jerret.me/download/${{ steps.desktop_download_assets.outputs.mac_dmg }}
+            - Windows: https://mc.jerret.me/download/${{ steps.desktop_download_assets.outputs.windows_zip }}
 
             This release is not marked as the repository latest release because `releases/latest` remains reserved for the Android latest backup asset.
 
@@ -373,6 +377,43 @@ jobs:
             artifacts/desktop-release/latest-win.yml
           overwrite_files: true
 
+      - name: Update desktop latest release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "${DESKTOP_LATEST_TAG}" "${GITHUB_SHA}"
+          git push origin "refs/tags/${DESKTOP_LATEST_TAG}" --force
+
+      - name: Publish desktop latest alias release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-latest
+          name: Media Clean Desktop Latest
+          generate_release_notes: false
+          make_latest: false
+          body: |
+            ## Media Clean Desktop Latest
+
+            This moving release contains the latest stable Desktop download aliases only. It is intentionally separate from the repository-level `releases/latest` endpoint so Android and Desktop downloads do not conflict.
+
+            Canonical website download URLs:
+
+            - macOS: https://mc.jerret.me/download/${{ steps.desktop_download_assets.outputs.mac_dmg }}
+            - Windows: https://mc.jerret.me/download/${{ steps.desktop_download_assets.outputs.windows_zip }}
+
+            Versioned release: https://github.com/${{ github.repository }}/releases/tag/${{ needs.resolve-release.outputs.release_tag }}
+          files: |
+            artifacts/desktop-release/media-clean-desktop-macos-*.dmg
+            artifacts/desktop-release/media-clean-desktop-macos-*.zip
+            artifacts/desktop-release/media-clean-desktop-windows-*.zip
+            artifacts/desktop-release/media-clean-desktop-latest.sha256
+            artifacts/desktop-release/media-clean-desktop-update-*.json
+            artifacts/desktop-release/latest-mac.yml
+            artifacts/desktop-release/latest-win.yml
+          overwrite_files: true
+
       - name: Publish release summary
         shell: bash
         run: |
@@ -383,8 +424,9 @@ jobs:
             echo "- Version: ${RELEASE_VERSION}"
             echo "- Channel: ${DESKTOP_RELEASE_CHANNEL}"
             echo "- macOS distribution: ${MACOS_DISTRIBUTION}"
-            echo "- macOS latest download: ${{ steps.desktop_download_assets.outputs.mac_dmg_url }}"
-            echo "- Windows latest download: ${{ steps.desktop_download_assets.outputs.windows_zip_url }}"
+            echo "- Canonical macOS download: ${{ steps.desktop_download_assets.outputs.canonical_mac_dmg_url }}"
+            echo "- Canonical Windows download: ${{ steps.desktop_download_assets.outputs.canonical_windows_zip_url }}"
+            echo "- Desktop latest release: https://github.com/${{ github.repository }}/releases/tag/${DESKTOP_LATEST_TAG}"
             echo ""
             for report in artifacts/desktop-release/media-clean-desktop-v*.size-report.md; do
               echo ""

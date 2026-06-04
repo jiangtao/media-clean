@@ -34,4 +34,4 @@ npm run page:deploy:prod
 5. Planned production domain: `mc.jerret.me`.
 6. Every Android download button points to `https://mc.jerret.me/download/android-latest.apk`.
 7. The formal APK is maintained by `.github/workflows/android-release.yml`; the workflow generates `page/public/download/android-latest.apk` during release and deploys it to Vercel, while the GitHub Release latest asset remains only as a backup and page-only deployment hydration source.
-8. Desktop download entries use a fixed desktop release tag, for example `https://github.com/jiangtao/media-clean/releases/download/desktop-v0.0.1/media-clean-desktop-macos-arm64.dmg`; do not use the repository-level `releases/latest` endpoint because that entry remains reserved for the Android backup.
+8. Desktop download entries always point to canonical website URLs, for example `https://mc.jerret.me/download/media-clean-desktop-macos-arm64.dmg` and `https://mc.jerret.me/download/media-clean-desktop-windows-x64.zip`; Vercel redirects those URLs to the dedicated `desktop-latest` GitHub Release, so the page no longer binds to a concrete version tag.

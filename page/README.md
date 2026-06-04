@@ -34,4 +34,4 @@ npm run page:deploy:prod
 5. 正式域名规划为 `mc.jerret.me`。
 6. 页面中的 Android 下载按钮统一指向 `https://mc.jerret.me/download/android-latest.apk`。
 7. 正式 APK 由 `.github/workflows/android-release.yml` 维护；workflow 会在发布时生成 `page/public/download/android-latest.apk` 并部署到 Vercel，GitHub Release latest asset 只作为备份和 page-only deploy hydrate 来源。
-8. 页面中的 Desktop 下载入口使用固定桌面 release tag，例如 `https://github.com/jiangtao/media-clean/releases/download/desktop-v0.0.1/media-clean-desktop-macos-arm64.dmg`；不要使用仓库级 `releases/latest`，该入口保留给 Android backup。
+8. 页面中的 Desktop 下载入口统一指向官网固定地址，例如 `https://mc.jerret.me/download/media-clean-desktop-macos-arm64.dmg` 和 `https://mc.jerret.me/download/media-clean-desktop-windows-x64.zip`；Vercel 将这些地址 302 到 `desktop-latest` 专用 GitHub Release，页面不再绑定具体版本 tag。

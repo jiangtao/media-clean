@@ -6194,7 +6194,7 @@
                   class="flex items-center gap-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-full transition-colors">
                   <span>EN</span>
                 </a>
-                <a data-desktop-release-link href="https://github.com/jiangtao/media-clean/releases/tag/desktop-v0.0.1" target="_blank" rel="noopener noreferrer"
+                <a data-desktop-release-link href="https://github.com/jiangtao/media-clean/releases/tag/desktop-latest" target="_blank" rel="noopener noreferrer"
                   class="flex items-center gap-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-full transition-colors"><span>桌面版</span></a>
                 <a data-android-download-link download="android-latest.apk"
                   class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full hover:shadow-lg transition-shadow inline-flex items-center justify-center"><span>下载 Android</span></a>
@@ -6248,7 +6248,7 @@
                       <div class="font-semibold">Android APK</div>
                     </div>
                   </a>
-                  <a data-desktop-download-link download="media-clean-desktop-macos-arm64.dmg"
+                  <a data-desktop-download-link href="https://mc.jerret.me/download/media-clean-desktop-macos-arm64.dmg" download="media-clean-desktop-macos-arm64.dmg"
                     class="bg-white border border-gray-300 text-gray-900 px-8 py-4 rounded-2xl flex items-center gap-3 hover:bg-gray-50 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -6438,13 +6438,17 @@
                     <span class="w-2 h-2 rounded-full bg-blue-600"></span><span>Media Clean Desktop</span>
                   </div>
                   <h2 class="text-3xl md:text-4xl font-bold mb-4">桌面版工作台已开放下载</h2>
-                  <p class="text-lg text-gray-600 mb-6">在电脑上完成本地扫描、识别队列、候选审阅和清理确认。当前提供 macOS Apple Silicon DMG，按照开源免费路径发布；首次打开时可在系统安全设置中确认。</p>
+                  <p class="text-lg text-gray-600 mb-6">在电脑上完成本地扫描、识别队列、候选审阅和清理确认。当前提供 macOS Apple Silicon DMG 与 Windows portable ZIP，按照开源免费路径发布；macOS 首次打开时可在系统安全设置中确认。</p>
                   <div class="flex flex-col sm:flex-row gap-3">
-                    <a data-desktop-download-link download="media-clean-desktop-macos-arm64.dmg"
+                    <a data-desktop-download-link href="https://mc.jerret.me/download/media-clean-desktop-macos-arm64.dmg" download="media-clean-desktop-macos-arm64.dmg"
                       class="bg-gray-900 text-white px-6 py-3 rounded-xl inline-flex items-center justify-center gap-2 hover:bg-gray-800 transition-colors">
                       <span>下载 macOS DMG</span>
                     </a>
-                    <a data-desktop-release-link href="https://github.com/jiangtao/media-clean/releases/tag/desktop-v0.0.1" target="_blank" rel="noopener noreferrer"
+                    <a data-desktop-windows-download-link href="https://mc.jerret.me/download/media-clean-desktop-windows-x64.zip" download="media-clean-desktop-windows-x64.zip"
+                      class="bg-white border border-gray-300 text-gray-700 px-6 py-3 rounded-xl inline-flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
+                      <span>下载 Windows ZIP</span>
+                    </a>
+                    <a data-desktop-release-link href="https://github.com/jiangtao/media-clean/releases/tag/desktop-latest" target="_blank" rel="noopener noreferrer"
                       class="bg-white border border-gray-300 text-gray-700 px-6 py-3 rounded-xl inline-flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
                       <span>查看发布说明</span>
                     </a>
@@ -6638,7 +6642,7 @@
                     <div class="font-semibold">Android APK</div>
                   </div>
                 </a>
-                <a data-desktop-download-link download="media-clean-desktop-macos-arm64.dmg" class="bg-white text-purple-600 px-8 py-4 rounded-2xl flex items-center gap-3 hover:bg-gray-100 transition-colors justify-center">
+                <a data-desktop-download-link href="https://mc.jerret.me/download/media-clean-desktop-macos-arm64.dmg" download="media-clean-desktop-macos-arm64.dmg" class="bg-white text-purple-600 px-8 py-4 rounded-2xl flex items-center gap-3 hover:bg-gray-100 transition-colors justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                     class="lucide lucide-monitor-down size-5">
@@ -6695,8 +6699,10 @@
                         class="hover:text-white transition-colors"><span>功能特性</span></a></li>
                     <li><a data-android-download-link download="android-latest.apk"
                         class="hover:text-white transition-colors"><span>下载 Android</span></a></li>
-                    <li><a data-desktop-download-link download="media-clean-desktop-macos-arm64.dmg"
-                        class="hover:text-white transition-colors"><span>下载桌面版</span></a></li>
+                    <li><a data-desktop-download-link href="https://mc.jerret.me/download/media-clean-desktop-macos-arm64.dmg" download="media-clean-desktop-macos-arm64.dmg"
+                        class="hover:text-white transition-colors"><span>下载 macOS 桌面版</span></a></li>
+                    <li><a data-desktop-windows-download-link href="https://mc.jerret.me/download/media-clean-desktop-windows-x64.zip" download="media-clean-desktop-windows-x64.zip"
+                        class="hover:text-white transition-colors"><span>下载 Windows 桌面版</span></a></li>
                   </ul>
                 </div>
                 <div>
@@ -6732,8 +6738,9 @@
 
   <script>
     const ANDROID_RELEASE_LATEST_URL = 'https://mc.jerret.me/download/android-latest.apk';
-    const DESKTOP_MACOS_DMG_URL = 'https://github.com/jiangtao/media-clean/releases/download/desktop-v0.0.1/media-clean-desktop-macos-arm64.dmg';
-    const DESKTOP_RELEASE_URL = 'https://github.com/jiangtao/media-clean/releases/tag/desktop-v0.0.1';
+    const DESKTOP_MACOS_DMG_URL = 'https://mc.jerret.me/download/media-clean-desktop-macos-arm64.dmg';
+    const DESKTOP_WINDOWS_ZIP_URL = 'https://mc.jerret.me/download/media-clean-desktop-windows-x64.zip';
+    const DESKTOP_RELEASE_URL = 'https://github.com/jiangtao/media-clean/releases/tag/desktop-latest';
 
     function wireAndroidDownloadLinks() {
       document.querySelectorAll('[data-android-download-link]').forEach((link) => {
@@ -6748,6 +6755,11 @@
         link.setAttribute('href', DESKTOP_MACOS_DMG_URL);
         link.setAttribute('download', 'media-clean-desktop-macos-arm64.dmg');
         link.setAttribute('aria-label', '下载 Media Clean Desktop macOS DMG');
+      });
+      document.querySelectorAll('[data-desktop-windows-download-link]').forEach((link) => {
+        link.setAttribute('href', DESKTOP_WINDOWS_ZIP_URL);
+        link.setAttribute('download', 'media-clean-desktop-windows-x64.zip');
+        link.setAttribute('aria-label', '下载 Media Clean Desktop Windows ZIP');
       });
       document.querySelectorAll('[data-desktop-release-link]').forEach((link) => {
         link.setAttribute('href', DESKTOP_RELEASE_URL);

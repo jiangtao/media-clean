@@ -6,7 +6,7 @@ Media Clean is a local photo-library recognition and cleanup tool. It is built f
 
 Product website: [https://mc.jerret.me](https://mc.jerret.me)
 
-Desktop release: [Media Clean Desktop 0.0.1](https://github.com/jiangtao/media-clean/releases/tag/desktop-v0.0.1), macOS DMG: [media-clean-desktop-macos-arm64.dmg](https://github.com/jiangtao/media-clean/releases/download/desktop-v0.0.1/media-clean-desktop-macos-arm64.dmg).
+Desktop release: [Media Clean Desktop Latest](https://github.com/jiangtao/media-clean/releases/tag/desktop-latest), macOS DMG: [media-clean-desktop-macos-arm64.dmg](https://mc.jerret.me/download/media-clean-desktop-macos-arm64.dmg), Windows ZIP: [media-clean-desktop-windows-x64.zip](https://mc.jerret.me/download/media-clean-desktop-windows-x64.zip).
 
 <video controls width="100%" src="./page/public/promo-video-60fps.mp4">
   This reader does not support embedded video playback.

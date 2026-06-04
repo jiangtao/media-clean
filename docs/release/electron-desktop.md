@@ -68,13 +68,15 @@ island 不再使用透明大窗口承载。之前 island 后面的“透明背�
 
 Desktop 第一阶段不走 Mac App Store 或 Microsoft Store。用户下载入口采用“官网固定地址 + GitHub Release 备份地址”的双入口模式，和 Android page download 契约保持一致：
 
-1. 官网固定入口后续接入：
+1. 官网固定入口当前已接入，页面和 README 都必须使用这两个地址：
    - macOS：`https://mc.jerret.me/download/media-clean-desktop-macos-arm64.dmg`
    - Windows：`https://mc.jerret.me/download/media-clean-desktop-windows-x64.zip`
-2. GitHub Release 备份入口当前由 `release-desktop` 直接发布。桌面端不能使用仓库级 `releases/latest`，因为该入口已经作为 Android latest 备份下载契约；Desktop 必须使用 tag-specific 地址：
+2. GitHub Release 备份入口当前由 `release-desktop` 直接发布。桌面端不能使用仓库级 `releases/latest`，因为该入口已经作为 Android latest 备份下载契约；Desktop 使用版本化地址和 `desktop-latest` 专用地址：
    - macOS：`https://github.com/jiangtao/media-clean/releases/download/desktop-v<version>/media-clean-desktop-macos-arm64.dmg`
    - Windows：`https://github.com/jiangtao/media-clean/releases/download/desktop-v<version>/media-clean-desktop-windows-x64.zip`
-3. 每次正式发布同时上传版本化资产和 latest 别名资产。版本化资产用于审计、回滚和 checksum 追溯；latest 别名资产用于用户下载按钮。
+   - macOS latest：`https://github.com/jiangtao/media-clean/releases/download/desktop-latest/media-clean-desktop-macos-arm64.dmg`
+   - Windows latest：`https://github.com/jiangtao/media-clean/releases/download/desktop-latest/media-clean-desktop-windows-x64.zip`
+3. 每次正式发布同时上传版本化资产和 latest 别名资产，并强制更新 `desktop-latest` release。版本化资产用于审计、回滚和 checksum 追溯；latest 别名资产用于用户下载按钮。
 4. macOS 默认公开 `.dmg` 是开源免费分发包：ad-hoc signed、未 notarized。下载页和 Release notes 必须明确提示首次打开可能触发 Gatekeeper，用户需要先校验 `media-clean-desktop-latest.sha256`，再通过 Control-click / Open 或 System Settings / Privacy & Security / Open Anyway 打开。
 5. 如果后续拿到 Apple Developer ID，`release-desktop` 可选择 `signed-notarized` 模式；只有这个模式才需要 `MACOS_CERTIFICATE_BASE64`、`APPLE_ID` 等 secrets，并且 `MACOS_CERTIFICATE_BASE64` 必须是 `.p12` 证书的 base64，不是邮箱地址。
 6. Windows 第一阶段是 portable zip，下载页必须标注“解压后运行”，后续接入 Windows code signing 与 NSIS / MSI installer 后再替换默认入口。
@@ -191,7 +193,7 @@ Electron Desktop 的体积风险主要来自 Electron runtime、renderer bundle�
 1. `resolve-release`：校验 `desktop-v<version>` tag、解析 Desktop version 和 channel。
 2. `build-macos-release` / `build-windows-release`：并行产出 macOS 与 Windows release assets。
 3. `publish-release`：等待两个平台都成功后创建 tag，并把所有 assets 发布到同一个 GitHub Release。
-4. `publish-release` 会额外生成固定文件名 latest 别名，但 GitHub 备份链接必须使用 `releases/download/desktop-v<version>/...`，不能占用仓库级 `releases/latest`。官网固定下载入口后续由 `mc.jerret.me/download/...` 指向当前桌面 tag。
+4. `publish-release` 会额外生成固定文件名 latest 别名，并更新 `desktop-latest` 专用 release；GitHub 备份链接不能占用仓库级 `releases/latest`。官网固定下载入口由 `mc.jerret.me/download/...` 通过 Vercel redirect 指向 `desktop-latest`。
 
 正式 Desktop workflow 默认不需要 Apple 付费账号。`macos_distribution=unsigned` 时不读取任何 Apple signing secrets，会产出开源免费分发用的 ad-hoc signed `.dmg`。
 
@@ -242,7 +244,7 @@ node scripts/desktop/install-launch-agent.mjs --uninstall
 10. macOS 默认可公开 ad-hoc signed `.dmg`，但必须同时公开 SHA256、Gatekeeper 首次打开说明和 `distribution: ad-hoc` metadata；如果选择 `signed-notarized`，则必须签名与 notarization 通过后才允许公开。
 11. Windows release 必须至少产出 portable zip、checksum、metadata、size report、`latest-win.yml` 和 update manifest。
 12. 每次 release 必须上传 checksum、metadata、size report 和 update manifest。
-13. 每次 release 必须上传 `media-clean-desktop-macos-<arch>.dmg`、`media-clean-desktop-windows-<arch>.zip` 和 `media-clean-desktop-latest.sha256`，作为用户侧稳定下载入口。
+13. 每次 release 必须上传 `media-clean-desktop-macos-<arch>.dmg`、`media-clean-desktop-windows-<arch>.zip` 和 `media-clean-desktop-latest.sha256`，并同步到 `desktop-latest`，作为用户侧稳定下载入口。
 14. 如果使用 PR 自动发布，合并前必须保留 `desktop-release` 标签；合并后 `.github/workflows/desktop-release-on-label.yml` 会触发正式 `release-desktop.yml`。
 
 ## TODO

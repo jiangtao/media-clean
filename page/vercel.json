@@ -1,6 +1,23 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/download/media-clean-desktop-macos-arm64.dmg",
+      "destination": "https://github.com/jiangtao/media-clean/releases/download/desktop-latest/media-clean-desktop-macos-arm64.dmg",
+      "permanent": false
+    },
+    {
+      "source": "/download/media-clean-desktop-windows-x64.zip",
+      "destination": "https://github.com/jiangtao/media-clean/releases/download/desktop-latest/media-clean-desktop-windows-x64.zip",
+      "permanent": false
+    },
+    {
+      "source": "/download/media-clean-desktop-latest.sha256",
+      "destination": "https://github.com/jiangtao/media-clean/releases/download/desktop-latest/media-clean-desktop-latest.sha256",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/download/android-latest.apk",

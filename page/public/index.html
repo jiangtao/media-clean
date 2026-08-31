@@ -127,6 +127,127 @@
         display: none;
       }
     }
+
+    .hero-title {
+      margin-bottom: 1.25rem;
+      font-size: 2.4rem;
+      line-height: 1.15;
+      letter-spacing: -0.035em;
+      text-wrap: balance;
+    }
+
+    .hero-title__line {
+      display: inline-block;
+      vertical-align: bottom;
+    }
+
+    .hero-title__line--lead {
+      width: 5em;
+    }
+
+    .hero-title__line--accent {
+      width: 4em;
+    }
+
+    .hero-title__typing {
+      display: block;
+      width: 0;
+      overflow: hidden;
+      box-sizing: content-box;
+      white-space: nowrap;
+      border-right: 0.065em solid rgb(79 70 229);
+    }
+
+    .hero-title__typing--lead {
+      animation:
+        hero-type-lead 0.8s steps(6, end) 0.15s forwards,
+        hero-caret-hide 1ms linear 0.95s forwards;
+    }
+
+    .hero-title__typing--accent {
+      animation:
+        hero-type-accent 0.6s steps(4, end) 0.95s both,
+        hero-caret-blink 0.7s step-end 0.95s infinite both;
+    }
+
+    .hero-description {
+      max-width: 36rem;
+      line-height: 1.7;
+      text-wrap: pretty;
+    }
+
+    @keyframes hero-type-lead {
+      from {
+        width: 0;
+      }
+
+      to {
+        width: 5em;
+      }
+    }
+
+    @keyframes hero-type-accent {
+      from {
+        width: 0;
+      }
+
+      to {
+        width: 4em;
+      }
+    }
+
+    @keyframes hero-caret-hide {
+      to {
+        border-right-color: transparent;
+      }
+    }
+
+    @keyframes hero-caret-blink {
+      0%,
+      100% {
+        border-right-color: transparent;
+      }
+
+      50% {
+        border-right-color: rgb(79 70 229);
+      }
+    }
+
+    @media (min-width: 48rem) {
+      .hero-title {
+        font-size: 3rem;
+      }
+    }
+
+    @media (max-width: 47.999rem) {
+      .hero-title__line {
+        display: block;
+        margin-inline: auto;
+      }
+
+      .hero-title__line--accent {
+        margin-top: 0.08em;
+      }
+
+      .hero-description {
+        margin-inline: auto;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero-title__typing {
+        border-right-color: transparent;
+        animation: none;
+      }
+
+      .hero-title__typing--lead {
+        width: 5em;
+      }
+
+      .hero-title__typing--accent {
+        width: 4em;
+      }
+    }
   </style>
   <style type="text/css" data-vite-dev-id="/workspaces/default/code/src/styles/index.css">
     /*! tailwindcss v4.1.12 | MIT License | https://tailwindcss.com */
@@ -6316,8 +6437,10 @@
                     <path d="M4 17v2"></path>
                     <path d="M5 18H3"></path>
                   </svg><span>智能相册管理工具</span></div>
-                <h1 class="text-5xl md:text-6xl font-bold mb-6 leading-tight">让你的相册<span class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">焕然一新</span></h1>
-                <p class="text-xl text-gray-600 mb-8 max-w-xl">Media Clean 帮助您快速识别和清理重复、模糊、相似的照片，让相册保持干净整洁，释放更多存储空间。</p>
+                <h1 class="hero-title font-bold" aria-label="让你的相册焕然一新">
+                  <span class="hero-title__line hero-title__line--lead" aria-hidden="true"><span class="hero-title__typing hero-title__typing--lead">让你的相册</span></span><span class="hero-title__line hero-title__line--accent" aria-hidden="true"><span class="hero-title__typing hero-title__typing--accent bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">焕然一新</span></span>
+                </h1>
+                <p class="hero-description text-lg text-gray-600 mb-8">Media Clean 找出重复、模糊和相似照片，轻松清理相册、释放空间。</p>
                 <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                   <!-- Apple 版本暂不支持
                   <a data-android-download-link class="bg-black text-white px-8 py-4 rounded-2xl flex items-center gap-3 hover:bg-gray-800 transition-colors">
